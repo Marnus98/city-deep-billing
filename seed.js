@@ -130,21 +130,24 @@ function getOrCreateMeter(serial, utilityType, role, location) {
   return m;
 }
 
-function upsertAssignment({ meterId, tenantId, tariffCode, serviceFlag, sign, allocationPct, carriesLevy, isCommonArea, energyOnly, periodStart }) {
+function upsertAssignment({ meterId, tenantId, tariffCode, serviceFlag, sign, allocationPct, kvarhAllocationPct, kvaAllocationPct, capacityChargeOverride, carriesLevy, isCommonArea, energyOnly, periodStart }) {
   const open = get(
     'SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL ORDER BY id DESC LIMIT 1',
     [meterId]
   );
+  const near = (a, b) => Math.abs((a == null ? 0 : a) - (b == null ? 0 : b)) < 1e-6;
   const same = open && open.tenant_id === tenantId && open.tariff_code === tariffCode &&
     open.service_charge_flag === (serviceFlag ? 1 : 0) && open.sign === sign &&
-    Math.abs(open.allocation_pct - allocationPct) < 1e-6 && open.carries_network_levy === (carriesLevy ? 1 : 0) &&
-    open.energy_only === (energyOnly ? 1 : 0);
+    near(open.allocation_pct, allocationPct) && near(open.allocation_pct_kvarh, kvarhAllocationPct) &&
+    near(open.allocation_pct_kva, kvaAllocationPct) && near(open.capacity_charge_override, capacityChargeOverride) &&
+    open.carries_network_levy === (carriesLevy ? 1 : 0) && open.energy_only === (energyOnly ? 1 : 0);
   if (same) return open;
   if (open) run('UPDATE meter_assignments SET effective_to=? WHERE id=?', [periodStart, open.id]);
   run(`INSERT INTO meter_assignments
-      (meter_id, tenant_id, tariff_code, service_charge_flag, sign, allocation_pct, carries_network_levy, is_common_area, energy_only, effective_from)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [meterId, tenantId, tariffCode, serviceFlag ? 1 : 0, sign, allocationPct, carriesLevy ? 1 : 0, isCommonArea ? 1 : 0, energyOnly ? 1 : 0, periodStart]);
+      (meter_id, tenant_id, tariff_code, service_charge_flag, sign, allocation_pct, allocation_pct_kvarh, allocation_pct_kva, capacity_charge_override, carries_network_levy, is_common_area, energy_only, effective_from)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [meterId, tenantId, tariffCode, serviceFlag ? 1 : 0, sign, allocationPct, kvarhAllocationPct ?? null, kvaAllocationPct ?? null,
+     capacityChargeOverride ?? null, carriesLevy ? 1 : 0, isCommonArea ? 1 : 0, energyOnly ? 1 : 0, periodStart]);
   return get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL', [meterId]);
 }
 
@@ -153,6 +156,17 @@ function upsertAssignment({ meterId, tenantId, tariffCode, serviceFlag, sign, al
 function detectEnergyOnly(row) {
   return !!row.service_flag && row.service_charge === 0 && row.capacity_charge === 0 &&
     row.network_surcharge === 0 && row.business_surcharge === 0;
+}
+
+// Detects a fixed capacity charge that doesn't match the standard tariff rate - confirmed as a
+// genuine per-tenant negotiated rate (Unit 4 ATC SA Wireless Infrastructure: flat R661.90/month
+// in all 12 imported months regardless of the standard rate changing), not a data error.
+function detectCapacityChargeOverride(row, tariff2) {
+  if (row.tariff_code !== 2 || !row.service_flag || tariff2.capacityCharge == null) return null;
+  const standard = tariff2.capacityCharge * (row.sign || 1);
+  const actual = row.capacity_charge || 0;
+  if (Math.abs(actual - standard) < 0.5) return null;
+  return row.sign ? actual / row.sign : actual;
 }
 
 function allocationFromRow(rawConsumption, billable, commonAreaPct) {
@@ -186,9 +200,11 @@ function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tari
     const kvaAlloc = allocationFromRow(row.kva, row.billable_kva, row.common_area_pct);
 
     const energyOnly = detectEnergyOnly(row);
+    const capacityChargeOverride = detectCapacityChargeOverride(row, tariffParams.tariff2);
     const assignment = upsertAssignment({
       meterId: meter.id, tenantId: tenant.id, tariffCode: row.tariff_code, serviceFlag: row.service_flag,
-      sign: row.sign, allocationPct, carriesLevy: !!row.network_levy, isCommonArea: row.common_area_pct != null,
+      sign: row.sign, allocationPct, kvarhAllocationPct: kvarhAlloc, kvaAllocationPct: kvaAlloc, capacityChargeOverride,
+      carriesLevy: !!row.network_levy, isCommonArea: row.common_area_pct != null,
       energyOnly, periodStart: billingPeriod.start_date,
     });
 
@@ -196,7 +212,7 @@ function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tari
       rawConsumptionKwh: row.consumption_kwh, rawKvarh: row.kvarh, rawKva: row.kva,
       allocationPct, kvarhAllocationPct: kvarhAlloc, kvaAllocationPct: kvaAlloc,
       tariffCode: row.tariff_code, serviceChargeFlag: !!row.service_flag, sign: row.sign,
-      carriesNetworkLevy: !!row.network_levy, isCommonArea: row.common_area_pct != null, energyOnly,
+      carriesNetworkLevy: !!row.network_levy, isCommonArea: row.common_area_pct != null, energyOnly, capacityChargeOverride,
       tariff1: tariffParams.tariff1, tariff2: tariffParams.tariff2, yChargeEnabled: precinctYEnabled,
     });
     for (const li of result.lineItems) lineItems.push({ ...li, meter_id: meter.id, utility_type: 'electricity' });
@@ -261,7 +277,13 @@ function seedMonth(monthData) {
     const tenant = getOrCreateTenant(name, siteForTenantName(name));
     const elecBlock = elecTenantsByName[name];
     const waterBlock = waterTenantsByName[name];
-    const precinctYEnabled = elecBlock ? elecBlock.header_row >= 96 : true; // Mini Park section >= row 96 has working Y formula
+    // The kVArh demand charge (column Y) only has a working formula in the "Mini Park" precinct's
+    // section of the Electrical Billing sheet, not "Industrial Park" (confirmed Phase 1 finding).
+    // This used to be detected by a hardcoded row-number cutoff tuned to March/April's specific
+    // row layout, which silently breaks on any month where tenants were added/removed (the
+    // precinct boundary moves row-for-row with the roster). Site name is the actual business
+    // rule and is stable across every month.
+    const precinctYEnabled = siteForTenantName(name) === 'Mini Park';
     const { bill, subtotal } = generateBill(
       tenant, billingPeriod,
       elecBlock ? elecBlock.meters : [],
@@ -288,13 +310,36 @@ function seedMonth(monthData) {
   console.log(`Seeded ${count} tenants for period ${monthData.label} (${billingPeriod.start_date} - ${billingPeriod.end_date})`);
 }
 
+// All 12 imported months, July 2025 - June 2026. Order here doesn't matter for correctness -
+// seedMonth() is re-sorted by each workbook's own period.start date below - because the file
+// named "July 2025" turns out to carry an internal period of 30 May - 25 June 2025 (about a month
+// behind its filename), which leaves a real, unexplained gap between it and the August 2025
+// file's period (25 June - 25 July 2025 is not covered by any workbook supplied). That gap is
+// reproduced here rather than guessed at - see README "Known data gaps".
+const MONTH_FILES = [
+  'july2025.json', 'august2025.json', 'september2025.json', 'october2025.json',
+  'november2025.json', 'december2025.json', 'january2026.json', 'february2026.json',
+  'march.json', 'april.json', 'may2026.json', 'june2026.json',
+];
+
 function main() {
-  seedUsers();
-  const march = JSON.parse(fs.readFileSync(path.join(__dirname, 'march.json'), 'utf8'));
-  const april = JSON.parse(fs.readFileSync(path.join(__dirname, 'april.json'), 'utf8'));
-  seedMonth(march);
-  seedMonth(april);
-  console.log('Seed complete.');
+  const months = MONTH_FILES
+    .map((f) => JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8')))
+    .sort((a, b) => a.period.start.localeCompare(b.period.start));
+  // Each seedUsers()/seedMonth() call is many small INSERT/UPDATE statements; run the whole
+  // import as one transaction instead of auto-committing every statement individually - orders
+  // of magnitude faster (this matters because seeding runs synchronously on server boot on hosts
+  // with an ephemeral filesystem, e.g. Render's free tier, before the port opens).
+  db.exec('BEGIN');
+  try {
+    seedUsers();
+    for (const monthData of months) seedMonth(monthData);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  console.log(`Seed complete (${months.length} months).`);
 }
 
 // Allow `require('./seed').run(db)` from server.js for auto-seed-on-first-boot (handy on hosts

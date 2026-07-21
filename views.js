@@ -256,12 +256,15 @@ function tariffsPage({ user, tariffs }) {
 
 function billingPeriodsPage({ user, periods }) {
   const body = `
-  <h1 class="text-2xl font-bold mb-4">Billing Periods</h1>
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Billing Periods</h1>
+    <a href="/billing-periods/new" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">+ New billing period</a>
+  </div>
   <div class="bg-white rounded-lg border overflow-hidden">
     <table class="w-full text-sm">
       <thead><tr class="text-left border-b bg-slate-50">
         <th class="px-4 py-2">Label</th><th class="px-4 py-2">Start</th><th class="px-4 py-2">End</th>
-        <th class="px-4 py-2">Due date</th><th class="px-4 py-2 text-right">Bills</th>
+        <th class="px-4 py-2">Due date</th><th class="px-4 py-2 text-right">Bills</th><th class="px-4 py-2"></th>
       </tr></thead>
       <tbody>
       ${periods.map(p => `<tr class="border-b last:border-0">
@@ -270,11 +273,89 @@ function billingPeriodsPage({ user, periods }) {
         <td class="px-4 py-2">${esc(p.end_date)}</td>
         <td class="px-4 py-2">${esc(p.due_date || '-')}</td>
         <td class="px-4 py-2 text-right">${p.bill_count}</td>
+        <td class="px-4 py-2 text-right"><a class="text-blue-600 hover:underline" href="/readings/${p.id}">Capture readings</a></td>
       </tr>`).join('')}
       </tbody>
     </table>
   </div>`;
   return layout({ title: 'Billing Periods', user, active: '/billing-periods', body });
+}
+
+function newBillingPeriodPage({ user, error }) {
+  const body = `
+  <a href="/billing-periods" class="text-sm text-blue-600 hover:underline">&larr; Billing periods</a>
+  <h1 class="text-2xl font-bold mt-2 mb-4">New billing period</h1>
+  ${error ? `<div class="bg-red-50 text-red-700 text-sm rounded p-2 mb-4 max-w-lg">${esc(error)}</div>` : ''}
+  <div class="bg-white rounded-lg border p-6 max-w-lg">
+    <form method="post" action="/billing-periods" class="space-y-4">
+      <div><label class="text-sm font-medium">Label</label>
+        <input name="label" placeholder="2026-07" class="w-full border rounded px-3 py-2 mt-1" required/></div>
+      <div><label class="text-sm font-medium">Start date</label>
+        <input name="start_date" type="date" class="w-full border rounded px-3 py-2 mt-1" required/></div>
+      <div><label class="text-sm font-medium">End date</label>
+        <input name="end_date" type="date" class="w-full border rounded px-3 py-2 mt-1" required/></div>
+      <div><label class="text-sm font-medium">Invoice date</label>
+        <input name="invoice_date" type="date" class="w-full border rounded px-3 py-2 mt-1"/></div>
+      <div><label class="text-sm font-medium">Due date</label>
+        <input name="due_date" type="date" class="w-full border rounded px-3 py-2 mt-1"/></div>
+      <button class="bg-slate-900 text-white rounded px-4 py-2 font-medium">Create &amp; capture readings</button>
+    </form>
+  </div>`;
+  return layout({ title: 'New billing period', user, active: '/billing-periods', body });
+}
+
+function readingsCapturePage({ user, period, groups }) {
+  const rowsHtml = groups.map(g => `
+    <div class="bg-white rounded-lg border mb-4">
+      <div class="px-4 py-2 border-b font-semibold">${esc(g.tenant.name)}</div>
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-slate-500 bg-slate-50">
+          <th class="px-4 py-1">Serial</th><th class="px-4 py-1">Utility</th>
+          <th class="px-4 py-1">Start reading</th><th class="px-4 py-1">End reading</th>
+          <th class="px-4 py-1">kVA (demand)</th><th class="px-4 py-1">kVArh end</th>
+        </tr></thead>
+        <tbody>
+        ${g.meters.map(m => `<tr class="border-t">
+          <td class="px-4 py-1 font-mono">${esc(m.serial)}</td>
+          <td class="px-4 py-1">${esc(m.utility_type)}</td>
+          <td class="px-4 py-1"><input name="start_${m.meter_id}" type="number" step="0.01" value="${m.priorEnd ?? ''}" class="border rounded px-2 py-1 w-28"/></td>
+          <td class="px-4 py-1"><input name="end_${m.meter_id}" type="number" step="0.01" class="border rounded px-2 py-1 w-28"/></td>
+          <td class="px-4 py-1">${m.showDemand ? `<input name="kva_${m.meter_id}" type="number" step="0.01" class="border rounded px-2 py-1 w-24"/>` : '<span class="text-slate-300">&mdash;</span>'}</td>
+          <td class="px-4 py-1">${m.showDemand ? `<input name="kvarh_end_${m.meter_id}" type="number" step="0.01" value="${m.priorEndKvarh ?? ''}" class="border rounded px-2 py-1 w-24"/>` : '<span class="text-slate-300">&mdash;</span>'}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
+
+  const body = `
+  <a href="/billing-periods" class="text-sm text-blue-600 hover:underline">&larr; Billing periods</a>
+  <h1 class="text-2xl font-bold mt-2 mb-1">Capture readings &mdash; ${esc(period.label)}</h1>
+  <p class="text-sm text-slate-500 mb-4">Enter each meter's closing reading for this period. Start readings are pre-filled from the last recorded reading &mdash; double-check any meter that was replaced. Leave a row blank to skip that meter for now; a tenant's bill won't be (re)generated until every one of their meters has a reading for this period.</p>
+  <form method="post" action="/readings/${period.id}">
+    ${rowsHtml || '<div class="bg-white border rounded p-6 text-slate-400">No active meter assignments found.</div>'}
+    <button class="bg-slate-900 text-white rounded px-6 py-2 font-medium mt-2">Save readings &amp; generate bills</button>
+  </form>`;
+  return layout({ title: `Capture readings - ${period.label}`, user, active: '/billing-periods', body });
+}
+
+function readingsResultPage({ user, period, result }) {
+  const body = `
+  <a href="/billing-periods" class="text-sm text-blue-600 hover:underline">&larr; Billing periods</a>
+  <h1 class="text-2xl font-bold mt-2 mb-4">Readings saved &mdash; ${esc(period.label)}</h1>
+  <div class="bg-white rounded-lg border p-6 max-w-xl mb-4">
+    <div class="text-lg font-semibold text-green-700 mb-1">${result.billsCreated} bill${result.billsCreated === 1 ? '' : 's'} generated</div>
+    <a href="/billing-periods" class="text-sm text-blue-600 hover:underline">Back to billing periods &rarr;</a>
+  </div>
+  ${result.missing.length ? `
+  <div class="bg-white rounded-lg border p-4 max-w-xl">
+    <div class="font-semibold text-amber-700 mb-2">${result.missing.length} meter reading${result.missing.length === 1 ? '' : 's'} still missing</div>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-slate-500"><th>Tenant</th><th>Meter</th><th>Utility</th></tr></thead>
+      <tbody>${result.missing.map(m => `<tr class="border-t"><td class="py-1">${esc(m.tenant)}</td><td class="py-1 font-mono">${esc(m.serial)}</td><td class="py-1">${esc(m.utility_type)}</td></tr>`).join('')}</tbody>
+    </table>
+    <a href="/readings/${period.id}" class="text-sm text-blue-600 hover:underline mt-3 inline-block">Go back and fill these in &rarr;</a>
+  </div>` : ''}`;
+  return layout({ title: `Readings saved - ${period.label}`, user, active: '/billing-periods', body });
 }
 
 function billingSelectorPage({ user, tenants, periods }) {
@@ -425,6 +506,7 @@ function auditLogPage({ user, entries }) {
 
 module.exports = {
   esc, money, fmtNum, layout, loginPage, dashboardPage, tenantsPage, tenantDetailPage,
-  metersPage, tariffsPage, billingPeriodsPage, billingSelectorPage, billDetailPage,
+  metersPage, tariffsPage, billingPeriodsPage, newBillingPeriodPage, readingsCapturePage,
+  readingsResultPage, billingSelectorPage, billDetailPage,
   reconciliationPage, auditLogPage, statusColor,
 };

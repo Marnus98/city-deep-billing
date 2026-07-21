@@ -8,6 +8,7 @@ const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
 const { buildBillingSlipPdf } = require('./pdf');
+const billing = require('./billing');
 
 const db = open();
 migrate(db);
@@ -50,6 +51,14 @@ function requireLogin(req, res) {
   const user = auth.currentUser(req);
   if (!user) { redirect(res, '/login'); return null; }
   return user;
+}
+
+function requireRole(req, res, user, allowed) {
+  if (!allowed.has(user.role)) {
+    send(res, 403, views.layout({ title: 'Forbidden', user, active: null, body: '<div class="bg-white border rounded p-6">You do not have permission to do this.</div>' }));
+    return false;
+  }
+  return true;
 }
 
 // ---------------- data helpers ----------------
@@ -155,6 +164,87 @@ route('GET', '/billing-periods', async (req, res) => {
   const periods = all(`SELECT bp.*, (SELECT COUNT(*) FROM bills WHERE billing_period_id=bp.id) as bill_count
     FROM billing_periods bp ORDER BY bp.start_date DESC`);
   send(res, 200, views.billingPeriodsPage({ user, periods }));
+});
+
+route('GET', '/billing-periods/new', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  send(res, 200, views.newBillingPeriodPage({ user }));
+});
+
+route('POST', '/billing-periods', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const body = await readBody(req);
+  const label = (body.label || '').trim();
+  if (!label || !body.start_date || !body.end_date) {
+    return send(res, 400, views.newBillingPeriodPage({ user, error: 'Label, start date and end date are all required.' }));
+  }
+  const existing = get('SELECT * FROM billing_periods WHERE label=?', [label]);
+  if (existing) return send(res, 400, views.newBillingPeriodPage({ user, error: `A billing period labelled "${label}" already exists.` }));
+  run('INSERT INTO billing_periods (label, start_date, end_date, invoice_date, due_date) VALUES (?,?,?,?,?)',
+    [label, body.start_date, body.end_date, body.invoice_date || null, body.due_date || null]);
+  const period = get('SELECT * FROM billing_periods WHERE label=?', [label]);
+  audit(user.userId, 'create', 'billing_period', period.id, null, null, label, null);
+  redirect(res, `/readings/${period.id}`);
+});
+
+route('GET', '/readings/:periodId', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const period = get('SELECT * FROM billing_periods WHERE id=?', [params.periodId]);
+  if (!period) return send(res, 404, 'Not found');
+  const assignments = all(`
+    SELECT ma.*, m.serial, m.utility_type, t.id as t_id, t.name as tenant_name
+    FROM meter_assignments ma JOIN meters m ON m.id=ma.meter_id JOIN tenants t ON t.id=ma.tenant_id
+    WHERE ma.effective_to IS NULL ORDER BY t.name, m.utility_type, m.serial`);
+  const groups = [];
+  const byTenant = new Map();
+  for (const a of assignments) {
+    const prior = get(`SELECT mr.* FROM meter_readings mr JOIN billing_periods bp ON bp.id=mr.billing_period_id
+      WHERE mr.meter_id=? AND bp.start_date<? ORDER BY bp.start_date DESC LIMIT 1`, [a.meter_id, period.start_date]);
+    const existingReading = get('SELECT * FROM meter_readings WHERE meter_id=? AND billing_period_id=?', [a.meter_id, period.id]);
+    const row = {
+      meter_id: a.meter_id, serial: a.serial, utility_type: a.utility_type,
+      showDemand: a.utility_type === 'electricity' && a.tariff_code === 1 && !a.energy_only,
+      priorEnd: existingReading ? existingReading.start_reading : (prior ? prior.end_reading : ''),
+      priorEndKvarh: existingReading ? existingReading.start_reading_kvarh : (prior ? prior.end_reading_kvarh : ''),
+    };
+    if (!byTenant.has(a.t_id)) { const g = { tenant: { id: a.t_id, name: a.tenant_name }, meters: [] }; byTenant.set(a.t_id, g); groups.push(g); }
+    byTenant.get(a.t_id).meters.push(row);
+  }
+  send(res, 200, views.readingsCapturePage({ user, period, groups }));
+});
+
+route('POST', '/readings/:periodId', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const period = get('SELECT * FROM billing_periods WHERE id=?', [params.periodId]);
+  if (!period) return send(res, 404, 'Not found');
+  const body = await readBody(req);
+  const assignments = all('SELECT meter_id FROM meter_assignments WHERE effective_to IS NULL');
+  let saved = 0;
+  for (const a of assignments) {
+    const endVal = body[`end_${a.meter_id}`];
+    if (endVal === undefined || endVal === '') continue;
+    const startVal = body[`start_${a.meter_id}`];
+    const kva = body[`kva_${a.meter_id}`];
+    const kvarhEnd = body[`kvarh_end_${a.meter_id}`];
+    const existing = get('SELECT * FROM meter_readings WHERE meter_id=? AND billing_period_id=?', [a.meter_id, period.id]);
+    const startReading = startVal !== undefined && startVal !== '' ? Number(startVal) : (existing ? existing.start_reading : 0);
+    const startKvarh = existing ? existing.start_reading_kvarh : null;
+    run(`INSERT INTO meter_readings (meter_id, billing_period_id, start_reading, end_reading, start_reading_kvarh, end_reading_kvarh, kva_reading, source, entered_by)
+         VALUES (?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(meter_id, billing_period_id) DO UPDATE SET
+           start_reading=excluded.start_reading, end_reading=excluded.end_reading,
+           start_reading_kvarh=excluded.start_reading_kvarh, end_reading_kvarh=excluded.end_reading_kvarh,
+           kva_reading=excluded.kva_reading, source=excluded.source, entered_by=excluded.entered_by`,
+      [a.meter_id, period.id, startReading, Number(endVal), startKvarh, kvarhEnd ? Number(kvarhEnd) : null, kva ? Number(kva) : 0, 'manual', user.userId]);
+    saved++;
+  }
+  const result = billing.generateBillsForPeriod(db, period.id);
+  audit(user.userId, 'capture_readings', 'billing_period', period.id, null, null, `${saved} readings saved, ${result.billsCreated} bills generated`, null);
+  send(res, 200, views.readingsResultPage({ user, period, result }));
 });
 
 route('GET', '/billing', async (req, res) => {

@@ -7,7 +7,8 @@ const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, 'data', 'billing.db');
 
-function open() { fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+function open() {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
   const db = new DatabaseSync(DB_PATH);
   db.exec('PRAGMA foreign_keys = ON;');
   return db;
@@ -180,6 +181,15 @@ function migrate(db) {
     timestamp TEXT DEFAULT (datetime('now'))
   );
   `);
+
+  // Additive migrations for columns added after the initial schema. node:sqlite's SQLite build
+  // doesn't need "IF NOT EXISTS" guards for ADD COLUMN (older SQLite lacks that syntax anyway),
+  // so we check PRAGMA table_info ourselves before altering, which makes this safe to re-run on
+  // every boot including against the March/April data already seeded.
+  const cols = db.prepare("PRAGMA table_info(meter_assignments)").all().map((c) => c.name);
+  if (!cols.includes('allocation_pct_kvarh')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kvarh REAL');
+  if (!cols.includes('allocation_pct_kva')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kva REAL');
+  if (!cols.includes('capacity_charge_override')) db.exec('ALTER TABLE meter_assignments ADD COLUMN capacity_charge_override REAL');
 }
 
 module.exports = { open, migrate, DB_PATH };

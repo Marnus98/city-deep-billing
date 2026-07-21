@@ -16,7 +16,7 @@ function calcElectricityMeterLine({
   rawConsumptionKwh, rawKvarh, rawKva,
   allocationPct, kvarhAllocationPct, kvaAllocationPct,
   tariffCode, serviceChargeFlag, sign,
-  carriesNetworkLevy, isCommonArea, energyOnly,
+  carriesNetworkLevy, isCommonArea, energyOnly, capacityChargeOverride,
   tariff1, tariff2, yChargeEnabled
 }) {
   // 'energyOnly' reproduces a handful of manually-adjusted rows in the source workbook (e.g. the
@@ -54,7 +54,13 @@ function calcElectricityMeterLine({
   } else {
     const t = tariff2;
     serviceCharge = t.serviceCharge * K * L;
-    capacityCharge = t.capacityCharge * K * L;
+    // A handful of tenants carry a fixed capacity charge that doesn't match the standard tariff
+    // rate in *any* month, even as the standard rate itself changes - e.g. Unit 4 ATC SA Wireless
+    // Infrastructure is charged a flat R661.90/month every single month from July 2025 through
+    // June 2026, confirmed against 12 consecutive workbooks. That's a genuine per-tenant
+    // negotiated/grandfathered rate baked into the source data, not noise - captured at import
+    // time (see seed.js) and applied here instead of the standard rate when present.
+    capacityCharge = (capacityChargeOverride != null ? capacityChargeOverride : t.capacityCharge) * K * L;
     energyCharge = stepEnergyCharge(Q, t.blocks) * L;
     networkSurcharge = t.surchargePct * Q * L;
   }

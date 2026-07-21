@@ -134,21 +134,45 @@ water don't create two tenant records for one real tenant.
 
 ## Reconciliation results
 
-Full detail is live at **/reconciliation** once the app is running. Summary across all 96
-tenant/period/utility rows (24 tenants × 2 utilities × 2 months, using the tenant name aliasing
-above):
+Full detail is live at **/reconciliation** once the app is running. Summary across all 572
+tenant/period/utility rows (roughly 24 tenants × 2 utilities × 12 months, July 2025 - June 2026,
+using the tenant name aliasing above):
 
 | Result | Count |
 |---|---|
-| Exact match (to the cent) | 92 |
-| Within 2% (see below) | 4 |
+| Exact match (to the cent) | 565 |
+| Off by more than 1% | 7 |
 
-The remaining 4 rows are one tenant's water bill in both months (a small-value ~R150/month common
-area water levy row, off by ~R2–3, i.e. ~2%) — not yet root-caused to a specific formula, flagged
-here rather than hidden. Every other electricity and water figure for every tenant, across both
-months, ties out exactly, including the two hardest cases in the source data: a bulk/feeder meter
-that bills 0% of energy but 100% of demand (Unit 3 HUDACO Trading), and the manually-adjusted SA
-Wireless credit line (Unit 6C Teraoka).
+Every other electricity and water figure for every tenant, across all 12 months, ties out exactly
+— including the hardest cases in the source data: a bulk/feeder meter that bills 0% of energy but
+100% of demand (Unit 3 HUDACO Trading), the manually-adjusted SA Wireless credit line (Unit 6C
+Teraoka), and a tenant with a fixed R661.90/month capacity charge that doesn't match the standard
+tariff rate in *any* of the 12 months (Unit 4 ATC SA Wireless Infrastructure — confirmed as a
+genuine per-tenant negotiated rate, now applied automatically via `capacity_charge_override` on
+that meter's assignment).
+
+The remaining 7 rows, all individually explained rather than hidden:
+
+- **5 rows, one tenant's water bill (Redefine Common Area Mini Park), various months** — a
+  small-value (~R50-150/month) common-area water levy row, off by ~R1-7 (~2%). Not yet
+  root-caused to a specific formula.
+- **2 rows, July 2025 only (Kimmo, Unit 3 HUDACO Trading, electricity)** — the July 2025 workbook
+  excludes one specific meter's charges from the tenant's own stated total (Excel's own total
+  formula skips that row that month, for a reason not visible from the data), while the app's
+  total includes every assigned meter. Confined to this one month; every other month for these
+  two tenants matches exactly. Worth a gut-check against whoever managed billing in July 2025 if
+  that month's figures matter to you.
+
+## Known data gaps
+
+The file named **"City Deep July 2025 with solar Recon Final.xlsx"** internally covers a period
+of **30 May - 25 June 2025** (per its own period cells), about a month behind what its filename
+suggests. The next file, August 2025, starts its period on 25 July 2025 - so there's a real,
+unexplained gap between 25 June and 25 July 2025 that no supplied workbook covers. Both months'
+data are imported and labelled exactly as extracted (period dates as recorded in the source
+workbook, label "2025-07" kept for continuity with the filename), and the gap is left as-is rather
+than guessed at. If a "true June 2025" or "true July 2025" workbook exists separately, sending it
+over would close this gap.
 
 ## Source data provenance
 
