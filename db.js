@@ -7,7 +7,7 @@ const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, 'data', 'billing.db');
 
-function open() {
+function open() { fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
   const db = new DatabaseSync(DB_PATH);
   db.exec('PRAGMA foreign_keys = ON;');
   return db;
