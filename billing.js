@@ -45,7 +45,7 @@ function generateBillsForPeriod(db, periodId) {
   }
 
   const assignments = all(db, `
-    SELECT ma.*, m.serial, m.utility_type, t.id as t_id, t.name as tenant_name, s.name as site_name
+    SELECT ma.*, m.serial, m.utility_type, m.unit_scale, t.id as t_id, t.name as tenant_name, s.name as site_name
     FROM meter_assignments ma
     JOIN meters m ON m.id = ma.meter_id
     JOIN tenants t ON t.id = ma.tenant_id
@@ -73,9 +73,15 @@ function generateBillsForPeriod(db, periodId) {
       anyReading = true;
 
       if (a.utility_type === 'electricity') {
-        const rawConsumptionKwh = reading.end_reading - reading.start_reading;
+        // Some meters read a fraction of true consumption off the dial (CT ratio) and need
+        // multiplying to get real kWh - e.g. one meter in the source data is x260. Historical
+        // Excel-imported months get this for free (Excel's own consumption figure is used
+        // directly), but readings entered here are raw dial deltas and need the multiplier
+        // applied explicitly. See seed.js's getOrCreateMeter for where this is captured.
+        const unitScale = a.unit_scale || 1;
+        const rawConsumptionKwh = (reading.end_reading - reading.start_reading) * unitScale;
         const rawKvarh = (reading.end_reading_kvarh != null && reading.start_reading_kvarh != null)
-          ? reading.end_reading_kvarh - reading.start_reading_kvarh : 0;
+          ? (reading.end_reading_kvarh - reading.start_reading_kvarh) * unitScale : 0;
         const rawKva = reading.kva_reading || 0;
         // Reproduces the Phase 1 finding that the kVArh demand charge only applies in the "Mini
         // Park" precinct's section of the source workbook, not "Industrial Park" - see calc.js.

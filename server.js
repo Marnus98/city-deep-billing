@@ -64,8 +64,8 @@ function requireRole(req, res, user, allowed) {
 // ---------------- data helpers ----------------
 function latestPeriod() { return get('SELECT * FROM billing_periods ORDER BY start_date DESC LIMIT 1'); }
 
-function dashboardData() {
-  const period = latestPeriod();
+function dashboardData(periodId) {
+  const period = periodId ? get('SELECT * FROM billing_periods WHERE id=?', [periodId]) : latestPeriod();
   const activeTenants = get("SELECT COUNT(*) c FROM tenants WHERE status='active'").c;
   const billedThisMonth = period ? get('SELECT COUNT(DISTINCT tenant_id) c FROM bills WHERE billing_period_id=?', [period.id]).c : 0;
   const draftBills = get("SELECT COUNT(*) c FROM bills WHERE status='draft'").c;
@@ -80,13 +80,14 @@ function dashboardData() {
   const recentBills = all(`SELECT b.*, t.name as tenant, bp.label as period FROM bills b
     JOIN tenants t ON t.id=b.tenant_id JOIN billing_periods bp ON bp.id=b.billing_period_id
     ORDER BY b.generated_at DESC LIMIT 8`);
+  const allPeriods = all('SELECT * FROM billing_periods ORDER BY start_date DESC');
   return {
     stats: {
       activeTenants, billedThisMonth, missingCount: missing.length, draftBills, finalisedBills,
       totalElecBilled: totals.elecBilled, totalWaterBilled: totals.waterBilled, totalBilled,
-      totalElecKwh: consumption.e, totalWaterM3: consumption.w,
+      totalElecKwh: consumption.e, totalWaterKl: consumption.w,
     },
-    recentBills, missing, currentPeriod: period,
+    recentBills, missing, currentPeriod: period, allPeriods,
   };
 }
 
@@ -121,9 +122,9 @@ route('GET', '/logout', async (req, res) => {
   redirect(res, '/login');
 });
 
-route('GET', '/dashboard', async (req, res) => {
+route('GET', '/dashboard', async (req, res, params, query) => {
   const user = requireLogin(req, res); if (!user) return;
-  const data = dashboardData();
+  const data = dashboardData(query.periodId);
   send(res, 200, views.dashboardPage({ user, ...data }));
 });
 
@@ -195,7 +196,7 @@ route('GET', '/readings/:periodId', async (req, res, params) => {
   const period = get('SELECT * FROM billing_periods WHERE id=?', [params.periodId]);
   if (!period) return send(res, 404, 'Not found');
   const assignments = all(`
-    SELECT ma.*, m.serial, m.utility_type, t.id as t_id, t.name as tenant_name
+    SELECT ma.*, m.serial, m.utility_type, m.unit_scale, t.id as t_id, t.name as tenant_name
     FROM meter_assignments ma JOIN meters m ON m.id=ma.meter_id JOIN tenants t ON t.id=ma.tenant_id
     WHERE ma.effective_to IS NULL ORDER BY t.name, m.utility_type, m.serial`);
   const groups = [];
@@ -206,6 +207,7 @@ route('GET', '/readings/:periodId', async (req, res, params) => {
     const existingReading = get('SELECT * FROM meter_readings WHERE meter_id=? AND billing_period_id=?', [a.meter_id, period.id]);
     const row = {
       meter_id: a.meter_id, serial: a.serial, utility_type: a.utility_type,
+      unitScale: a.unit_scale || 1,
       showDemand: a.utility_type === 'electricity' && a.tariff_code === 1 && !a.energy_only,
       priorEnd: existingReading ? existingReading.start_reading : (prior ? prior.end_reading : ''),
       priorEndKvarh: existingReading ? existingReading.start_reading_kvarh : (prior ? prior.end_reading_kvarh : ''),
@@ -273,7 +275,7 @@ route('GET', '/billing/:tenantId/:periodId', async (req, res, params) => {
   }
   const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' ORDER BY id", [bill.id]);
   const waterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water' ORDER BY id", [bill.id]);
-  const elecMeters = all(`SELECT DISTINCT m.serial, mr.start_reading, mr.end_reading FROM bill_line_items bli
+  const elecMeters = all(`SELECT DISTINCT m.serial, m.unit_scale, mr.start_reading, mr.end_reading FROM bill_line_items bli
     JOIN meters m ON m.id=bli.meter_id LEFT JOIN meter_readings mr ON mr.meter_id=m.id AND mr.billing_period_id=?
     WHERE bli.bill_id=? AND bli.utility_type='electricity'`, [period.id, bill.id]);
   const waterMeters = all(`SELECT DISTINCT m.serial, mr.start_reading, mr.end_reading FROM bill_line_items bli
@@ -303,7 +305,6 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
     elecLineItems: elecItems, waterLineItems: waterItems,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
     status: bill.status, generatedAt: bill.generated_at,
-    bankingDetails: 'City Deep Industrial Park (Pty) Ltd | Bank: FNB Business | Acc: 62 1234 5678 | Branch: 250 655',
     notes: 'Reprinted from stored billing data - not from a live browser view.',
   });
   audit(user.userId, 'pdf_download', 'bill', bill.id, null, null, null, null);

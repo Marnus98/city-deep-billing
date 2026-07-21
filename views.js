@@ -79,11 +79,17 @@ function statCard(label, value, sub) {
   </div>`;
 }
 
-function dashboardPage({ user, stats, recentBills, missing, currentPeriod }) {
+function dashboardPage({ user, stats, recentBills, missing, currentPeriod, allPeriods }) {
   const body = `
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold">Dashboard</h1>
-    <div class="text-sm text-slate-500">Current billing month: <span class="font-semibold text-slate-700">${esc(currentPeriod?.label || '-')}</span></div>
+    <form method="get" action="/dashboard" class="flex items-center gap-2">
+      <label class="text-sm text-slate-500">Billing month:</label>
+      <select name="periodId" class="border rounded px-3 py-2 text-sm">
+        ${(allPeriods || []).map(p => `<option value="${p.id}" ${currentPeriod && p.id === currentPeriod.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
+      </select>
+      <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
+    </form>
   </div>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     ${statCard('Active tenants', stats.activeTenants)}
@@ -97,7 +103,7 @@ function dashboardPage({ user, stats, recentBills, missing, currentPeriod }) {
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     ${statCard('Total electricity consumption', fmtNum(stats.totalElecKwh, 0) + ' kWh')}
-    ${statCard('Total water consumption', fmtNum(stats.totalWaterM3, 0) + ' m&sup3;')}
+    ${statCard('Total water consumption', fmtNum(stats.totalWaterKl, 0) + ' kL')}
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     <div class="bg-white rounded-lg border">
@@ -312,6 +318,7 @@ function readingsCapturePage({ user, period, groups }) {
         <thead><tr class="text-left text-slate-500 bg-slate-50">
           <th class="px-4 py-1">Serial</th><th class="px-4 py-1">Utility</th>
           <th class="px-4 py-1">Start reading</th><th class="px-4 py-1">End reading</th>
+          <th class="px-4 py-1">Multiplier</th>
           <th class="px-4 py-1">kVA (demand)</th><th class="px-4 py-1">kVArh end</th>
         </tr></thead>
         <tbody>
@@ -320,6 +327,7 @@ function readingsCapturePage({ user, period, groups }) {
           <td class="px-4 py-1">${esc(m.utility_type)}</td>
           <td class="px-4 py-1"><input name="start_${m.meter_id}" type="number" step="0.01" value="${m.priorEnd ?? ''}" class="border rounded px-2 py-1 w-28"/></td>
           <td class="px-4 py-1"><input name="end_${m.meter_id}" type="number" step="0.01" class="border rounded px-2 py-1 w-28"/></td>
+          <td class="px-4 py-1">${m.unitScale && m.unitScale !== 1 ? `<span class="badge bg-amber-100 text-amber-700">&times;${m.unitScale}</span>` : '<span class="text-slate-300">&mdash;</span>'}</td>
           <td class="px-4 py-1">${m.showDemand ? `<input name="kva_${m.meter_id}" type="number" step="0.01" class="border rounded px-2 py-1 w-24"/>` : '<span class="text-slate-300">&mdash;</span>'}</td>
           <td class="px-4 py-1">${m.showDemand ? `<input name="kvarh_end_${m.meter_id}" type="number" step="0.01" value="${m.priorEndKvarh ?? ''}" class="border rounded px-2 py-1 w-24"/>` : '<span class="text-slate-300">&mdash;</span>'}</td>
         </tr>`).join('')}
@@ -330,7 +338,7 @@ function readingsCapturePage({ user, period, groups }) {
   const body = `
   <a href="/billing-periods" class="text-sm text-blue-600 hover:underline">&larr; Billing periods</a>
   <h1 class="text-2xl font-bold mt-2 mb-1">Capture readings &mdash; ${esc(period.label)}</h1>
-  <p class="text-sm text-slate-500 mb-4">Enter each meter's closing reading for this period. Start readings are pre-filled from the last recorded reading &mdash; double-check any meter that was replaced. Leave a row blank to skip that meter for now; a tenant's bill won't be (re)generated until every one of their meters has a reading for this period.</p>
+  <p class="text-sm text-slate-500 mb-4">Enter each meter's closing reading exactly as it appears on the meter dial. Start readings are pre-filled from the last recorded reading &mdash; double-check any meter that was replaced. Leave a row blank to skip that meter for now; a tenant's bill won't be (re)generated until every one of their meters has a reading for this period. Meters flagged with a <span class="badge bg-amber-100 text-amber-700">&times;N</span> multiplier read a fraction of true consumption off the dial (CT ratio) &mdash; enter the raw dial numbers as-is, the app applies the multiplier automatically.</p>
   <form method="post" action="/readings/${period.id}">
     ${rowsHtml || '<div class="bg-white border rounded p-6 text-slate-400">No active meter assignments found.</div>'}
     <button class="bg-slate-900 text-white rounded px-6 py-2 font-medium mt-2">Save readings &amp; generate bills</button>
@@ -391,7 +399,11 @@ function billDetailPage({ user, tenant, period, bill, elecItems, waterItems, ele
       <div class="text-xs uppercase text-slate-400 mb-1">Meter readings</div>
       <table class="w-full text-xs mb-3">
         <thead><tr class="text-left text-slate-500"><th class="py-1">Serial</th><th>Start</th><th>End</th><th>Consumption</th></tr></thead>
-        <tbody>${meters.map(m => `<tr class="border-t"><td class="py-1 font-mono">${esc(m.serial)}</td><td>${fmtNum(m.start_reading, 2)}</td><td>${fmtNum(m.end_reading, 2)}</td><td>${fmtNum(m.end_reading - m.start_reading, 2)}</td></tr>`).join('') || '<tr><td class="py-1 text-slate-400" colspan="4">No meter readings</td></tr>'}</tbody>
+        <tbody>${meters.map(m => {
+          const scale = m.unit_scale || 1;
+          const consumption = (m.end_reading - m.start_reading) * scale;
+          return `<tr class="border-t"><td class="py-1 font-mono">${esc(m.serial)}</td><td>${fmtNum(m.start_reading, 2)}</td><td>${fmtNum(m.end_reading, 2)}</td><td>${fmtNum(consumption, 2)}${scale !== 1 ? ` <span class="text-slate-400">(&times;${scale})</span>` : ''}</td></tr>`;
+        }).join('') || '<tr><td class="py-1 text-slate-400" colspan="4">No meter readings</td></tr>'}</tbody>
       </table>
       <div class="text-xs uppercase text-slate-400 mb-1">Charge breakdown</div>
       <table class="w-full text-sm">

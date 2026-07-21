@@ -121,10 +121,22 @@ function getOrCreateTenant(name, siteName) {
   return tenant;
 }
 
-function getOrCreateMeter(serial, utilityType, role, location) {
+// unitScale is the meter's billing multiplier (CT ratio) - some electricity meters read a
+// fraction of true consumption off the dial and need multiplying to get real kWh (confirmed
+// against the 'Elect Readings' sheet's own 'Billing Mult' column: 14 meters in April 2026 alone
+// have a multiplier other than 1, up to x260). The Electrical Billing sheet's own start/end/
+// consumption columns already have this baked in for historical months (seed.js passes Excel's
+// own consumption_kwh straight through, never recomputes end-start itself), so this only matters
+// for the *new* manual reading-capture flow (billing.js), which does compute end-start itself and
+// needs to know the multiplier to get real kWh from what a user types in off the meter dial.
+function getOrCreateMeter(serial, utilityType, role, location, unitScale) {
   let m = get('SELECT * FROM meters WHERE serial=?', [serial]);
   if (!m) {
-    run('INSERT INTO meters (serial, utility_type, role, location) VALUES (?,?,?,?)', [serial, utilityType, role, location]);
+    run('INSERT INTO meters (serial, utility_type, role, location, unit_scale) VALUES (?,?,?,?,?)',
+      [serial, utilityType, role, location, unitScale || 1]);
+    m = get('SELECT * FROM meters WHERE serial=?', [serial]);
+  } else if (unitScale && Math.abs((m.unit_scale ?? 1) - unitScale) > 1e-9) {
+    run('UPDATE meters SET unit_scale=? WHERE id=?', [unitScale, m.id]);
     m = get('SELECT * FROM meters WHERE serial=?', [serial]);
   }
   return m;
@@ -183,12 +195,13 @@ function siteForTenantName(name) {
 }
 
 // ---------- Bill generation ----------
-function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tariffParams, precinctYEnabled) {
+function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tariffParams, precinctYEnabled, unitScaleBySerial) {
   const lineItems = [];
   let elecKwhTotal = 0, waterM3Total = 0;
 
   for (const row of elecMeterRows) {
-    const meter = getOrCreateMeter(row.serial, 'electricity', row.common_area_pct != null ? 'common_area' : 'tenant', row.location);
+    const unitScale = (unitScaleBySerial && unitScaleBySerial[row.serial]) || 1;
+    const meter = getOrCreateMeter(row.serial, 'electricity', row.common_area_pct != null ? 'common_area' : 'tenant', row.location, unitScale);
     // store reading
     run(`INSERT OR REPLACE INTO meter_readings
         (meter_id, billing_period_id, start_reading, end_reading, start_reading_kvarh, end_reading_kvarh, kva_reading, source)
@@ -271,6 +284,13 @@ function seedMonth(monthData) {
   const waterTenantsByName = {};
   for (const t of monthData.water_billing) waterTenantsByName[canonicalTenantName(t.name)] = t;
 
+  // Per-meter billing multiplier (CT ratio), read off the 'Elect Readings' sheet's own 'Billing
+  // Mult' column for this month - see getOrCreateMeter for why this matters.
+  const unitScaleBySerial = {};
+  for (const r of monthData.elect_readings || []) {
+    if (r.serial != null && typeof r.billing_mult === 'number') unitScaleBySerial[r.serial] = r.billing_mult;
+  }
+
   const allNames = new Set([...Object.keys(elecTenantsByName), ...Object.keys(waterTenantsByName)]);
   let count = 0;
   for (const name of allNames) {
@@ -288,7 +308,7 @@ function seedMonth(monthData) {
       tenant, billingPeriod,
       elecBlock ? elecBlock.meters : [],
       waterBlock ? waterBlock.meters : [],
-      params, precinctYEnabled
+      params, precinctYEnabled, unitScaleBySerial
     );
     // Excel reference totals for reconciliation
     if (elecBlock && elecBlock.totals) {

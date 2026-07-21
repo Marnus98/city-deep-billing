@@ -116,8 +116,6 @@ function buildBillingSlipPdf(data) {
   doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 }); doc.text(right - 90, y, money(data.total), { bold: true, size: 12 }); y -= 26;
 
   doc.line(left, y, right, y); y -= 16;
-  doc.text(left, y, 'Banking Details:', { bold: true }); y -= 13;
-  doc.text(left, y, data.bankingDetails || 'Bank: (to be supplied)   Account: (to be supplied)   Branch code: (to be supplied)', { size: 9 }); y -= 20;
   if (data.notes) { doc.text(left, y, 'Notes: ' + data.notes, { size: 9 }); y -= 16; }
   doc.text(left, 30, `Bill status: ${data.status.toUpperCase()}  |  Generated: ${data.generatedAt}  |  This is a system-generated statement.`, { size: 7 });
 

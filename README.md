@@ -57,7 +57,15 @@ open internet.**
 - **Tariffs** — both electricity tariffs and the water/sanitation tariff, version-controlled by
   effective date (the versioning mechanism is live even though March's and April's rates
   happened to be identical in the source data).
-- **Billing Periods** — March 2026 and April 2026, each showing bill counts.
+- **Billing Periods** — 12 imported months (July 2025 - June 2026), each showing bill counts, plus
+  a **"+ New billing period"** button to start a fresh month.
+- **Capturing a new month** — from Billing Periods, create a period (label + dates), then you land
+  on a reading-capture form: one row per active meter, grouped by tenant, pre-filled with last
+  period's closing reading as this period's starting point. Enter each meter's new closing
+  reading exactly as it appears on the dial - meters with a CT ratio/multiplier (flagged with a
+  `×N` badge) get that multiplier applied automatically, you don't need to do the math yourself.
+  Saving generates bills (status `draft`) using the same calculation engine reconciled against
+  the historical months.
 - **Billing** — select any tenant + any month and see the full breakdown: readings, per-category
   charge lines, subtotal, VAT (15%), total — matching Section 10 of the brief.
 - **PDF billing slips** — generated server-side from the stored bill data (not from a live
@@ -75,13 +83,11 @@ open internet.**
 This was built as **Phase 3 (working prototype)** of the brief's own six-phase plan, focused on
 proving the calculation engine and core workflows against real data. Not yet built:
 
-- Create/edit forms for tenants, meters, tariffs, and new-month reading capture (the data model
-  and calculation engine fully support it — `calc.js` and `db.js` are the pieces to build the
-  forms against; `seed.js` shows the exact pattern a "capture this month's readings" handler
-  would follow).
+- Create/edit forms for tenants, meters, and tariffs (new-month reading capture *is* built — see
+  "Capturing a new month" below).
 - Bill status workflow UI (draft → reviewed → finalised → issued, with locking and
   reversal/amendment) — the `bills.status` column and states exist in the schema; only the
-  read-side is wired up.
+  read-side is wired up. Bills generated via the reading-capture flow default to `draft`.
 - ZIP-of-all-slips download and the combined monthly pack.
 - Excel import *wizard* (this prototype imports via a one-off script, `extract.py` +
   `seed.js`, rather than an in-app upload flow).
