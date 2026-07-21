@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: city-deep-billing
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_VERSION
+        value: 22.9.0

@@ -1,0 +1,12 @@
+{
+  "name": "city-deep-billing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "City Deep Industrial Park tenant utility billing prototype - zero external dependencies (see README).",
+  "engines": { "node": ">=22.5.0" },
+  "scripts": {
+    "seed": "node seed.js",
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}
