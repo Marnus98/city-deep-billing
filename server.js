@@ -10,6 +10,7 @@ const views = require('./views');
 const { buildBillingSlipPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
+const municipalCompare = require('./municipal_compare');
 
 const db = open();
 migrate(db);
@@ -24,6 +25,10 @@ if (tenantCount === 0) {
   require('./seed').run();
   console.log('Initial seed complete.');
 }
+// Separate, self-contained pipeline (own de-dup key: invoice_number) - always safe to re-run, so
+// just run it on every boot rather than gating on an empty-table check. Picks up any newly-added
+// months in municipal_statements.json automatically on the next deploy.
+require('./seed_municipal').run();
 
 function get(sql, params = []) { return db.prepare(sql).get(...params); }
 function all(sql, params = []) { return db.prepare(sql).all(...params); }
@@ -342,6 +347,19 @@ route('GET', '/solar-billing-slips', async (req, res, params, query) => {
   const period = query.periodId ? get('SELECT * FROM billing_periods WHERE id=?', [query.periodId]) : latestPeriod();
   const slips = period ? solar.getSolarSlips(db, period.id) : [];
   send(res, 200, views.solarBillingSlipsPage({ user, period, allPeriods, slips }));
+});
+
+route('GET', '/municipal-accounts', async (req, res, params, query) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const accounts = all('SELECT * FROM municipal_accounts ORDER BY label');
+  if (!accounts.length) return send(res, 200, views.municipalAccountsPage({ user, accounts, account: null, statements: [], statement: null }));
+  const accountId = query.accountId ? Number(query.accountId) : accounts[0].id;
+  const account = accounts.find((a) => a.id === accountId) || accounts[0];
+  const statements = all('SELECT * FROM municipal_statements WHERE municipal_account_id=? ORDER BY statement_date', [account.id]);
+  const statementId = query.statementId ? Number(query.statementId) : (statements.length ? statements[statements.length - 1].id : null);
+  const statement = statements.find((s) => s.id === statementId) || statements[statements.length - 1] || null;
+  const comparison = statement ? municipalCompare.buildComparison(db, statement, account.label) : null;
+  send(res, 200, views.municipalAccountsPage({ user, accounts, account, statements, statement, comparison }));
 });
 
 route('GET', '/reconciliation', async (req, res) => {

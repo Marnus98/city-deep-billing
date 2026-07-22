@@ -180,6 +180,44 @@ function migrate(db) {
     reason TEXT,
     timestamp TEXT DEFAULT (datetime('now'))
   );
+  -- One row per City of Johannesburg municipal (bulk supply) account. The park has 4 physical
+  -- stands each billed directly by COJ, independent of the tenant-level billing this app
+  -- otherwise does - these are the "landlord" bulk accounts the site's own tenant charges are
+  -- ultimately funded from, not tenant bills themselves.
+  CREATE TABLE IF NOT EXISTS municipal_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_number TEXT UNIQUE NOT NULL,
+    label TEXT NOT NULL,
+    address TEXT,
+    market_value REAL
+  );
+
+  -- One row per COJ statement (invoice_number is COJ's own unique ID and the true de-dup key -
+  -- COJ's "Statement for" month label is informational only; see seed_municipal.js for why it
+  -- can't be used as a period key). Deliberately flat (not a generic line-items table) since COJ's
+  -- statement always has exactly these 6 charge categories - Property Rates, Electricity, Water,
+  -- Sanitation, Refuse, Sundry - every month, for every account.
+  CREATE TABLE IF NOT EXISTS municipal_statements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    municipal_account_id INTEGER NOT NULL REFERENCES municipal_accounts(id),
+    invoice_number TEXT UNIQUE NOT NULL,
+    statement_for TEXT NOT NULL,
+    statement_date TEXT,
+    due_date TEXT,
+    elec_reading_start TEXT, elec_reading_end TEXT,
+    elec_consumption_kwh REAL, elec_consumption_kvarh REAL, elec_tariff_type TEXT,
+    elec_excl_vat REAL, elec_vat REAL, elec_incl_vat REAL,
+    water_reading_start TEXT, water_reading_end TEXT,
+    water_consumption_kl REAL,
+    water_excl_vat REAL, water_vat REAL, water_incl_vat REAL,
+    sanitation_excl_vat REAL, sanitation_vat REAL, sanitation_incl_vat REAL,
+    refuse_excl_vat REAL, refuse_vat REAL, refuse_incl_vat REAL,
+    sundry_excl_vat REAL, sundry_vat REAL, sundry_incl_vat REAL,
+    property_rates_excl_vat REAL, property_rates_vat REAL, property_rates_incl_vat REAL,
+    grand_total_incl_vat REAL,
+    source_file TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
   `);
 
   // Additive migrations for columns added after the initial schema. node:sqlite's SQLite build

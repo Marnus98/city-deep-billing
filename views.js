@@ -16,6 +16,7 @@ function layout({ title, user, active, body }) {
   const nav = [
     ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
     ['/billing-periods', 'Billing Periods'], ['/billing', 'Billing'], ['/solar-billing-slips', 'Solar Billing Slips'],
+    ['/municipal-accounts', 'Municipality'],
     ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
   ];
   return `<!DOCTYPE html>
@@ -517,6 +518,132 @@ function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
   return layout({ title: 'Solar Billing Slips', user, active: '/solar-billing-slips', body });
 }
 
+function municipalAccountsPage({ user, accounts, account, statements, statement, comparison }) {
+  if (!accounts.length) {
+    return layout({ title: 'Municipality', user, active: '/municipal-accounts', body: `
+      <h1 class="text-2xl font-bold mb-4">Municipality</h1>
+      <div class="bg-white border rounded p-6 text-slate-400">No municipal statements imported yet.</div>` });
+  }
+
+  const catRow = (label, consumption, unit, exclVat, vat, inclVat, isTotal) => `
+    <tr class="border-t ${isTotal ? 'font-semibold bg-slate-50' : ''}">
+      <td class="py-1.5 pl-2">${esc(label)}</td>
+      <td class="py-1.5 text-right">${consumption != null ? fmtNum(consumption, 1) + (unit ? ' ' + unit : '') : '&mdash;'}</td>
+      <td class="py-1.5 text-right">${money(exclVat)}</td>
+      <td class="py-1.5 text-right">${money(vat)}</td>
+      <td class="py-1.5 text-right">${money(inclVat)}</td>
+    </tr>`;
+
+  let breakdownHtml = `<div class="bg-white border rounded p-6 text-slate-400">No statements for this account yet.</div>`;
+  if (statement) {
+    const s = statement;
+    const totalExcl = s.property_rates_excl_vat + s.elec_excl_vat + s.water_excl_vat + s.sanitation_excl_vat + s.refuse_excl_vat + s.sundry_excl_vat;
+    const totalVat = s.property_rates_vat + s.elec_vat + s.water_vat + s.sanitation_vat + s.refuse_vat + s.sundry_vat;
+    breakdownHtml = `
+    <div class="bg-white rounded-lg border mb-6">
+      <div class="px-4 py-3 border-b font-semibold flex justify-between items-baseline flex-wrap gap-2">
+        <span>Statement for ${esc(s.statement_for)} <span class="text-slate-400 font-normal text-sm">(invoice ${esc(s.invoice_number)}, issued ${esc(s.statement_date)})</span></span>
+        <span class="badge ${s.elec_tariff_type === 'TOU' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}">${s.elec_tariff_type === 'TOU' ? 'Time-of-Use electricity tariff' : 'Flat-rate electricity tariff'}</span>
+      </div>
+      <div class="px-4 py-3">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-slate-500 border-b">
+            <th class="py-1 pl-2">Category</th><th class="py-1 text-right">Consumption</th>
+            <th class="py-1 text-right">Excl. VAT</th><th class="py-1 text-right">VAT</th><th class="py-1 text-right">Total</th>
+          </tr></thead>
+          <tbody>
+            ${catRow('Property Rates', null, null, s.property_rates_excl_vat, s.property_rates_vat, s.property_rates_incl_vat)}
+            ${catRow('Electricity' + (s.elec_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.elec_reading_start)} to ${esc(s.elec_reading_end)})</span>` : ''), s.elec_consumption_kwh, 'kWh', s.elec_excl_vat, s.elec_vat, s.elec_incl_vat)}
+            ${catRow('Water' + (s.water_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.water_reading_start)} to ${esc(s.water_reading_end)})</span>` : ''), s.water_consumption_kl, 'KL', s.water_excl_vat, s.water_vat, s.water_incl_vat)}
+            ${catRow('Sanitation <span class="text-slate-400 text-xs">(billed on water consumption)</span>', s.water_consumption_kl, 'KL', s.sanitation_excl_vat, s.sanitation_vat, s.sanitation_incl_vat)}
+            ${catRow('Refuse', null, null, s.refuse_excl_vat, s.refuse_vat, s.refuse_incl_vat)}
+            ${catRow('Sundry', null, null, s.sundry_excl_vat, s.sundry_vat, s.sundry_incl_vat)}
+            ${catRow('Total Charges', null, null, totalExcl, totalVat, s.grand_total_incl_vat, true)}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  let comparisonHtml = '';
+  if (comparison) {
+    if (!comparison.period) {
+      comparisonHtml = `<div class="bg-white border rounded p-4 mb-6 text-slate-400">No internal billing period overlaps this statement's reading dates yet.</div>`;
+    } else if (!comparison.ours || comparison.ours.tenant_count === 0) {
+      comparisonHtml = `<div class="bg-white border rounded p-4 mb-6 text-slate-400">No internal billing data for site "${esc(comparison.siteName)}" in the matching period (${esc(comparison.period.label)}) yet.</div>`;
+    } else {
+      const variance = (a, b) => (b ? ((a - b) / b) * 100 : 0);
+      const compRow = (label, ourVal, cojVal, unit) => `<tr class="border-t">
+        <td class="py-1.5 pl-2">${esc(label)}</td>
+        <td class="py-1.5 text-right">${unit === 'R' ? money(ourVal) : fmtNum(ourVal, 1) + ' ' + unit}</td>
+        <td class="py-1.5 text-right">${unit === 'R' ? money(cojVal) : fmtNum(cojVal, 1) + ' ' + unit}</td>
+        <td class="py-1.5 text-right ${Math.abs(variance(ourVal, cojVal)) < 5 ? 'text-green-600' : 'text-amber-600'}">${variance(ourVal, cojVal).toFixed(1)}%</td>
+      </tr>`;
+      comparisonHtml = `
+      <div class="bg-white rounded-lg border mb-6">
+        <div class="px-4 py-3 border-b font-semibold">Our billing vs. the utility &mdash; ${esc(comparison.siteName)}</div>
+        <div class="px-4 pt-2 text-xs text-slate-400">Matched to our billing period <b>${esc(comparison.period.label)}</b> (${esc(comparison.period.start_date)} to ${esc(comparison.period.end_date)}), the closest overlap with this statement's own reading dates (~${comparison.overlapDays} days overlap). ${comparison.coj.matched.length > 1 ? `Utility side combines ${comparison.coj.matched.map((m) => esc(m.account)).join(' + ')}.` : ''}</div>
+        <div class="px-4 py-3">
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-slate-500 border-b">
+              <th class="py-1 pl-2"></th><th class="py-1 text-right">Our billing (tenants)</th>
+              <th class="py-1 text-right">Utility (COJ)</th><th class="py-1 text-right">Variance</th>
+            </tr></thead>
+            <tbody>
+              ${compRow('Electricity consumption', comparison.ours.elec_kwh, comparison.coj.elecKwh, 'kWh')}
+              ${compRow('Electricity charge', comparison.ours.elec_rand, comparison.coj.elecRand, 'R')}
+              ${compRow('Water consumption', comparison.ours.water_kl, comparison.coj.waterKl, 'KL')}
+              ${compRow('Water &amp; sanitation charge', comparison.ours.water_rand, comparison.coj.waterRand, 'R')}
+            </tbody>
+          </table>
+          <p class="text-xs text-slate-400 mt-2">"Our billing" sums what we invoice ${comparison.ours.tenant_count} tenant(s) on this site for the matched period; the utility figure is what COJ billed the bulk account(s) supplying that same site. A gap is expected (common-area/park losses, timing misalignment between the two billing cycles) &mdash; large or growing gaps are worth investigating.</p>
+        </div>
+      </div>`;
+    }
+  }
+
+  const body = `
+  <div class="flex items-center justify-between mb-1 flex-wrap gap-3">
+    <h1 class="text-2xl font-bold">Municipality Accounts</h1>
+    <form method="get" action="/municipal-accounts" class="flex items-center gap-2 flex-wrap">
+      <label class="text-sm text-slate-500">Account:</label>
+      <select name="accountId" onchange="this.form.submit()" class="border rounded px-3 py-2 text-sm">
+        ${accounts.map((a) => `<option value="${a.id}" ${account && a.id === account.id ? 'selected' : ''}>${esc(a.label)} (${esc(a.account_number)})</option>`).join('')}
+      </select>
+      <label class="text-sm text-slate-500">Statement:</label>
+      <select name="statementId" class="border rounded px-3 py-2 text-sm">
+        ${statements.map((s) => `<option value="${s.id}" ${statement && s.id === statement.id ? 'selected' : ''}>${esc(s.statement_for)} (${esc(s.statement_date)})</option>`).join('')}
+      </select>
+      <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
+    </form>
+  </div>
+  <p class="text-sm text-slate-500 mb-4">City of Johannesburg bulk-supply statements for this physical stand. Each of the 4 accounts (Mini, Rittle, Industrial A, Industrial B) is billed directly by COJ, separate from tenant billing. Note: COJ's own billing periods don't line up with this app's billing periods, and a statement's own label can run about a month ahead of the reading period it actually covers.</p>
+  ${breakdownHtml}
+  ${comparisonHtml}
+  ${statements.length ? `
+  <div class="bg-white rounded-lg border overflow-hidden">
+    <div class="px-4 py-3 border-b font-semibold">All statements for this account</div>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b bg-slate-50">
+        <th class="px-4 py-2">Statement for</th><th class="px-4 py-2">Issued</th>
+        <th class="px-4 py-2 text-right">Elec kWh</th><th class="px-4 py-2 text-right">Water KL</th>
+        <th class="px-4 py-2 text-right">Total (incl. VAT)</th><th class="px-4 py-2"></th>
+      </tr></thead>
+      <tbody>
+      ${statements.slice().reverse().map((s) => `<tr class="border-b last:border-0 ${statement && s.id === statement.id ? 'bg-slate-50' : ''}">
+        <td class="px-4 py-2 font-medium">${esc(s.statement_for)}</td>
+        <td class="px-4 py-2 text-slate-500">${esc(s.statement_date)}</td>
+        <td class="px-4 py-2 text-right">${fmtNum(s.elec_consumption_kwh, 0)}</td>
+        <td class="px-4 py-2 text-right">${fmtNum(s.water_consumption_kl, 0)}</td>
+        <td class="px-4 py-2 text-right font-medium">${money(s.grand_total_incl_vat)}</td>
+        <td class="px-4 py-2 text-right"><a class="text-blue-600 hover:underline" href="/municipal-accounts?accountId=${account.id}&statementId=${s.id}">View</a></td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>` : ''}`;
+  return layout({ title: 'Municipality Accounts', user, active: '/municipal-accounts', body });
+}
+
 function reconciliationPage({ user, rows, summary }) {
   const body = `
   <h1 class="text-2xl font-bold mb-1">Reconciliation: App vs. Source Workbook</h1>
@@ -579,6 +706,6 @@ module.exports = {
   esc, money, fmtNum, layout, loginPage, dashboardPage, tenantsPage, tenantDetailPage,
   metersPage, tariffsPage, billingPeriodsPage, newBillingPeriodPage, readingsCapturePage,
   readingsResultPage, billingSelectorPage, billDetailPage,
-  solarBillingSlipsPage,
+  solarBillingSlipsPage, municipalAccountsPage,
   reconciliationPage, auditLogPage, statusColor,
 };
