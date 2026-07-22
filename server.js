@@ -9,6 +9,7 @@ const auth = require('./auth');
 const views = require('./views');
 const { buildBillingSlipPdf } = require('./pdf');
 const billing = require('./billing');
+const solar = require('./solar');
 
 const db = open();
 migrate(db);
@@ -63,6 +64,28 @@ function requireRole(req, res, user, allowed) {
 
 // ---------------- data helpers ----------------
 function latestPeriod() { return get('SELECT * FROM billing_periods ORDER BY start_date DESC LIMIT 1'); }
+
+// Trailing up-to-12-month view of a tenant's billed cost (excl. VAT), split Electricity / Water /
+// Sanitation, ending at (and including) the given period - feeds the trend chart on the PDF slip.
+// Sanitation is stored under utility_type='water' in bill_line_items (it's part of the same
+// municipal water/sewer account), so it's split out here by category rather than being a
+// separate utility_type in the schema.
+function monthlyTrendForTenant(tenantId, asOfStartDate) {
+  const rows = all(`
+    SELECT bp.label, bp.start_date,
+      COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) as elec,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category NOT IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as water,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as sanitation
+    FROM billing_periods bp
+    LEFT JOIN bills b ON b.billing_period_id = bp.id AND b.tenant_id = ?
+    LEFT JOIN bill_line_items bli ON bli.bill_id = b.id
+    WHERE bp.start_date <= ?
+    GROUP BY bp.id
+    ORDER BY bp.start_date DESC
+    LIMIT 12
+  `, [tenantId, asOfStartDate]);
+  return rows.reverse();
+}
 
 function dashboardData(periodId) {
   const period = periodId ? get('SELECT * FROM billing_periods WHERE id=?', [periodId]) : latestPeriod();
@@ -297,6 +320,7 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
   const period = get('SELECT * FROM billing_periods WHERE id=?', [bill.billing_period_id]);
   const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' ORDER BY id", [bill.id]);
   const waterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water' ORDER BY id", [bill.id]);
+  const monthlyTrend = monthlyTrendForTenant(tenant.id, period.start_date);
   const pdfBuf = buildBillingSlipPdf({
     tenantName: tenant.name, invoiceNumber: bill.invoice_number, unit: tenant.unit,
     periodLabel: period.label, accountNumber: tenant.account_number, startDate: period.start_date,
@@ -304,12 +328,20 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
     elecConsumption: bill.electricity_consumption_kwh.toFixed(2), waterConsumption: bill.water_consumption_m3.toFixed(2),
     elecLineItems: elecItems, waterLineItems: waterItems,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
-    status: bill.status, generatedAt: bill.generated_at,
+    status: bill.status, generatedAt: bill.generated_at, monthlyTrend,
     notes: 'Reprinted from stored billing data - not from a live browser view.',
   });
   audit(user.userId, 'pdf_download', 'bill', bill.id, null, null, null, null);
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${bill.invoice_number}.pdf"` });
   res.end(pdfBuf);
+});
+
+route('GET', '/solar-billing-slips', async (req, res, params, query) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const allPeriods = all('SELECT * FROM billing_periods ORDER BY start_date DESC');
+  const period = query.periodId ? get('SELECT * FROM billing_periods WHERE id=?', [query.periodId]) : latestPeriod();
+  const slips = period ? solar.getSolarSlips(db, period.id) : [];
+  send(res, 200, views.solarBillingSlipsPage({ user, period, allPeriods, slips }));
 });
 
 route('GET', '/reconciliation', async (req, res) => {

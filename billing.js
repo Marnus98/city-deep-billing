@@ -137,4 +137,4 @@ function generateBillsForPeriod(db, periodId) {
   return { billsCreated, missing };
 }
 
-module.exports = { generateBillsForPeriod };
+module.exports = { generateBillsForPeriod, activeTariffParams };

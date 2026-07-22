@@ -15,37 +15,59 @@ const PAGE_H = 841.89;
 
 class PDFDoc {
   constructor() {
-    this.ops = [];
+    this.pages = [[]]; // one ops array per page - see newPage()
     this.page = { width: PAGE_W, height: PAGE_H };
   }
-  text(x, y, str, { size = 10, bold = false } = {}) {
+  get currentOps() { return this.pages[this.pages.length - 1]; }
+  // Starts a new page (used to put the 12-month trend chart on its own page so it never has to
+  // fight the electricity/water tables above it for vertical space).
+  newPage() { this.pages.push([]); return this; }
+  text(x, y, str, { size = 10, bold = false, angle = 0 } = {}) {
     const font = bold ? 'F2' : 'F1';
-    this.ops.push(`BT /${font} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
+    if (angle) {
+      // Rotated text (used for the vertical "Rand" axis label) needs its own little transform
+      // matrix around the BT/ET block rather than the plain Td translation used everywhere else.
+      const rad = (angle * Math.PI) / 180;
+      const cos = Math.cos(rad).toFixed(4), sin = Math.sin(rad).toFixed(4), nsin = (-Math.sin(rad)).toFixed(4);
+      this.currentOps.push(`q ${cos} ${sin} ${nsin} ${cos} ${x.toFixed(2)} ${y.toFixed(2)} cm BT /${font} ${size} Tf 0 0 Td (${escapePdfText(str)}) Tj ET Q`);
+    } else {
+      this.currentOps.push(`BT /${font} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
+    }
     return this;
   }
-  line(x1, y1, x2, y2, width = 0.75) {
-    this.ops.push(`${width} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
+  line(x1, y1, x2, y2, width = 0.75, { color } = {}) {
+    const colorOp = color ? `${color[0]} ${color[1]} ${color[2]} RG ` : '';
+    this.currentOps.push(`${colorOp}${width} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
     return this;
   }
   rect(x, y, w, h, { fill } = {}) {
     if (fill) {
       const [r, g, b] = fill;
-      this.ops.push(`${r} ${g} ${b} rg ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`);
+      this.currentOps.push(`${r} ${g} ${b} rg ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`);
     } else {
-      this.ops.push(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`);
+      this.currentOps.push(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`);
     }
     return this;
   }
   build() {
-    const content = this.ops.join('\n');
     const objects = [];
-    objects.push('<< /Type /Catalog /Pages 2 0 R >>'); // 1
-    objects.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'); // 2
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.page.width} ${this.page.height}] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>`); // 3
-    objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'); // 4
-    objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'); // 5
-    const streamBytes = Buffer.byteLength(content, 'utf8');
-    objects.push(`<< /Length ${streamBytes} >>\nstream\n${content}\nendstream`); // 6
+    const catalogIdx = objects.length; objects.push(null); // 1
+    const pagesIdx = objects.length; objects.push(null); // 2
+    const f1Idx = objects.length; objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'); // 3
+    const f2Idx = objects.length; objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'); // 4
+
+    const pageObjNums = [];
+    for (const pageOps of this.pages) {
+      const pageIdx = objects.length; objects.push(null); // reserved, filled in below
+      const contentIdx = objects.length;
+      const content = pageOps.join('\n');
+      const streamBytes = Buffer.byteLength(content, 'utf8');
+      objects.push(`<< /Length ${streamBytes} >>\nstream\n${content}\nendstream`);
+      objects[pageIdx] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.page.width} ${this.page.height}] /Resources << /Font << /F1 ${f1Idx + 1} 0 R /F2 ${f2Idx + 1} 0 R >> >> /Contents ${contentIdx + 1} 0 R >>`;
+      pageObjNums.push(pageIdx + 1);
+    }
+    objects[catalogIdx] = '<< /Type /Catalog /Pages 2 0 R >>';
+    objects[pagesIdx] = `<< /Type /Pages /Kids [${pageObjNums.map((n) => n + ' 0 R').join(' ')}] /Count ${pageObjNums.length} >>`;
 
     let out = '%PDF-1.4\n';
     const offsets = [0];
@@ -74,6 +96,77 @@ function money(n) {
   const [intPart, decPart] = fixed.split('.');
   const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${neg ? '-' : ''}R ${withCommas}.${decPart}`;
+}
+
+// Compact number formatting for chart axis ticks/labels - no "R" prefix, no decimals (matches
+// the tenant's existing internal utility-cost chart, which labels its axis "Rand" once rather
+// than repeating the currency symbol on every value).
+function moneyShort(n) {
+  const v = Math.round(Number(n || 0));
+  const neg = v < 0;
+  return (neg ? '-' : '') + Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function shortMonthLabel(label) {
+  // "2026-04" -> "APR 26"
+  const m = /^(\d{4})-(\d{2})$/.exec(label);
+  if (!m) return label;
+  const [, y, mo] = m;
+  return `${MONTH_ABBR[parseInt(mo, 10) - 1]} ${y.slice(2)}`;
+}
+
+// Stacked bar chart: one bar per month, split Electricity / Water / Sanitation, with the total
+// (excl. VAT) labelled above each bar - reproduces the layout of the tenant's existing "Utility
+// Cost Excluding VAT" report so this page looks familiar rather than inventing a new format.
+// `series`: chronological array of { label, elec, water, sanitation } (label like "2026-04").
+function drawTrendChart(doc, { x, y, width, height, series }) {
+  const COLOR_ELEC = [0.11, 0.16, 0.34];
+  const COLOR_WATER = [0.13, 0.62, 0.35];
+  const COLOR_SAN = [0.93, 0.55, 0.09];
+
+  const totals = series.map((s) => (s.elec || 0) + (s.water || 0) + (s.sanitation || 0));
+  const maxVal = Math.max(1, ...totals);
+  const chartBottom = y - height;
+  const n = series.length || 1;
+  const colWidth = width / n;
+  const barWidth = Math.min(30, colWidth * 0.55);
+
+  // Legend, top-right of the chart block.
+  const legendItems = [['Sanitation', COLOR_SAN], ['Water', COLOR_WATER], ['Electricity', COLOR_ELEC]];
+  let lx = x + width - 190;
+  const ly = y + 16;
+  for (const [label, color] of legendItems) {
+    doc.rect(lx, ly, 7, 7, { fill: color });
+    doc.text(lx + 10, ly + 1, label, { size: 8 });
+    lx += 65;
+  }
+
+  // Y-axis gridlines + tick labels (4 bands).
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const v = (maxVal * t) / ticks;
+    const ty = chartBottom + (height * t) / ticks;
+    doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
+    doc.text(x - 32, ty - 3, moneyShort(v), { size: 6 });
+  }
+  doc.text(x - 55, chartBottom + height / 2 - 15, 'Rand', { size: 8, bold: true, angle: 90 });
+
+  series.forEach((s, i) => {
+    const colX = x + i * colWidth + (colWidth - barWidth) / 2;
+    const elecH = ((s.elec || 0) / maxVal) * height;
+    const waterH = ((s.water || 0) / maxVal) * height;
+    const sanH = ((s.sanitation || 0) / maxVal) * height;
+    let by = chartBottom;
+    doc.rect(colX, by, barWidth, elecH, { fill: COLOR_ELEC }); by += elecH;
+    doc.rect(colX, by, barWidth, waterH, { fill: COLOR_WATER }); by += waterH;
+    doc.rect(colX, by, barWidth, sanH, { fill: COLOR_SAN }); by += sanH;
+    const total = totals[i];
+    if (total > 0) doc.text(colX - 8, by + 4, moneyShort(total), { size: 6, bold: true });
+    doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
+  });
+
+  doc.line(x, chartBottom, x + width, chartBottom, 0.75);
 }
 
 // Builds the billing slip PDF for one bill. `data` shape - see server.js buildBillPdfData().
@@ -118,6 +211,18 @@ function buildBillingSlipPdf(data) {
   doc.line(left, y, right, y); y -= 16;
   if (data.notes) { doc.text(left, y, 'Notes: ' + data.notes, { size: 9 }); y -= 16; }
   doc.text(left, 30, `Bill status: ${data.status.toUpperCase()}  |  Generated: ${data.generatedAt}  |  This is a system-generated statement.`, { size: 7 });
+
+  // Second page: rolling utility-cost trend chart, only when there's more than one month of
+  // history to show (a brand-new tenant's very first bill would just be a single flat bar).
+  if (data.monthlyTrend && data.monthlyTrend.length > 1) {
+    doc.newPage();
+    let ty = PAGE_H - 50;
+    doc.text(left, ty, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); ty -= 14;
+    doc.text(left, ty, `Utility Cost Excluding VAT - ${data.tenantName}`, { size: 11, bold: true }); ty -= 8;
+    doc.line(left, ty, right, ty); ty -= 30;
+    drawTrendChart(doc, { x: left + 40, y: ty, width: right - left - 40, height: 420, series: data.monthlyTrend });
+    doc.text(left, 30, `Trailing ${data.monthlyTrend.length}-month view, ending ${data.periodLabel}. Figures exclude VAT.`, { size: 7 });
+  }
 
   return doc.build();
 }

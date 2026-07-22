@@ -277,6 +277,30 @@ function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tari
   return { bill, subtotal, elecKwhTotal, waterM3Total };
 }
 
+// These 4 mini-substation "bulk export" meters aren't billed to any single tenant, so they never
+// go through generateBill()/calc.js and never get a meters/meter_readings row from the main import
+// loop. The new "Solar Billing Slips" report (solar.js) needs their raw readings directly (they
+// represent how much a whole mini-sub exported back to the grid), so import them here as
+// role='bulk' meters purely for that report to read - they carry no tenant assignment and never
+// appear on any bill.
+const SOLAR_BULK_EXPORT_METERS = [
+  { serial: '35726713E', label: 'Bulk Meter Mini Sub D (feeds JC Bakery)' },
+  { serial: '35775954E', label: 'Mini Sub B Bulk Meter (feeds Lesco/Agrana)' },
+  { serial: '35776118E', label: 'Bulk Mini Sub E (feeds SkillCraft)' },
+  { serial: '36533986E', label: 'Bulk Meter Mini Sub F (feeds Teraoka SA)' },
+];
+function seedSolarBulkMeters(monthData, billingPeriod) {
+  for (const cfg of SOLAR_BULK_EXPORT_METERS) {
+    const row = (monthData.elect_readings || []).find((r) => r.serial === cfg.serial);
+    if (!row) continue; // not present in this month's workbook - skip, don't break the rest of the import
+    const meter = getOrCreateMeter(cfg.serial, 'electricity', 'bulk', row.location || cfg.label, row.billing_mult || 1);
+    run(`INSERT OR REPLACE INTO meter_readings
+        (meter_id, billing_period_id, start_reading, end_reading, source)
+        VALUES (?,?,?,?,?)`,
+      [meter.id, billingPeriod.id, row.start_kwh || 0, row.end_kwh || 0, 'excel_import']);
+  }
+}
+
 function seedMonth(monthData) {
   const { billingPeriod, params } = seedTariffsAndPeriod(monthData);
   const elecTenantsByName = {};
@@ -327,6 +351,7 @@ function seedMonth(monthData) {
     }
     count++;
   }
+  seedSolarBulkMeters(monthData, billingPeriod);
   console.log(`Seeded ${count} tenants for period ${monthData.label} (${billingPeriod.start_date} - ${billingPeriod.end_date})`);
 }
 

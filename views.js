@@ -15,8 +15,8 @@ function fmtNum(n, dp = 2) { return Number(n || 0).toLocaleString('en-US', { min
 function layout({ title, user, active, body }) {
   const nav = [
     ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
-    ['/billing-periods', 'Billing Periods'], ['/billing', 'Billing'], ['/tariffs', 'Tariffs'],
-    ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
+    ['/billing-periods', 'Billing Periods'], ['/billing', 'Billing'], ['/solar-billing-slips', 'Solar Billing Slips'],
+    ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
   ];
   return `<!DOCTYPE html>
 <html lang="en">
@@ -458,6 +458,65 @@ function billDetailPage({ user, tenant, period, bill, elecItems, waterItems, ele
   return layout({ title: `${tenant.name} - ${period.label}`, user, active: '/billing', body });
 }
 
+function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
+  const kwh = (n) => fmtNum(n, 1) + ' kWh';
+
+  const rowHtml = (r) => `<tr class="border-t ${r.bold ? 'font-semibold bg-slate-50' : ''}">
+    <td class="py-1 pl-2">${esc(r.label)}${r.serial ? ` <span class="text-slate-400 font-mono text-xs">(${esc(r.serial)})</span>` : ''}</td>
+    <td class="py-1 text-right ${r.kwh < 0 ? 'text-red-600' : ''}">${kwh(r.kwh)}</td>
+    <td class="py-1 text-right ${r.rand < 0 ? 'text-red-600' : ''}">${money(r.rand)}</td>
+  </tr>`;
+
+  const sectionHtml = (s) => `
+    <div class="text-xs uppercase tracking-wide text-slate-500 mt-3 mb-1">${esc(s.heading)}</div>
+    <table class="w-full text-sm">
+      <tbody>${s.rows.map(rowHtml).join('')}</tbody>
+    </table>`;
+
+  const slipHtml = (slip) => `
+  <div class="bg-white rounded-lg border mb-6">
+    <div class="px-4 py-3 border-b font-semibold flex justify-between items-baseline">
+      <span>${esc(slip.title)}</span>
+      <span class="text-slate-500 text-sm font-normal">Total Due: ${kwh(slip.total.due.kwh)} &middot; ${money(slip.total.due.rand)}</span>
+    </div>
+    <div class="px-4 py-2">
+      ${slip.sections.map(sectionHtml).join('')}
+      <div class="mt-3 pt-3 border-t">
+        <table class="w-full text-sm">
+          <tbody>
+            <tr class="border-t"><td class="py-1 pl-2 font-medium">Tenant Munic Usage (total)</td><td class="py-1 text-right">${kwh(slip.total.muniUsage.kwh)}</td><td class="py-1 text-right">${money(slip.total.muniUsage.rand)}</td></tr>
+            <tr class="border-t"><td class="py-1 pl-2 font-medium">Solar Used (total)</td><td class="py-1 text-right">${kwh(slip.total.solarUsed.kwh)}</td><td class="py-1 text-right">${money(slip.total.solarUsed.rand)}</td></tr>
+            <tr class="border-t font-semibold bg-slate-50"><td class="py-1 pl-2">Total Due</td><td class="py-1 text-right">${kwh(slip.total.due.kwh)}</td><td class="py-1 text-right">${money(slip.total.due.rand)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+
+  const parkTotal = slips.reduce((s, sl) => ({ kwh: s.kwh + sl.total.due.kwh, rand: s.rand + sl.total.due.rand }), { kwh: 0, rand: 0 });
+  const parkSolar = slips.reduce((s, sl) => ({ kwh: s.kwh + sl.total.solarUsed.kwh, rand: s.rand + sl.total.solarUsed.rand }), { kwh: 0, rand: 0 });
+
+  const body = `
+  <div class="flex items-center justify-between mb-1">
+    <h1 class="text-2xl font-bold">Solar Billing Slips</h1>
+    <form method="get" action="/solar-billing-slips" class="flex items-center gap-2">
+      <label class="text-sm text-slate-500">Billing month:</label>
+      <select name="periodId" class="border rounded px-3 py-2 text-sm">
+        ${(allPeriods || []).map((p) => `<option value="${p.id}" ${period && p.id === period.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
+      </select>
+      <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
+    </form>
+  </div>
+  <p class="text-sm text-slate-500 mb-4">Breaks down each solar-connected tenant's already-billed electricity energy charge by source &mdash; municipal grid vs. the on-site solar installation. This is a reporting view only; it does not change any tenant's invoiced amount (every figure below is reconstructed from that tenant's actual bill).</p>
+  ${!slips.length ? `<div class="bg-white border rounded p-6 text-slate-400">No billing data for this period yet.</div>` : `
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-w-2xl">
+    ${statCard('Park-wide total (7 solar tenants)', money(parkTotal.rand), fmtNum(parkTotal.kwh, 0) + ' kWh')}
+    ${statCard('Of which solar-sourced', money(parkSolar.rand), fmtNum(parkSolar.kwh, 0) + ' kWh &middot; ' + (parkTotal.rand ? ((parkSolar.rand / parkTotal.rand) * 100).toFixed(1) : '0') + '% of total')}
+  </div>
+  ${slips.map(slipHtml).join('')}`}`;
+  return layout({ title: 'Solar Billing Slips', user, active: '/solar-billing-slips', body });
+}
+
 function reconciliationPage({ user, rows, summary }) {
   const body = `
   <h1 class="text-2xl font-bold mb-1">Reconciliation: App vs. Source Workbook</h1>
@@ -520,5 +579,6 @@ module.exports = {
   esc, money, fmtNum, layout, loginPage, dashboardPage, tenantsPage, tenantDetailPage,
   metersPage, tariffsPage, billingPeriodsPage, newBillingPeriodPage, readingsCapturePage,
   readingsResultPage, billingSelectorPage, billDetailPage,
+  solarBillingSlipsPage,
   reconciliationPage, auditLogPage, statusColor,
 };
