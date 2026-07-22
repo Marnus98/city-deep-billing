@@ -51,7 +51,6 @@ function round2(n) { return Math.round(((n || 0) + Number.EPSILON) * 100) / 100;
 function seedStatement(rec) {
   const acc = getOrCreateAccount(rec.account, rec.address, rec.market_value);
   const existing = get('SELECT id FROM municipal_statements WHERE invoice_number=?', [rec.invoice_number]);
-  if (existing) return false; // already imported - invoice_number is the de-dup key
 
   const w = rec.water;
   const waterExcl = w.water_excl_vat || 0;
@@ -63,10 +62,22 @@ function seedStatement(rec) {
   const waterVat = waterSanExcl > 0 ? round2((w.vat || 0) * (waterExcl / waterSanExcl)) : 0;
   const sanVat = round2((w.vat || 0) - waterVat);
 
+  const L = rec.electricity.lines || {};
+
+  // Delete-then-reinsert rather than skip-if-exists: makes this safe to re-run whenever the
+  // extractor/schema gains new fields (as it did when the TOU breakdown columns were added) -
+  // previously-imported statements pick up the new data on the next seed run instead of silently
+  // staying stale forever.
+  if (existing) run('DELETE FROM municipal_statements WHERE id=?', [existing.id]);
+
   run(`INSERT INTO municipal_statements (
       municipal_account_id, invoice_number, statement_for, statement_date, due_date,
       elec_reading_start, elec_reading_end, elec_consumption_kwh, elec_consumption_kvarh, elec_tariff_type,
       elec_excl_vat, elec_vat, elec_incl_vat,
+      elec_off_peak_kwh, elec_off_peak_rand, elec_peak_kwh, elec_peak_rand,
+      elec_standard_kwh, elec_standard_rand, elec_energy_kwh, elec_energy_rand,
+      elec_demand_kva, elec_demand_rand, elec_reactive_kvarh, elec_reactive_rand,
+      elec_service_rand, elec_network_surcharge_rand,
       water_reading_start, water_reading_end, water_consumption_kl,
       water_excl_vat, water_vat, water_incl_vat,
       sanitation_excl_vat, sanitation_vat, sanitation_incl_vat,
@@ -74,13 +85,17 @@ function seedStatement(rec) {
       sundry_excl_vat, sundry_vat, sundry_incl_vat,
       property_rates_excl_vat, property_rates_vat, property_rates_incl_vat,
       grand_total_incl_vat, source_file
-    ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?)`,
+    ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?)`,
     [
       acc.id, rec.invoice_number, rec.statement_for, rec.statement_date, rec.due_date,
       rec.electricity.reading_period ? rec.electricity.reading_period[0] : null,
       rec.electricity.reading_period ? rec.electricity.reading_period[1] : null,
       rec.electricity.consumption_kwh, rec.electricity.consumption_kvarh, rec.electricity.tariff_type,
       rec.electricity.excl_vat, rec.electricity.vat, rec.electricity.incl_vat,
+      L.off_peak_qty || 0, L.off_peak || 0, L.peak_qty || 0, L.peak || 0,
+      L.standard_qty || 0, L.standard || 0, L.energy_qty || 0, L.energy || 0,
+      L.demand_qty || 0, L.demand || 0, L.reactive_qty || 0, L.reactive || 0,
+      L.service || 0, L.network_surcharge || 0,
       w.reading_period ? w.reading_period[0] : null, w.reading_period ? w.reading_period[1] : null, w.consumption_kl,
       round2(waterExcl), waterVat, round2(waterExcl + waterVat),
       round2(sanExcl), sanVat, round2(sanExcl + sanVat),
@@ -89,25 +104,25 @@ function seedStatement(rec) {
       rec.property_rates.excl_vat, rec.property_rates.vat, rec.property_rates.incl_vat,
       rec.grand_total_incl_vat, rec.file,
     ]);
-  return true;
+  return existing ? 'updated' : 'created';
 }
 
 function main() {
   const jsonPath = path.join(__dirname, 'municipal_statements.json');
   if (!fs.existsSync(jsonPath)) { console.log('No municipal_statements.json found - skipping municipal import.'); return; }
   const records = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-  let created = 0, skipped = 0;
+  let created = 0, updated = 0;
   db.exec('BEGIN');
   try {
     for (const rec of records) {
-      if (seedStatement(rec)) created++; else skipped++;
+      if (seedStatement(rec) === 'created') created++; else updated++;
     }
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
   }
-  console.log(`Municipal import: ${created} statement(s) added, ${skipped} already present.`);
+  console.log(`Municipal import: ${created} statement(s) added, ${updated} refreshed.`);
 }
 
 if (require.main === module) { main(); db.close(); }

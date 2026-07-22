@@ -118,4 +118,97 @@ function buildComparison(db, statement, accountLabel) {
   return { siteName, period: match.period, overlapDays: Math.round(match.overlapDays), ours, coj };
 }
 
-module.exports = { SITE_MAP, buildComparison, bestOverlappingPeriod, ourSiteTotals, cojSiteTotals };
+// ---------- "All Accounts (Combined)" mode ----------
+// Every distinct COJ "Statement for" label seen across all 4 accounts, most recent first - used
+// to populate the period picker when the combined view is selected.
+function allStatementLabels(db) {
+  return all(db, `SELECT statement_for, MAX(statement_date) AS latest_date
+    FROM municipal_statements GROUP BY statement_for ORDER BY latest_date DESC`);
+}
+
+const NUMERIC_FIELDS = [
+  'elec_consumption_kwh', 'elec_consumption_kvarh', 'elec_excl_vat', 'elec_vat', 'elec_incl_vat',
+  'elec_off_peak_kwh', 'elec_off_peak_rand', 'elec_peak_kwh', 'elec_peak_rand',
+  'elec_standard_kwh', 'elec_standard_rand', 'elec_energy_kwh', 'elec_energy_rand',
+  'elec_demand_kva', 'elec_demand_rand', 'elec_reactive_kvarh', 'elec_reactive_rand',
+  'elec_service_rand', 'elec_network_surcharge_rand',
+  'water_consumption_kl', 'water_excl_vat', 'water_vat', 'water_incl_vat',
+  'sanitation_excl_vat', 'sanitation_vat', 'sanitation_incl_vat',
+  'refuse_excl_vat', 'refuse_vat', 'refuse_incl_vat',
+  'sundry_excl_vat', 'sundry_vat', 'sundry_incl_vat',
+  'property_rates_excl_vat', 'property_rates_vat', 'property_rates_incl_vat',
+  'grand_total_incl_vat',
+];
+
+// Sums the exact-match statement (by "Statement for" label) across every one of the 4 accounts
+// into one synthetic statement-shaped object with the same field names municipalAccountsPage
+// already knows how to render. Accounts with no statement under that exact label are listed in
+// `missingAccounts` rather than silently skipped, since that changes what the combined total means.
+function buildCombinedStatement(db, statementFor) {
+  const rows = all(db, `SELECT ms.*, ma.label AS account_label FROM municipal_statements ms
+    JOIN municipal_accounts ma ON ma.id = ms.municipal_account_id WHERE ms.statement_for = ?`, [statementFor]);
+  const combined = { statement_for: statementFor, invoice_number: null, statement_date: null, elec_tariff_type: 'mixed' };
+  for (const f of NUMERIC_FIELDS) combined[f] = 0;
+  let earliestElecStart = null, latestElecEnd = null, earliestWaterStart = null, latestWaterEnd = null;
+  const matchedAccounts = [];
+  for (const r of rows) {
+    for (const f of NUMERIC_FIELDS) combined[f] += r[f] || 0;
+    if (r.elec_reading_start && (!earliestElecStart || r.elec_reading_start < earliestElecStart)) earliestElecStart = r.elec_reading_start;
+    if (r.elec_reading_end && (!latestElecEnd || r.elec_reading_end > latestElecEnd)) latestElecEnd = r.elec_reading_end;
+    if (r.water_reading_start && (!earliestWaterStart || r.water_reading_start < earliestWaterStart)) earliestWaterStart = r.water_reading_start;
+    if (r.water_reading_end && (!latestWaterEnd || r.water_reading_end > latestWaterEnd)) latestWaterEnd = r.water_reading_end;
+    matchedAccounts.push(r.account_label);
+  }
+  combined.elec_reading_start = earliestElecStart; combined.elec_reading_end = latestElecEnd;
+  combined.water_reading_start = earliestWaterStart; combined.water_reading_end = latestWaterEnd;
+  const missingAccounts = Object.keys(SITE_MAP).filter((l) => !matchedAccounts.includes(l));
+  return { statement: combined, matchedAccounts, missingAccounts };
+}
+
+// Sums this app's own internally-billed electricity/water across *every* tenant, any site, for one
+// billing period - the "our total spend" side of the combined all-accounts comparison.
+function ourAllSitesTotals(db, periodId) {
+  const consumption = get(db, `
+    SELECT COALESCE(SUM(b.electricity_consumption_kwh),0) AS elec_kwh, COALESCE(SUM(b.water_consumption_m3),0) AS water_kl,
+      COUNT(DISTINCT b.tenant_id) AS tenant_count
+    FROM bills b WHERE b.billing_period_id = ?
+  `, [periodId]);
+  const charges = get(db, `
+    SELECT COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END),0) AS elec_rand,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' THEN bli.amount END),0) AS water_rand
+    FROM bill_line_items bli JOIN bills b ON b.id = bli.bill_id WHERE b.billing_period_id = ?
+  `, [periodId]);
+  return { ...consumption, ...charges };
+}
+
+// Combined-mode comparison: utility side is all 4 accounts (best-overlap matched per account, same
+// method as cojSiteTotals), our side is every tenant on every site.
+function buildComparisonAll(db, combinedStatement) {
+  const anchorStart = combinedStatement.elec_reading_start || combinedStatement.water_reading_start;
+  const anchorEnd = combinedStatement.elec_reading_end || combinedStatement.water_reading_end;
+  const match = bestOverlappingPeriod(db, anchorStart, anchorEnd);
+  if (!match) return { siteName: 'All sites', period: null };
+  const ours = ourAllSitesTotals(db, match.period.id);
+  const accounts = all(db, 'SELECT * FROM municipal_accounts');
+  let elecKwh = 0, elecRand = 0, waterKl = 0, waterRand = 0;
+  const matched = [];
+  for (const acc of accounts) {
+    const statements = all(db, 'SELECT * FROM municipal_statements WHERE municipal_account_id=?', [acc.id]);
+    let best = null, bestDays = 0;
+    for (const s of statements) {
+      const d = daysOverlap(anchorStart, anchorEnd, s.elec_reading_start || s.water_reading_start, s.elec_reading_end || s.water_reading_end);
+      if (d > bestDays) { bestDays = d; best = s; }
+    }
+    if (best) {
+      elecKwh += best.elec_consumption_kwh || 0; elecRand += best.elec_incl_vat || 0;
+      waterKl += best.water_consumption_kl || 0; waterRand += (best.water_incl_vat || 0) + (best.sanitation_incl_vat || 0);
+      matched.push({ account: acc.label, statement_for: best.statement_for, overlapDays: Math.round(bestDays) });
+    }
+  }
+  return { siteName: 'All sites', period: match.period, overlapDays: Math.round(match.overlapDays), ours, coj: { elecKwh, elecRand, waterKl, waterRand, matched } };
+}
+
+module.exports = {
+  SITE_MAP, buildComparison, bestOverlappingPeriod, ourSiteTotals, cojSiteTotals,
+  allStatementLabels, buildCombinedStatement, ourAllSitesTotals, buildComparisonAll,
+};

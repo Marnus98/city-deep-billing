@@ -207,6 +207,16 @@ function migrate(db) {
     elec_reading_start TEXT, elec_reading_end TEXT,
     elec_consumption_kwh REAL, elec_consumption_kvarh REAL, elec_tariff_type TEXT,
     elec_excl_vat REAL, elec_vat REAL, elec_incl_vat REAL,
+    -- Granular electricity breakdown (TOU accounts use off_peak/peak/standard; flat-rate accounts
+    -- use energy instead; demand/reactive/service/network_surcharge apply to both). All are
+    -- excl. VAT Rand amounts except the _kwh/_kva/_kvarh quantity columns.
+    elec_off_peak_kwh REAL, elec_off_peak_rand REAL,
+    elec_peak_kwh REAL, elec_peak_rand REAL,
+    elec_standard_kwh REAL, elec_standard_rand REAL,
+    elec_energy_kwh REAL, elec_energy_rand REAL,
+    elec_demand_kva REAL, elec_demand_rand REAL,
+    elec_reactive_kvarh REAL, elec_reactive_rand REAL,
+    elec_service_rand REAL, elec_network_surcharge_rand REAL,
     water_reading_start TEXT, water_reading_end TEXT,
     water_consumption_kl REAL,
     water_excl_vat REAL, water_vat REAL, water_incl_vat REAL,
@@ -228,6 +238,17 @@ function migrate(db) {
   if (!cols.includes('allocation_pct_kvarh')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kvarh REAL');
   if (!cols.includes('allocation_pct_kva')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kva REAL');
   if (!cols.includes('capacity_charge_override')) db.exec('ALTER TABLE meter_assignments ADD COLUMN capacity_charge_override REAL');
+
+  const msCols = db.prepare("PRAGMA table_info(municipal_statements)").all().map((c) => c.name);
+  const newMsCols = [
+    'elec_off_peak_kwh', 'elec_off_peak_rand', 'elec_peak_kwh', 'elec_peak_rand',
+    'elec_standard_kwh', 'elec_standard_rand', 'elec_energy_kwh', 'elec_energy_rand',
+    'elec_demand_kva', 'elec_demand_rand', 'elec_reactive_kvarh', 'elec_reactive_rand',
+    'elec_service_rand', 'elec_network_surcharge_rand',
+  ];
+  for (const c of newMsCols) {
+    if (!msCols.includes(c)) db.exec(`ALTER TABLE municipal_statements ADD COLUMN ${c} REAL`);
+  }
 }
 
 module.exports = { open, migrate, DB_PATH };

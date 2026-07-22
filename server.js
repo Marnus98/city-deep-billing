@@ -352,14 +352,31 @@ route('GET', '/solar-billing-slips', async (req, res, params, query) => {
 route('GET', '/municipal-accounts', async (req, res, params, query) => {
   const user = requireLogin(req, res); if (!user) return;
   const accounts = all('SELECT * FROM municipal_accounts ORDER BY label');
-  if (!accounts.length) return send(res, 200, views.municipalAccountsPage({ user, accounts, account: null, statements: [], statement: null }));
+  if (!accounts.length) return send(res, 200, views.municipalAccountsPage({ user, accounts, account: null, statements: [], statement: null, comparison: null, isCombined: false }));
+
+  if (query.accountId === 'all') {
+    const labels = municipalCompare.allStatementLabels(db);
+    const statementFor = query.statementFor || (labels.length ? labels[0].statement_for : null);
+    let statement = null, comparison = null, combinedInfo = null;
+    if (statementFor) {
+      combinedInfo = municipalCompare.buildCombinedStatement(db, statementFor);
+      statement = combinedInfo.statement;
+      comparison = municipalCompare.buildComparisonAll(db, statement);
+    }
+    return send(res, 200, views.municipalAccountsPage({
+      user, accounts, account: { id: 'all', label: 'All Accounts (Combined)' }, isCombined: true,
+      statementLabels: labels, selectedStatementFor: statementFor, combinedInfo,
+      statements: [], statement, comparison,
+    }));
+  }
+
   const accountId = query.accountId ? Number(query.accountId) : accounts[0].id;
   const account = accounts.find((a) => a.id === accountId) || accounts[0];
   const statements = all('SELECT * FROM municipal_statements WHERE municipal_account_id=? ORDER BY statement_date', [account.id]);
   const statementId = query.statementId ? Number(query.statementId) : (statements.length ? statements[statements.length - 1].id : null);
   const statement = statements.find((s) => s.id === statementId) || statements[statements.length - 1] || null;
   const comparison = statement ? municipalCompare.buildComparison(db, statement, account.label) : null;
-  send(res, 200, views.municipalAccountsPage({ user, accounts, account, statements, statement, comparison }));
+  send(res, 200, views.municipalAccountsPage({ user, accounts, account, statements, statement, comparison, isCombined: false }));
 });
 
 route('GET', '/reconciliation', async (req, res) => {
