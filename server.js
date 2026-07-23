@@ -7,7 +7,7 @@ const querystring = require('querystring');
 const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
-const { buildBillingSlipPdf } = require('./pdf');
+const { buildBillingSlipPdf, buildMunicipalStatementPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
@@ -363,10 +363,11 @@ route('GET', '/municipal-accounts', async (req, res, params, query) => {
       statement = combinedInfo.statement;
       comparison = municipalCompare.buildComparisonAll(db, statement);
     }
+    const pdfUrl = statementFor ? `/municipal-pdf?accountId=all&statementFor=${encodeURIComponent(statementFor)}` : null;
     return send(res, 200, views.municipalAccountsPage({
       user, accounts, account: { id: 'all', label: 'All Accounts (Combined)' }, isCombined: true,
       statementLabels: labels, selectedStatementFor: statementFor, combinedInfo,
-      statements: [], statement, comparison,
+      statements: [], statement, comparison, pdfUrl,
     }));
   }
 
@@ -376,7 +377,61 @@ route('GET', '/municipal-accounts', async (req, res, params, query) => {
   const statementId = query.statementId ? Number(query.statementId) : (statements.length ? statements[statements.length - 1].id : null);
   const statement = statements.find((s) => s.id === statementId) || statements[statements.length - 1] || null;
   const comparison = statement ? municipalCompare.buildComparison(db, statement, account.label) : null;
-  send(res, 200, views.municipalAccountsPage({ user, accounts, account, statements, statement, comparison, isCombined: false }));
+  const pdfUrl = statement ? `/municipal-pdf?statementId=${statement.id}` : null;
+  send(res, 200, views.municipalAccountsPage({ user, accounts, account, statements, statement, comparison, isCombined: false, pdfUrl }));
+});
+
+// Builds the flat data object buildMunicipalStatementPdf() expects from either a real
+// municipal_statements row or the synthetic combined-statement object, plus whatever extra
+// context (account label/number/address, trend series, missing-accounts note) that statement
+// shape doesn't carry on its own.
+function municipalPdfData(statement, accountLabel, accountNumber, address, monthlyTrend, combinedInfo) {
+  const s = statement;
+  return {
+    accountLabel, accountNumber, address,
+    statementFor: s.statement_for, invoiceNumber: s.invoice_number, statementDate: s.statement_date,
+    tariffType: s.elec_tariff_type,
+    elecReadingStart: s.elec_reading_start, elecReadingEnd: s.elec_reading_end,
+    elecConsumptionKwh: s.elec_consumption_kwh, elecExclVat: s.elec_excl_vat, elecVat: s.elec_vat, elecInclVat: s.elec_incl_vat,
+    elecLines: municipalCompare.electricityLineItems(s),
+    waterReadingStart: s.water_reading_start, waterReadingEnd: s.water_reading_end, waterConsumptionKl: s.water_consumption_kl,
+    waterExclVat: s.water_excl_vat, waterVat: s.water_vat, waterInclVat: s.water_incl_vat,
+    sanitationExclVat: s.sanitation_excl_vat, sanitationVat: s.sanitation_vat, sanitationInclVat: s.sanitation_incl_vat,
+    refuseExclVat: s.refuse_excl_vat, refuseVat: s.refuse_vat, refuseInclVat: s.refuse_incl_vat,
+    sundryExclVat: s.sundry_excl_vat, sundryVat: s.sundry_vat, sundryInclVat: s.sundry_incl_vat,
+    propertyRatesExclVat: s.property_rates_excl_vat, propertyRatesVat: s.property_rates_vat, propertyRatesInclVat: s.property_rates_incl_vat,
+    totalExclVat: s.property_rates_excl_vat + s.elec_excl_vat + s.water_excl_vat + s.sanitation_excl_vat + s.refuse_excl_vat + s.sundry_excl_vat,
+    totalVat: s.property_rates_vat + s.elec_vat + s.water_vat + s.sanitation_vat + s.refuse_vat + s.sundry_vat,
+    grandTotalInclVat: s.grand_total_incl_vat,
+    monthlyTrend, matchedAccounts: combinedInfo ? combinedInfo.matchedAccounts : null, missingAccounts: combinedInfo ? combinedInfo.missingAccounts : null,
+    generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+  };
+}
+
+route('GET', '/municipal-pdf', async (req, res, params, query) => {
+  const user = requireLogin(req, res); if (!user) return;
+
+  if (query.accountId === 'all') {
+    const statementFor = query.statementFor;
+    if (!statementFor) return send(res, 404, 'Not found');
+    const combinedInfo = municipalCompare.buildCombinedStatement(db, statementFor);
+    const trend = municipalCompare.monthlyTrendAllAccounts(db, combinedInfo.statement.statement_date);
+    const data = municipalPdfData(combinedInfo.statement, 'All Accounts (Combined)', '', 'City Deep Industrial Park - all municipal accounts', trend, combinedInfo);
+    const pdfBuf = buildMunicipalStatementPdf(data);
+    audit(user.userId, 'pdf_download', 'municipal_statement', null, null, null, null, `combined:${statementFor}`);
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="municipal-combined-${statementFor.replace(/\s+/g, '-')}.pdf"` });
+    return res.end(pdfBuf);
+  }
+
+  const statement = get('SELECT * FROM municipal_statements WHERE id=?', [Number(query.statementId)]);
+  if (!statement) return send(res, 404, 'Not found');
+  const account = get('SELECT * FROM municipal_accounts WHERE id=?', [statement.municipal_account_id]);
+  const trend = municipalCompare.monthlyTrendForAccount(db, account.id, statement.statement_date);
+  const data = municipalPdfData(statement, account.label, account.account_number, account.address, trend, null);
+  const pdfBuf = buildMunicipalStatementPdf(data);
+  audit(user.userId, 'pdf_download', 'municipal_statement', statement.id, null, null, null, null);
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="municipal-${account.label.replace(/\s+/g, '-')}-${statement.statement_for.replace(/\s+/g, '-')}.pdf"` });
+  res.end(pdfBuf);
 });
 
 route('GET', '/reconciliation', async (req, res) => {

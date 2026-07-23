@@ -208,7 +208,64 @@ function buildComparisonAll(db, combinedStatement) {
   return { siteName: 'All sites', period: match.period, overlapDays: Math.round(match.overlapDays), ours, coj: { elecKwh, elecRand, waterKl, waterRand, matched } };
 }
 
+// Shared by the on-screen breakdown table and the downloadable PDF so the two never drift apart:
+// the non-zero electricity charge components for one statement (TOU accounts get Off-peak/Peak/
+// Standard, flat-rate accounts get Energy, Demand/Reactive/Service/Network surcharge apply to
+// either - combined-mode statements can have several of these non-zero at once).
+function electricityLineItems(s) {
+  return [
+    { label: 'Off-peak', qty: s.elec_off_peak_kwh, unit: 'kWh', rand: s.elec_off_peak_rand },
+    { label: 'Peak', qty: s.elec_peak_kwh, unit: 'kWh', rand: s.elec_peak_rand },
+    { label: 'Standard', qty: s.elec_standard_kwh, unit: 'kWh', rand: s.elec_standard_rand },
+    { label: 'Energy (flat rate)', qty: s.elec_energy_kwh, unit: 'kWh', rand: s.elec_energy_rand },
+    { label: 'Demand', qty: s.elec_demand_kva, unit: 'kVA', rand: s.elec_demand_rand },
+    { label: 'Reactive energy', qty: s.elec_reactive_kvarh, unit: 'kVArh', rand: s.elec_reactive_rand },
+    { label: 'Service charge', qty: null, unit: null, rand: s.elec_service_rand },
+    { label: 'Network surcharge', qty: null, unit: null, rand: s.elec_network_surcharge_rand },
+  ].filter((l) => Math.abs(l.rand || 0) > 0.005);
+}
+
+// Trailing up-to-12-statement Electricity/Water/Sanitation trend (excl. VAT) for one municipal
+// account, chronological ascending - feeds the PDF's trend chart, same shape monthlyTrendForTenant
+// already produces for the tenant PDF chart ({label, elec, water, sanitation}), just re-derived
+// from municipal_statements instead of bill_line_items. label is a synthetic "YYYY-MM" derived
+// from statement_date so pdf.js's shortMonthLabel() (built for billing_periods.label) can format it
+// the same way.
+function monthlyTrendForAccount(db, accountId, asOfStatementDate) {
+  const rows = all(db, `
+    SELECT statement_for, statement_date, elec_excl_vat, water_excl_vat, sanitation_excl_vat
+    FROM municipal_statements
+    WHERE municipal_account_id = ? AND (? IS NULL OR statement_date <= ?)
+    ORDER BY statement_date DESC LIMIT 12
+  `, [accountId, asOfStatementDate || null, asOfStatementDate || null]);
+  return rows.reverse().map((r) => ({
+    label: r.statement_date ? r.statement_date.slice(0, 7).replace('/', '-') : r.statement_for,
+    elec: r.elec_excl_vat || 0, water: r.water_excl_vat || 0, sanitation: r.sanitation_excl_vat || 0,
+  }));
+}
+
+// Same trend, but summed across every account (for the "All Accounts Combined" PDF) - grouped by
+// the synthetic YYYY-MM label so accounts on slightly different statement dates within the same
+// month still land in one combined bar.
+function monthlyTrendAllAccounts(db, asOfStatementDate) {
+  const rows = all(db, `
+    SELECT statement_for, statement_date, elec_excl_vat, water_excl_vat, sanitation_excl_vat
+    FROM municipal_statements
+    WHERE (? IS NULL OR statement_date <= ?)
+    ORDER BY statement_date DESC
+  `, [asOfStatementDate || null, asOfStatementDate || null]);
+  const byLabel = new Map();
+  for (const r of rows) {
+    const label = r.statement_date ? r.statement_date.slice(0, 7).replace('/', '-') : r.statement_for;
+    if (!byLabel.has(label)) byLabel.set(label, { label, elec: 0, water: 0, sanitation: 0 });
+    const agg = byLabel.get(label);
+    agg.elec += r.elec_excl_vat || 0; agg.water += r.water_excl_vat || 0; agg.sanitation += r.sanitation_excl_vat || 0;
+  }
+  return [...byLabel.values()].sort((a, b) => a.label.localeCompare(b.label)).slice(-12);
+}
+
 module.exports = {
   SITE_MAP, buildComparison, bestOverlappingPeriod, ourSiteTotals, cojSiteTotals,
   allStatementLabels, buildCombinedStatement, ourAllSitesTotals, buildComparisonAll,
+  electricityLineItems, monthlyTrendForAccount, monthlyTrendAllAccounts,
 };

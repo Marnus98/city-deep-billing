@@ -245,4 +245,80 @@ function drawLineItemsTable(doc, items, left, right, y) {
   return y - 20;
 }
 
-module.exports = { PDFDoc, buildBillingSlipPdf, money };
+// Builds the PDF for one City of Johannesburg municipal statement (or a synthetic "All Accounts
+// Combined" statement - see municipal_compare.js buildCombinedStatement). Same visual language as
+// buildBillingSlipPdf: a breakdown table on page 1, a trailing trend chart on page 2 reusing the
+// exact same drawTrendChart the tenant bill uses, just fed the municipal Electricity/Water/
+// Sanitation totals instead of tenant-billed ones.
+function buildMunicipalStatementPdf(data) {
+  const doc = new PDFDoc();
+  const left = 42, right = PAGE_W - 42;
+  let y = PAGE_H - 50;
+
+  doc.text(left, y, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); y -= 14;
+  doc.text(left, y, 'Municipal Account Statement (City of Johannesburg)', { size: 10 }); y -= 8;
+  doc.line(left, y, right, y); y -= 18;
+
+  doc.text(left, y, 'Account:', { bold: true }); doc.text(left + 90, y, data.accountLabel);
+  doc.text(right - 180, y, 'Statement For:', { bold: true }); doc.text(right - 90, y, data.statementFor); y -= 15;
+  doc.text(left, y, 'Account No:', { bold: true }); doc.text(left + 90, y, data.accountNumber || '-');
+  doc.text(right - 180, y, 'Invoice No:', { bold: true }); doc.text(right - 90, y, data.invoiceNumber || (data.matchedAccounts ? `${data.matchedAccounts.length} accounts combined` : '-')); y -= 15;
+  doc.text(left, y, 'Address:', { bold: true }); doc.text(left + 90, y, data.address || '-');
+  doc.text(right - 180, y, 'Issued:', { bold: true }); doc.text(right - 90, y, data.statementDate || '-'); y -= 15;
+  doc.text(left, y, 'Tariff:', { bold: true });
+  doc.text(left + 90, y, data.tariffType === 'TOU' ? 'Time-of-Use' : data.tariffType === 'mixed' ? 'Mixed (combined accounts)' : 'Flat-rate'); y -= 20;
+
+  doc.line(left, y, right, y); y -= 18;
+
+  const colCons = right - 260, colExcl = right - 175, colVat = right - 90, colTotal = right;
+  const headerRow = (label1, label2) => {
+    doc.text(left, y, label1 || 'Category', { bold: true, size: 9 });
+    doc.text(colCons - 40, y, 'Consumption', { bold: true, size: 9 });
+    doc.text(colExcl - 40, y, 'Excl. VAT', { bold: true, size: 9 });
+    doc.text(colVat - 30, y, 'VAT', { bold: true, size: 9 });
+    doc.text(colTotal - 55, y, 'Total', { bold: true, size: 9 });
+    y -= 4; doc.line(left, y, right, y); y -= 13;
+  };
+  const catLine = (label, consumption, exclVat, vat, total, opts = {}) => {
+    doc.text(left + (opts.indent ? 14 : 0), y, label, { size: opts.indent ? 8 : 9.5, bold: !!opts.bold });
+    if (consumption != null) doc.text(colCons - 40, y, consumption, { size: opts.indent ? 8 : 9.5 });
+    doc.text(colExcl - 55, y, money(exclVat), { size: opts.indent ? 8 : 9.5, bold: !!opts.bold });
+    if (vat != null) doc.text(colVat - 45, y, money(vat), { size: opts.indent ? 8 : 9.5 });
+    doc.text(colTotal - 70, y, money(total), { size: opts.indent ? 8 : 9.5, bold: !!opts.bold });
+    y -= opts.indent ? 11 : 14;
+  };
+
+  const fmtQty = (n, unit) => n == null ? null : `${Math.abs(n) >= 1000 ? Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : n.toFixed(1)} ${unit}`;
+
+  headerRow();
+  catLine('Property Rates', null, data.propertyRatesExclVat, data.propertyRatesVat, data.propertyRatesInclVat);
+  catLine(`Electricity (${data.elecReadingStart || '?'} to ${data.elecReadingEnd || '?'})`, fmtQty(data.elecConsumptionKwh, 'kWh'), data.elecExclVat, data.elecVat, data.elecInclVat);
+  for (const l of data.elecLines || []) catLine(l.label, fmtQty(l.qty, l.unit || ''), l.rand, null, l.rand, { indent: true });
+  catLine(`Water (${data.waterReadingStart || '?'} to ${data.waterReadingEnd || '?'})`, fmtQty(data.waterConsumptionKl, 'KL'), data.waterExclVat, data.waterVat, data.waterInclVat);
+  catLine('Sanitation (billed on water consumption)', fmtQty(data.waterConsumptionKl, 'KL'), data.sanitationExclVat, data.sanitationVat, data.sanitationInclVat);
+  catLine('Refuse', null, data.refuseExclVat, data.refuseVat, data.refuseInclVat);
+  catLine('Sundry', null, data.sundryExclVat, data.sundryVat, data.sundryInclVat);
+  y -= 4; doc.line(left, y, right, y); y -= 14;
+  catLine('TOTAL CHARGES', null, data.totalExclVat, data.totalVat, data.grandTotalInclVat, { bold: true });
+  y -= 10;
+
+  if (data.missingAccounts && data.missingAccounts.length) {
+    doc.text(left, y, `Note: no statement found for ${data.missingAccounts.join(', ')} this month - combined totals exclude ${data.missingAccounts.length === 1 ? 'it' : 'them'}.`, { size: 7.5 });
+    y -= 14;
+  }
+  doc.text(left, 30, `Generated: ${data.generatedAt}. This is a reformatted summary of the City of Johannesburg statement, not a replacement invoice.`, { size: 7 });
+
+  if (data.monthlyTrend && data.monthlyTrend.length > 1) {
+    doc.newPage();
+    let ty = PAGE_H - 50;
+    doc.text(left, ty, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); ty -= 14;
+    doc.text(left, ty, `Municipal Utility Cost Excluding VAT - ${data.accountLabel}`, { size: 11, bold: true }); ty -= 8;
+    doc.line(left, ty, right, ty); ty -= 30;
+    drawTrendChart(doc, { x: left + 40, y: ty, width: right - left - 40, height: 420, series: data.monthlyTrend });
+    doc.text(left, 30, `Trailing ${data.monthlyTrend.length}-statement view, ending ${data.statementFor}. Figures exclude VAT - Sanitation shown separately from Water.`, { size: 7 });
+  }
+
+  return doc.build();
+}
+
+module.exports = { PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, money };

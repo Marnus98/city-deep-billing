@@ -64,46 +64,51 @@ function seedStatement(rec) {
 
   const L = rec.electricity.lines || {};
 
-  // Delete-then-reinsert rather than skip-if-exists: makes this safe to re-run whenever the
-  // extractor/schema gains new fields (as it did when the TOU breakdown columns were added) -
-  // previously-imported statements pick up the new data on the next seed run instead of silently
-  // staying stale forever.
-  if (existing) run('DELETE FROM municipal_statements WHERE id=?', [existing.id]);
+  // Same field list, values, whether this is an INSERT (new invoice_number) or UPDATE (re-running
+  // the seed against an invoice already imported - e.g. after a schema/extractor change). UPDATE
+  // rather than delete-then-reinsert specifically to keep each statement's row id stable across
+  // re-seeds: the id is used directly in /municipal-pdf download links, and those links are only
+  // useful if they keep working after the next redeploy.
+  const fields = [
+    'municipal_account_id', 'invoice_number', 'statement_for', 'statement_date', 'due_date',
+    'elec_reading_start', 'elec_reading_end', 'elec_consumption_kwh', 'elec_consumption_kvarh', 'elec_tariff_type',
+    'elec_excl_vat', 'elec_vat', 'elec_incl_vat',
+    'elec_off_peak_kwh', 'elec_off_peak_rand', 'elec_peak_kwh', 'elec_peak_rand',
+    'elec_standard_kwh', 'elec_standard_rand', 'elec_energy_kwh', 'elec_energy_rand',
+    'elec_demand_kva', 'elec_demand_rand', 'elec_reactive_kvarh', 'elec_reactive_rand',
+    'elec_service_rand', 'elec_network_surcharge_rand',
+    'water_reading_start', 'water_reading_end', 'water_consumption_kl',
+    'water_excl_vat', 'water_vat', 'water_incl_vat',
+    'sanitation_excl_vat', 'sanitation_vat', 'sanitation_incl_vat',
+    'refuse_excl_vat', 'refuse_vat', 'refuse_incl_vat',
+    'sundry_excl_vat', 'sundry_vat', 'sundry_incl_vat',
+    'property_rates_excl_vat', 'property_rates_vat', 'property_rates_incl_vat',
+    'grand_total_incl_vat', 'source_file',
+  ];
+  const values = [
+    acc.id, rec.invoice_number, rec.statement_for, rec.statement_date, rec.due_date,
+    rec.electricity.reading_period ? rec.electricity.reading_period[0] : null,
+    rec.electricity.reading_period ? rec.electricity.reading_period[1] : null,
+    rec.electricity.consumption_kwh, rec.electricity.consumption_kvarh, rec.electricity.tariff_type,
+    rec.electricity.excl_vat, rec.electricity.vat, rec.electricity.incl_vat,
+    L.off_peak_qty || 0, L.off_peak || 0, L.peak_qty || 0, L.peak || 0,
+    L.standard_qty || 0, L.standard || 0, L.energy_qty || 0, L.energy || 0,
+    L.demand_qty || 0, L.demand || 0, L.reactive_qty || 0, L.reactive || 0,
+    L.service || 0, L.network_surcharge || 0,
+    w.reading_period ? w.reading_period[0] : null, w.reading_period ? w.reading_period[1] : null, w.consumption_kl,
+    round2(waterExcl), waterVat, round2(waterExcl + waterVat),
+    round2(sanExcl), sanVat, round2(sanExcl + sanVat),
+    rec.refuse.excl_vat, rec.refuse.vat, rec.refuse.incl_vat,
+    rec.sundry.excl_vat, rec.sundry.vat, rec.sundry.incl_vat,
+    rec.property_rates.excl_vat, rec.property_rates.vat, rec.property_rates.incl_vat,
+    rec.grand_total_incl_vat, rec.file,
+  ];
 
-  run(`INSERT INTO municipal_statements (
-      municipal_account_id, invoice_number, statement_for, statement_date, due_date,
-      elec_reading_start, elec_reading_end, elec_consumption_kwh, elec_consumption_kvarh, elec_tariff_type,
-      elec_excl_vat, elec_vat, elec_incl_vat,
-      elec_off_peak_kwh, elec_off_peak_rand, elec_peak_kwh, elec_peak_rand,
-      elec_standard_kwh, elec_standard_rand, elec_energy_kwh, elec_energy_rand,
-      elec_demand_kva, elec_demand_rand, elec_reactive_kvarh, elec_reactive_rand,
-      elec_service_rand, elec_network_surcharge_rand,
-      water_reading_start, water_reading_end, water_consumption_kl,
-      water_excl_vat, water_vat, water_incl_vat,
-      sanitation_excl_vat, sanitation_vat, sanitation_incl_vat,
-      refuse_excl_vat, refuse_vat, refuse_incl_vat,
-      sundry_excl_vat, sundry_vat, sundry_incl_vat,
-      property_rates_excl_vat, property_rates_vat, property_rates_incl_vat,
-      grand_total_incl_vat, source_file
-    ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?)`,
-    [
-      acc.id, rec.invoice_number, rec.statement_for, rec.statement_date, rec.due_date,
-      rec.electricity.reading_period ? rec.electricity.reading_period[0] : null,
-      rec.electricity.reading_period ? rec.electricity.reading_period[1] : null,
-      rec.electricity.consumption_kwh, rec.electricity.consumption_kvarh, rec.electricity.tariff_type,
-      rec.electricity.excl_vat, rec.electricity.vat, rec.electricity.incl_vat,
-      L.off_peak_qty || 0, L.off_peak || 0, L.peak_qty || 0, L.peak || 0,
-      L.standard_qty || 0, L.standard || 0, L.energy_qty || 0, L.energy || 0,
-      L.demand_qty || 0, L.demand || 0, L.reactive_qty || 0, L.reactive || 0,
-      L.service || 0, L.network_surcharge || 0,
-      w.reading_period ? w.reading_period[0] : null, w.reading_period ? w.reading_period[1] : null, w.consumption_kl,
-      round2(waterExcl), waterVat, round2(waterExcl + waterVat),
-      round2(sanExcl), sanVat, round2(sanExcl + sanVat),
-      rec.refuse.excl_vat, rec.refuse.vat, rec.refuse.incl_vat,
-      rec.sundry.excl_vat, rec.sundry.vat, rec.sundry.incl_vat,
-      rec.property_rates.excl_vat, rec.property_rates.vat, rec.property_rates.incl_vat,
-      rec.grand_total_incl_vat, rec.file,
-    ]);
+  if (existing) {
+    run(`UPDATE municipal_statements SET ${fields.map((f) => `${f}=?`).join(', ')} WHERE id=?`, [...values, existing.id]);
+  } else {
+    run(`INSERT INTO municipal_statements (${fields.join(', ')}) VALUES (${fields.map(() => '?').join(',')})`, values);
+  }
   return existing ? 'updated' : 'created';
 }
 

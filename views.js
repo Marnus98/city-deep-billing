@@ -518,7 +518,7 @@ function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
   return layout({ title: 'Solar Billing Slips', user, active: '/solar-billing-slips', body });
 }
 
-function municipalAccountsPage({ user, accounts, account, statements, statement, comparison, isCombined, statementLabels, selectedStatementFor, combinedInfo }) {
+function municipalAccountsPage({ user, accounts, account, statements, statement, comparison, isCombined, statementLabels, selectedStatementFor, combinedInfo, pdfUrl }) {
   if (!accounts.length) {
     return layout({ title: 'Municipality', user, active: '/municipal-accounts', body: `
       <h1 class="text-2xl font-bold mb-4">Municipality</h1>
@@ -585,7 +585,10 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
     <div class="bg-white rounded-lg border mb-6">
       <div class="px-4 py-3 border-b font-semibold flex justify-between items-baseline flex-wrap gap-2">
         <span>Statement for ${esc(s.statement_for)}${s.invoice_number ? ` <span class="text-slate-400 font-normal text-sm">(invoice ${esc(s.invoice_number)}, issued ${esc(s.statement_date)})</span>` : ` <span class="text-slate-400 font-normal text-sm">(combining ${combinedInfo.matchedAccounts.length} account${combinedInfo.matchedAccounts.length === 1 ? '' : 's'}: ${combinedInfo.matchedAccounts.map(esc).join(', ')})</span>`}</span>
-        <span class="badge ${tariffBadge}">${tariffLabel}</span>
+        <div class="flex items-center gap-2">
+          <span class="badge ${tariffBadge}">${tariffLabel}</span>
+          ${pdfUrl ? `<a href="${pdfUrl}" class="bg-slate-900 text-white rounded px-3 py-1.5 text-sm font-medium">Download PDF</a>` : ''}
+        </div>
       </div>
       ${missingNote}
       <div class="px-4 py-3">
