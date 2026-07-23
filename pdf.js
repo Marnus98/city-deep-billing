@@ -169,6 +169,62 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
   doc.line(x, chartBottom, x + width, chartBottom, 0.75);
 }
 
+// Single-series bar chart - same visual language as drawTrendChart (gridlines, value-above-bar
+// labels, month labels) but only one colour/category, scaled to its OWN max rather than a shared
+// stacked max, so a category with much smaller Rand values (e.g. Water/Sanitation next to
+// Electricity) isn't squashed flat at the bottom of the chart.
+function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, color }) {
+  const values = series.map((s) => s[seriesKey] || 0);
+  const maxVal = Math.max(1, ...values);
+  const chartBottom = y - height;
+  const n = series.length || 1;
+  const colWidth = width / n;
+  const barWidth = Math.min(28, colWidth * 0.55);
+
+  const ticks = 3;
+  for (let t = 0; t <= ticks; t++) {
+    const v = (maxVal * t) / ticks;
+    const ty = chartBottom + (height * t) / ticks;
+    doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
+    doc.text(x - 32, ty - 3, moneyShort(v), { size: 6 });
+  }
+
+  series.forEach((s, i) => {
+    const colX = x + i * colWidth + (colWidth - barWidth) / 2;
+    const val = s[seriesKey] || 0;
+    const h = (val / maxVal) * height;
+    doc.rect(colX, chartBottom, barWidth, h, { fill: color });
+    if (val > 0) doc.text(colX - 8, chartBottom + h + 4, moneyShort(val), { size: 6, bold: true });
+    doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 12, shortMonthLabel(s.label), { size: 6 });
+  });
+
+  doc.line(x, chartBottom, x + width, chartBottom, 0.75);
+}
+
+// Three stacked single-series charts (Electricity / Water / Sanitation), each with its own colour
+// swatch + label as a mini-heading and its own Y-axis scale - replaces the single combined
+// stacked-bar chart so each utility's trend is legible on its own terms instead of all three
+// competing for the same axis.
+function drawTripleTrendCharts(doc, { x, y, width, series }) {
+  const COLOR_ELEC = [0.11, 0.16, 0.34];
+  const COLOR_WATER = [0.13, 0.62, 0.35];
+  const COLOR_SAN = [0.93, 0.55, 0.09];
+  const defs = [
+    { key: 'elec', label: 'Electricity', color: COLOR_ELEC },
+    { key: 'water', label: 'Water', color: COLOR_WATER },
+    { key: 'sanitation', label: 'Sanitation', color: COLOR_SAN },
+  ];
+  const chartHeight = 150;
+  let cy = y;
+  for (const def of defs) {
+    doc.rect(x, cy - 7, 7, 7, { fill: def.color });
+    doc.text(x + 11, cy - 6, def.label, { size: 9.5, bold: true });
+    cy -= 20;
+    drawSingleSeriesChart(doc, { x: x + 40, y: cy, width: width - 40, height: chartHeight, series, seriesKey: def.key, color: def.color });
+    cy -= chartHeight + 14 + 26;
+  }
+}
+
 // Builds the billing slip PDF for one bill. `data` shape - see server.js buildBillPdfData().
 function buildBillingSlipPdf(data) {
   const doc = new PDFDoc();
@@ -220,7 +276,7 @@ function buildBillingSlipPdf(data) {
     doc.text(left, ty, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); ty -= 14;
     doc.text(left, ty, `Utility Cost Excluding VAT - ${data.tenantName}`, { size: 11, bold: true }); ty -= 8;
     doc.line(left, ty, right, ty); ty -= 30;
-    drawTrendChart(doc, { x: left + 40, y: ty, width: right - left - 40, height: 420, series: data.monthlyTrend });
+    drawTripleTrendCharts(doc, { x: left + 40, y: ty, width: right - left - 40, series: data.monthlyTrend });
     doc.text(left, 30, `Trailing ${data.monthlyTrend.length}-month view, ending ${data.periodLabel}. Figures exclude VAT.`, { size: 7 });
   }
 
@@ -314,7 +370,7 @@ function buildMunicipalStatementPdf(data) {
     doc.text(left, ty, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); ty -= 14;
     doc.text(left, ty, `Municipal Utility Cost Excluding VAT - ${data.accountLabel}`, { size: 11, bold: true }); ty -= 8;
     doc.line(left, ty, right, ty); ty -= 30;
-    drawTrendChart(doc, { x: left + 40, y: ty, width: right - left - 40, height: 420, series: data.monthlyTrend });
+    drawTripleTrendCharts(doc, { x: left + 40, y: ty, width: right - left - 40, series: data.monthlyTrend });
     doc.text(left, 30, `Trailing ${data.monthlyTrend.length}-statement view, ending ${data.statementFor}. Figures exclude VAT - Sanitation shown separately from Water.`, { size: 7 });
   }
 
