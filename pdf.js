@@ -1,13 +1,34 @@
 // pdf.js - a minimal, dependency-free PDF writer.
 // Only what's needed for a clean, single-page A4 billing slip: text (Helvetica / Helvetica-Bold,
-// base-14 fonts so nothing needs to be embedded), straight lines and filled rectangles.
+// base-14 fonts so nothing needs to be embedded), straight lines, filled rectangles and (now) a
+// single embedded logo image (see logo_asset.js / registerImage()).
 // Written by hand because this sandbox's package registry access was too unreliable to install
 // a PDF library (see README "Known environment limitations") - production deployments should
 // swap this for pdfkit/puppeteer once normal npm access is available; the raw PDF this produces
 // is fully spec-valid in the meantime (verified by re-rendering it with poppler/pdftoppm).
+const LOGO = require('./logo_asset');
 
 function escapePdfText(s) {
   return String(s ?? '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+// Standard Helvetica / Helvetica-Bold glyph widths (per 1000-unit em square, from the base-14 AFM
+// metrics every PDF viewer ships with). Only the characters that actually appear in money strings
+// and column headers are listed - textWidth() below falls back to the digit width (556) for
+// anything else, which is close enough for the all-caps/number text this app ever right-aligns.
+const HELV_WIDTHS = {
+  ' ': 278, ',': 278, '.': 278, '-': 333, '/': 278, ':': 278, R: 722, K: 722, L: 556, W: 944, h: 556,
+  0: 556, 1: 556, 2: 556, 3: 556, 4: 556, 5: 556, 6: 556, 7: 556, 8: 556, 9: 556,
+};
+const HELV_BOLD_WIDTHS = {
+  ' ': 278, ',': 278, '.': 278, '-': 333, '/': 278, ':': 278, R: 722, K: 722, L: 611, W: 1000, h: 611,
+  0: 556, 1: 556, 2: 556, 3: 556, 4: 556, 5: 556, 6: 556, 7: 556, 8: 556, 9: 556,
+};
+function textWidth(str, { bold = false, size = 10 } = {}) {
+  const table = bold ? HELV_BOLD_WIDTHS : HELV_WIDTHS;
+  let units = 0;
+  for (const ch of String(str ?? '')) units += table[ch] ?? 556;
+  return (units / 1000) * size;
 }
 
 const PAGE_W = 595.28; // A4 pt
@@ -17,11 +38,31 @@ class PDFDoc {
   constructor() {
     this.pages = [[]]; // one ops array per page - see newPage()
     this.page = { width: PAGE_W, height: PAGE_H };
+    this.images = new Map(); // key -> { width, height, hex } - see registerImage()/image()
   }
   get currentOps() { return this.pages[this.pages.length - 1]; }
   // Starts a new page (used to put the 12-month trend chart on its own page so it never has to
   // fight the electricity/water tables above it for vertical space).
   newPage() { this.pages.push([]); return this; }
+  // Registers a raw-RGB image (see logo_asset.js for how the source bitmap is prepared) as a PDF
+  // Image XObject, keyed by `key` so the same image can be referenced from multiple draw() calls
+  // or pages without re-embedding it. The whole build() pipeline works on plain JS strings that
+  // get utf8-encoded at the very end (see build()), so raw image bytes can't be dropped in as-is
+  // (multi-byte utf8 would corrupt them) - hex-encoding keeps the stream pure ASCII while staying
+  // spec-valid via the standard /ASCIIHexDecode + /FlateDecode filter chain.
+  registerImage(key, { width, height, deflatedRgbBase64 }) {
+    if (!this.images.has(key)) {
+      const hex = Buffer.from(deflatedRgbBase64, 'base64').toString('hex').toUpperCase();
+      this.images.set(key, { width, height, hex });
+    }
+    return key;
+  }
+  // Draws a previously-registered image into the box (x, y) to (x+w, y+h) - y is the BOTTOM edge,
+  // matching the `rect()` convention below, not the top.
+  image(x, y, w, h, key) {
+    this.currentOps.push(`q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /${key} Do Q`);
+    return this;
+  }
   text(x, y, str, { size = 10, bold = false, angle = 0 } = {}) {
     const font = bold ? 'F2' : 'F1';
     if (angle) {
@@ -56,6 +97,18 @@ class PDFDoc {
     const f1Idx = objects.length; objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'); // 3
     const f2Idx = objects.length; objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'); // 4
 
+    // Image XObjects (e.g. the HolmStone logo) - registered once via registerImage(), referenced
+    // by every page's /Resources so any page can `Do` them regardless of which page called image().
+    const imageObjNums = {};
+    for (const [key, img] of this.images) {
+      const idx = objects.length;
+      objects.push(`<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /FlateDecode] /Length ${img.hex.length + 1} >>\nstream\n${img.hex}>\nendstream`);
+      imageObjNums[key] = idx + 1;
+    }
+    const xobjectDict = Object.keys(imageObjNums).length
+      ? ` /XObject << ${Object.entries(imageObjNums).map(([k, n]) => `/${k} ${n} 0 R`).join(' ')} >>`
+      : '';
+
     const pageObjNums = [];
     for (const pageOps of this.pages) {
       const pageIdx = objects.length; objects.push(null); // reserved, filled in below
@@ -63,7 +116,7 @@ class PDFDoc {
       const content = pageOps.join('\n');
       const streamBytes = Buffer.byteLength(content, 'utf8');
       objects.push(`<< /Length ${streamBytes} >>\nstream\n${content}\nendstream`);
-      objects[pageIdx] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.page.width} ${this.page.height}] /Resources << /Font << /F1 ${f1Idx + 1} 0 R /F2 ${f2Idx + 1} 0 R >> >> /Contents ${contentIdx + 1} 0 R >>`;
+      objects[pageIdx] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.page.width} ${this.page.height}] /Resources << /Font << /F1 ${f1Idx + 1} 0 R /F2 ${f2Idx + 1} 0 R >>${xobjectDict} >> /Contents ${contentIdx + 1} 0 R >>`;
       pageObjNums.push(pageIdx + 1);
     }
     objects[catalogIdx] = '<< /Type /Catalog /Pages 2 0 R >>';
@@ -98,13 +151,21 @@ function money(n) {
   return `${neg ? '-' : ''}R ${withCommas}.${decPart}`;
 }
 
-// Compact number formatting for chart axis ticks/labels - no "R" prefix, no decimals (matches
-// the tenant's existing internal utility-cost chart, which labels its axis "Rand" once rather
-// than repeating the currency symbol on every value).
+// Compact currency formatting for chart axis ticks/labels - no decimals, but with the "R" prefix
+// so each electricity/water/sanitation graph reads unambiguously as Rand on its own, without
+// requiring the reader to cross-reference the "Rand" axis caption.
 function moneyShort(n) {
   const v = Math.round(Number(n || 0));
   const neg = v < 0;
-  return (neg ? '-' : '') + Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (neg ? '-R ' : 'R ') + Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+// Compact quantity formatting for the consumption (kWh / kL) trend charts - same comma-grouping
+// as moneyShort but with a unit suffix instead of a currency prefix.
+function qtyShort(n, unit) {
+  const v = Math.round(Number(n || 0));
+  const neg = v < 0;
+  return (neg ? '-' : '') + Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ' + unit;
 }
 
 const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -142,15 +203,17 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
     lx += 65;
   }
 
-  // Y-axis gridlines + tick labels (4 bands).
+  // Y-axis gridlines + tick labels (4 bands), right-aligned so the "R" prefix doesn't push the
+  // longer labels into the chart area.
   const ticks = 4;
   for (let t = 0; t <= ticks; t++) {
     const v = (maxVal * t) / ticks;
     const ty = chartBottom + (height * t) / ticks;
     doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
-    doc.text(x - 32, ty - 3, moneyShort(v), { size: 6 });
+    const label = moneyShort(v);
+    doc.text(x - 6 - textWidth(label, { size: 6 }), ty - 3, label, { size: 6 });
   }
-  doc.text(x - 55, chartBottom + height / 2 - 15, 'Rand', { size: 8, bold: true, angle: 90 });
+  doc.text(x - 62, chartBottom + height / 2 - 15, 'Rand', { size: 8, bold: true, angle: 90 });
 
   series.forEach((s, i) => {
     const colX = x + i * colWidth + (colWidth - barWidth) / 2;
@@ -162,7 +225,10 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
     doc.rect(colX, by, barWidth, waterH, { fill: COLOR_WATER }); by += waterH;
     doc.rect(colX, by, barWidth, sanH, { fill: COLOR_SAN }); by += sanH;
     const total = totals[i];
-    if (total > 0) doc.text(colX - 8, by + 4, moneyShort(total), { size: 6, bold: true });
+    if (total > 0) {
+      const label = moneyShort(total);
+      doc.text(colX + barWidth / 2 - textWidth(label, { size: 6, bold: true }) / 2, by + 4, label, { size: 6, bold: true });
+    }
     doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
   });
 
@@ -171,9 +237,10 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
 
 // Single-series bar chart - same visual language as drawTrendChart (gridlines, value-above-bar
 // labels, month labels) but only one colour/category, scaled to its OWN max rather than a shared
-// stacked max, so a category with much smaller Rand values (e.g. Water/Sanitation next to
-// Electricity) isn't squashed flat at the bottom of the chart.
-function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, color }) {
+// stacked max, so a category with much smaller values (e.g. Water/Sanitation next to Electricity,
+// or kL next to kWh) isn't squashed flat at the bottom of the chart. `formatValue` defaults to the
+// Rand formatter but can be swapped for qtyShort() to reuse this same chart for consumption trends.
+function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, color, formatValue = moneyShort }) {
   const values = series.map((s) => s[seriesKey] || 0);
   const maxVal = Math.max(1, ...values);
   const chartBottom = y - height;
@@ -186,7 +253,8 @@ function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, co
     const v = (maxVal * t) / ticks;
     const ty = chartBottom + (height * t) / ticks;
     doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
-    doc.text(x - 32, ty - 3, moneyShort(v), { size: 6 });
+    const label = formatValue(v);
+    doc.text(x - 6 - textWidth(label, { size: 6 }), ty - 3, label, { size: 6 });
   }
 
   series.forEach((s, i) => {
@@ -194,7 +262,10 @@ function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, co
     const val = s[seriesKey] || 0;
     const h = (val / maxVal) * height;
     doc.rect(colX, chartBottom, barWidth, h, { fill: color });
-    if (val > 0) doc.text(colX - 8, chartBottom + h + 4, moneyShort(val), { size: 6, bold: true });
+    if (val > 0) {
+      const label = formatValue(val);
+      doc.text(colX + barWidth / 2 - textWidth(label, { size: 6, bold: true }) / 2, chartBottom + h + 4, label, { size: 6, bold: true });
+    }
     doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 12, shortMonthLabel(s.label), { size: 6 });
   });
 
@@ -220,8 +291,33 @@ function drawTripleTrendCharts(doc, { x, y, width, series }) {
     doc.rect(x, cy - 7, 7, 7, { fill: def.color });
     doc.text(x + 11, cy - 6, def.label, { size: 9.5, bold: true });
     cy -= 20;
-    drawSingleSeriesChart(doc, { x: x + 40, y: cy, width: width - 40, height: chartHeight, series, seriesKey: def.key, color: def.color });
+    drawSingleSeriesChart(doc, { x: x + 46, y: cy, width: width - 46, height: chartHeight, series, seriesKey: def.key, color: def.color });
     cy -= chartHeight + 14 + 26;
+  }
+}
+
+// Two stacked single-series charts (Electricity kWh / Water kL) - same layout as
+// drawTripleTrendCharts but for physical consumption instead of Rand cost, so a tenant can see
+// usage trends independent of tariff changes. Water consumption is stored in m3 in the schema,
+// which is numerically identical to kL (1 m3 = 1 kL), so waterM3 is simply labelled "kL".
+function drawConsumptionTrendCharts(doc, { x, y, width, series }) {
+  const COLOR_ELEC = [0.11, 0.16, 0.34];
+  const COLOR_WATER = [0.13, 0.62, 0.35];
+  const defs = [
+    { key: 'elecKwh', label: 'Electricity (kWh)', color: COLOR_ELEC, unit: 'kWh' },
+    { key: 'waterM3', label: 'Water (kL)', color: COLOR_WATER, unit: 'kL' },
+  ];
+  const chartHeight = 170;
+  let cy = y;
+  for (const def of defs) {
+    doc.rect(x, cy - 7, 7, 7, { fill: def.color });
+    doc.text(x + 11, cy - 6, def.label, { size: 9.5, bold: true });
+    cy -= 20;
+    drawSingleSeriesChart(doc, {
+      x: x + 46, y: cy, width: width - 46, height: chartHeight, series, seriesKey: def.key, color: def.color,
+      formatValue: (v) => qtyShort(v, def.unit),
+    });
+    cy -= chartHeight + 14 + 30;
   }
 }
 
@@ -231,8 +327,16 @@ function buildBillingSlipPdf(data) {
   const left = 42, right = PAGE_W - 42;
   let y = PAGE_H - 50;
 
+  // Logo, top-right corner - sized so it (and its whitespace-trimmed bounding box) sits entirely
+  // above the two-column tenant-info rows below, never overlapping them (see the y-jump right
+  // after the title/subtitle, which clears the divider line past the logo's bottom edge).
+  doc.registerImage('Logo', LOGO);
+  const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
+  doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
+
   doc.text(left, y, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); y -= 14;
-  doc.text(left, y, 'Utility Billing Statement', { size: 10 }); y -= 8;
+  doc.text(left, y, 'Utility Billing Statement', { size: 10 });
+  y = Math.min(y - 8, PAGE_H - 32 - logoH - 9); // clear the logo before the header divider
   doc.line(left, y, right, y); y -= 18;
 
   doc.text(left, y, 'Tenant:', { bold: true }); doc.text(left + 90, y, data.tenantName);
@@ -258,26 +362,38 @@ function buildBillingSlipPdf(data) {
   y = drawLineItemsTable(doc, data.waterLineItems, left, right, y);
   y -= 10;
 
+  // Subtotal / VAT / Total - all three amounts right-aligned to the same `right` edge (using the
+  // real Helvetica glyph widths from textWidth(), not a fixed left offset), so they line up in a
+  // column regardless of the bold/larger TOTAL PAYABLE row being visually wider text.
   doc.line(left, y, right, y); y -= 16;
-  doc.text(right - 220, y, 'Subtotal (excl. VAT)', {}); doc.text(right - 70, y, money(data.subtotal)); y -= 14;
-  doc.text(right - 220, y, `VAT (${(data.vatRate * 100).toFixed(0)}%)`, {}); doc.text(right - 70, y, money(data.vatAmount)); y -= 14;
+  const subtotalStr = money(data.subtotal);
+  doc.text(right - 220, y, 'Subtotal (excl. VAT)', {});
+  doc.text(right - textWidth(subtotalStr, { size: 10 }), y, subtotalStr); y -= 14;
+  const vatStr = money(data.vatAmount);
+  doc.text(right - 220, y, `VAT (${(data.vatRate * 100).toFixed(0)}%)`, {});
+  doc.text(right - textWidth(vatStr, { size: 10 }), y, vatStr); y -= 14;
   doc.line(right - 220, y + 8, right, y + 8);
-  doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 }); doc.text(right - 90, y, money(data.total), { bold: true, size: 12 }); y -= 26;
+  const totalStr = money(data.total);
+  doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 });
+  doc.text(right - textWidth(totalStr, { size: 12, bold: true }), y, totalStr, { bold: true, size: 12 }); y -= 26;
 
-  doc.line(left, y, right, y); y -= 16;
-  if (data.notes) { doc.text(left, y, 'Notes: ' + data.notes, { size: 9 }); y -= 16; }
-  doc.text(left, 30, `Bill status: ${data.status.toUpperCase()}  |  Generated: ${data.generatedAt}  |  This is a system-generated statement.`, { size: 7 });
-
-  // Second page: rolling utility-cost trend chart, only when there's more than one month of
-  // history to show (a brand-new tenant's very first bill would just be a single flat bar).
+  // Second page: rolling utility-cost (Rand) trend chart, only when there's more than one month
+  // of history to show (a brand-new tenant's very first bill would just be a single flat bar).
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
     doc.newPage();
     let ty = PAGE_H - 50;
     doc.text(left, ty, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); ty -= 14;
     doc.text(left, ty, `Utility Cost Excluding VAT - ${data.tenantName}`, { size: 11, bold: true }); ty -= 8;
     doc.line(left, ty, right, ty); ty -= 30;
-    drawTripleTrendCharts(doc, { x: left + 40, y: ty, width: right - left - 40, series: data.monthlyTrend });
-    doc.text(left, 30, `Trailing ${data.monthlyTrend.length}-month view, ending ${data.periodLabel}. Figures exclude VAT.`, { size: 7 });
+    drawTripleTrendCharts(doc, { x: left + 46, y: ty, width: right - left - 46, series: data.monthlyTrend });
+
+    // Third page: consumption (kWh / kL) trend, independent of tariff/Rand value entirely.
+    doc.newPage();
+    let cy = PAGE_H - 50;
+    doc.text(left, cy, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); cy -= 14;
+    doc.text(left, cy, `Consumption Trend - ${data.tenantName}`, { size: 11, bold: true }); cy -= 8;
+    doc.line(left, cy, right, cy); cy -= 30;
+    drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend });
   }
 
   return doc.build();

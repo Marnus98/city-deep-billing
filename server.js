@@ -80,7 +80,9 @@ function monthlyTrendForTenant(tenantId, asOfStartDate) {
     SELECT bp.label, bp.start_date,
       COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) as elec,
       COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category NOT IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as water,
-      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as sanitation
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as sanitation,
+      COALESCE(MAX(b.electricity_consumption_kwh), 0) as elecKwh,
+      COALESCE(MAX(b.water_consumption_m3), 0) as waterM3
     FROM billing_periods bp
     LEFT JOIN bills b ON b.billing_period_id = bp.id AND b.tenant_id = ?
     LEFT JOIN bill_line_items bli ON bli.bill_id = b.id
@@ -334,7 +336,6 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
     elecLineItems: elecItems, waterLineItems: waterItems,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
     status: bill.status, generatedAt: bill.generated_at, monthlyTrend,
-    notes: 'Reprinted from stored billing data - not from a live browser view.',
   });
   audit(user.userId, 'pdf_download', 'bill', bill.id, null, null, null, null);
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${bill.invoice_number}.pdf"` });
