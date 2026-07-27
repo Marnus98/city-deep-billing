@@ -11,12 +11,19 @@ reconciled against two real monthly workbooks (**March 2026** and **April 2026**
   password hashing, PDF generation) is built on Node's own standard library, including the
   built-in `node:sqlite` module. This was a deliberate choice for *this environment* — see
   "Why no Express/pdfkit/etc." below — not a recommendation to avoid them in production.
-- Seeded with the real March and April 2026 tenant, meter, tariff, reading and billing data
-  imported directly from the two workbooks you provided.
-- **Reconciled against the source workbook**: of 96 tenant/period/utility combinations (24
-  tenant-equivalents × 2 utilities × 2 months), 92 match the workbook's own totals exactly and
-  the remaining 4 are within 2% (see "Reconciliation results" below — every variance is
-  individually explained, none are unexplained).
+- Seeded with 13 real months of tenant, meter, tariff, reading and billing data (July 2025 -
+  July 2026) imported directly from the workbooks you provided.
+- **Reconciled against the source workbook**: of 620 tenant/period/utility combinations, 612
+  match the workbook's own totals exactly and the remaining 8 are within 2% (see "Reconciliation
+  results" below — every variance is individually explained, none are unexplained).
+- **Tariff change effective July 2026**: the July workbook carries a new tariff table - electricity
+  rates (energy, demand, service and capacity charges, all step-tariff blocks) are up **+9.01%**,
+  water is up **+8.00%**, sanitation is up **+10.99%**, versus June 2026. Flat surcharge
+  percentages (6% electrical, 2% business), the Special 70Amp fee and the Network Levy are
+  unchanged. This lands on 1 July, the standard start of the municipal tariff year, so it reads as
+  the annual increase rather than a data anomaly. The app's tariff versioning (`tariff_versions`,
+  keyed by `effective_from`) picks this up automatically - March through June already shared one
+  version, and July opens a new one.
 
 ## Quick start
 
@@ -57,7 +64,7 @@ open internet.**
 - **Tariffs** — both electricity tariffs and the water/sanitation tariff, version-controlled by
   effective date (the versioning mechanism is live even though March's and April's rates
   happened to be identical in the source data).
-- **Billing Periods** — 12 imported months (July 2025 - June 2026), each showing bill counts, plus
+- **Billing Periods** — 13 imported months (July 2025 - July 2026), each showing bill counts, plus
   a **"+ New billing period"** button to start a fresh month.
 - **Capturing a new month** — from Billing Periods, create a period (label + dates), then you land
   on a reading-capture form: one row per active meter, grouped by tenant, pre-filled with last
@@ -140,28 +147,28 @@ water don't create two tenant records for one real tenant.
 
 ## Reconciliation results
 
-Full detail is live at **/reconciliation** once the app is running. Summary across all 572
-tenant/period/utility rows (roughly 24 tenants × 2 utilities × 12 months, July 2025 - June 2026,
+Full detail is live at **/reconciliation** once the app is running. Summary across all 620
+tenant/period/utility rows (roughly 24-25 tenants × 2 utilities × 13 months, July 2025 - July 2026,
 using the tenant name aliasing above):
 
 | Result | Count |
 |---|---|
-| Exact match (to the cent) | 565 |
-| Off by more than 1% | 7 |
+| Exact match (to the cent) | 612 |
+| Off by more than 1% | 8 |
 
-Every other electricity and water figure for every tenant, across all 12 months, ties out exactly
+Every other electricity and water figure for every tenant, across all 13 months, ties out exactly
 — including the hardest cases in the source data: a bulk/feeder meter that bills 0% of energy but
 100% of demand (Unit 3 HUDACO Trading), the manually-adjusted SA Wireless credit line (Unit 6C
 Teraoka), and a tenant with a fixed R661.90/month capacity charge that doesn't match the standard
-tariff rate in *any* of the 12 months (Unit 4 ATC SA Wireless Infrastructure — confirmed as a
+tariff rate in *any* of the 13 months (Unit 4 ATC SA Wireless Infrastructure — confirmed as a
 genuine per-tenant negotiated rate, now applied automatically via `capacity_charge_override` on
 that meter's assignment).
 
-The remaining 7 rows, all individually explained rather than hidden:
+The remaining 8 rows, all individually explained rather than hidden:
 
-- **5 rows, one tenant's water bill (Redefine Common Area Mini Park), various months** — a
-  small-value (~R50-150/month) common-area water levy row, off by ~R1-7 (~2%). Not yet
-  root-caused to a specific formula.
+- **6 rows, one tenant's water bill (Redefine Common Area Mini Park), various months including
+  July 2026** — a small-value (~R50-150/month) common-area water levy row, off by ~R1-7 (~2%). Not
+  yet root-caused to a specific formula.
 - **2 rows, July 2025 only (Kimmo, Unit 3 HUDACO Trading, electricity)** — the July 2025 workbook
   excludes one specific meter's charges from the tenant's own stated total (Excel's own total
   formula skips that row that month, for a reason not visible from the data), while the app's

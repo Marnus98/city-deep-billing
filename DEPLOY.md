@@ -20,7 +20,8 @@ short. No git command line needed — everything below is clicking in a browser.
    `render.yaml` and configure everything itself (Node web service, free plan, start command).
 4. Click **Apply** / **Deploy**. First deploy takes 1–2 minutes.
 5. When it's done, Render gives you a URL like `https://city-deep-billing.onrender.com` — that's
-   your live app. The database seeds itself automatically on first boot (March + April 2026 data).
+   your live app. The database seeds itself automatically on first boot (13 months of data, July
+   2025 - July 2026).
 
 Sign in with `admin` / `admin123` (see README for all 4 demo logins) — **change these passwords
 first thing**, there's no edit-user screen yet so for now that means editing the `seedUsers()`

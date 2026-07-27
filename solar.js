@@ -11,7 +11,7 @@
 // 2026 with solar Recon - W_Solar slips.xlsx", one worksheet per tenant group) and verified against
 // that workbook's own totals (see README "Solar Billing Slips").
 //
-// Meter serials are stable across all 12 imported months (July 2025 - June 2026), confirmed by
+// Meter serials are stable across all 13 imported months (July 2025 - July 2026), confirmed by
 // checking every month's 'Elect Readings' sheet, so a single hardcoded topology below (keyed by
 // serial number, not sheet row) works for every period without per-month adjustment.
 const { activeTariffParams } = require('./billing');
