@@ -286,6 +286,34 @@ parsing or calculation error on this app's side:
    this app's computed total, not the workbook's cached one. Off by R400-4,000/month depending on
    how many Fire Water meters had nonzero readings that month.
 
+### Wingfield's municipal invoices (City of Ekurhuleni)
+
+Wingfield's bulk municipal supply is billed by a completely different municipality than City
+Deep's (City of Ekurhuleni, not City of Johannesburg), on one combined account (2210755502,
+"Refinery Prop Inv") rather than City Deep's 4 separate precinct accounts - property rates,
+electricity, water, sewerage and refuse all appear on the one PDF each month. Imported from 13
+monthly PDF invoices (June 2025 - June 2026) via `extract_wingfield_municipal.py` +
+`seed_wingfield_municipal.js`, following the same pattern as City Deep's `seed_municipal.js` (own
+de-dup key, own account-to-site mapping added to `municipal_compare.js`'s `SITE_MAP`, everything
+else in that comparison module works unchanged since it already resolves against whichever
+property's database is active).
+
+Every one of the 13 months reconciles to the cent against that statement's own "TOTAL CURRENT
+LEVY" figure (the current month's own new charges, kept deliberately separate from whatever
+arrears/balance-brought-forward the same statement also shows). Two source-PDF quirks worth
+knowing about, both reproduced rather than special-cased away:
+
+- **Ekurhuleni's own PDF layout repeats its property-info header and aging-table footer on every
+  physical page** of a multi-page statement, with the genuinely new itemised charges sandwiched in
+  between - the extractor strips the repeated boilerplate per page before summing each utility
+  section, rather than trying to pattern-match every possible label EMM might print.
+- **Three of the thirteen statements (Nov 2025, Dec 2025, Jan 2026) carry one-off "INTERIM"/
+  "INTERIM REVERSAL" water & sewer adjustment lines** instead of the usual "WATER n kl"/
+  "SEWER-BUSINESS n kl" lines (an estimated-reading correction, not a data error), and **Oct 2025
+  carries a one-off "FINAL NOTICE" fee** bucketed as Sundry. The extractor sums whatever
+  charge-shaped rows fall within each utility's section of the statement rather than only matching
+  specific labels, so these are picked up correctly without needing a special case for each one.
+
 ## Deployment (making this a real hosted URL)
 
 This sandbox can't expose a public URL itself. To get a working `https://...` link:

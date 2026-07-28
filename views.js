@@ -661,7 +661,7 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
           <table class="w-full text-sm">
             <thead><tr class="text-left text-slate-500 border-b">
               <th class="py-1 pl-2"></th><th class="py-1 text-right">Our billing (tenants)</th>
-              <th class="py-1 text-right">Utility (COJ)</th><th class="py-1 text-right">Variance</th>
+              <th class="py-1 text-right">Utility (municipal)</th><th class="py-1 text-right">Variance</th>
             </tr></thead>
             <tbody>
               ${compRow('Electricity consumption', comparison.ours.elec_kwh, comparison.coj.elecKwh, 'kWh')}
@@ -670,7 +670,7 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
               ${compRow('Water & sanitation charge', comparison.ours.water_rand, comparison.coj.waterRand, 'R')}
             </tbody>
           </table>
-          <p class="text-xs text-slate-400 mt-2">"Our billing" sums what we invoice ${comparison.ours.tenant_count} tenant(s) on this site for the matched period; the utility figure is what COJ billed the bulk account(s) supplying that same site. A gap is expected (common-area/park losses, timing misalignment between the two billing cycles) &mdash; large or growing gaps are worth investigating.</p>
+          <p class="text-xs text-slate-400 mt-2">"Our billing" sums what we invoice ${comparison.ours.tenant_count} tenant(s) on this site for the matched period; the utility figure is what the municipality billed the bulk account(s) supplying that same site. A gap is expected (common-area/park losses, timing misalignment between the two billing cycles) &mdash; large or growing gaps are worth investigating.</p>
         </div>
       </div>`;
     }
@@ -696,7 +696,7 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
       <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
     </form>
   </div>
-  <p class="text-sm text-slate-500 mb-4">City of Johannesburg bulk-supply statements for this physical stand. Each of the 4 accounts (Mini, Rittle, Industrial A, Industrial B) is billed directly by COJ, separate from tenant billing. Note: COJ's own billing periods don't line up with this app's billing periods, and a statement's own label can run about a month ahead of the reading period it actually covers. "All Accounts (Combined)" sums all 4 accounts for a chosen statement month and compares it against our total billing across every tenant, every site.</p>
+  <p class="text-sm text-slate-500 mb-4">Municipal bulk-supply statements for this property, billed directly by the local municipality, separate from tenant billing. Note: the municipality's own billing periods don't line up with this app's billing periods, and a statement's own label can run about a month ahead of the reading period it actually covers. "All Accounts (Combined)" sums every account for a chosen statement month and compares it against our total billing across every tenant, every site.</p>
   ${breakdownHtml}
   ${comparisonHtml}
   ${!isCombined && statements.length ? `

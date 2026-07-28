@@ -429,8 +429,9 @@ function buildMunicipalStatementPdf(data) {
   let y = PAGE_H - 50;
   const propertyName = (data.propertyName || 'CITY DEEP INDUSTRIAL PARK').toUpperCase();
 
+  const municipalityName = data.municipalityName || 'the municipality';
   doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
-  doc.text(left, y, 'Municipal Account Statement (City of Johannesburg)', { size: 10 }); y -= 8;
+  doc.text(left, y, `Municipal Account Statement (${municipalityName})`, { size: 10 }); y -= 8;
   doc.line(left, y, right, y); y -= 18;
 
   doc.text(left, y, 'Account:', { bold: true }); doc.text(left + 90, y, data.accountLabel);
@@ -480,7 +481,7 @@ function buildMunicipalStatementPdf(data) {
     doc.text(left, y, `Note: no statement found for ${data.missingAccounts.join(', ')} this month - combined totals exclude ${data.missingAccounts.length === 1 ? 'it' : 'them'}.`, { size: 7.5 });
     y -= 14;
   }
-  doc.text(left, 30, `Generated: ${data.generatedAt}. This is a reformatted summary of the City of Johannesburg statement, not a replacement invoice.`, { size: 7 });
+  doc.text(left, 30, `Generated: ${data.generatedAt}. This is a reformatted summary of the ${municipalityName} statement, not a replacement invoice.`, { size: 7 });
 
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
     doc.newPage();

@@ -13,11 +13,19 @@
 // Mapping confirmed directly by the client: Mini -> 'Mini Park', Industrial A/B -> 'Industrial
 // Park' (combined), Rittle -> 'City Deep' (this site doesn't have any tenants imported yet, so
 // the comparison will legitimately show "no internal data" for Rittle until it does).
+//
+// 'Refinery' is Wingfield's own single City of Ekurhuleni account (2210755502) -> 'Wingfield
+// Business Park' (its only site). Adding it here works with zero other changes to this file: this
+// module always operates on whatever db is currently active (see server.js's AsyncLocalStorage-
+// based currentDb()), and each property's municipal_accounts table only ever contains that
+// property's own account rows anyway (physical db-per-property isolation, see properties.js) - so
+// City Deep's 4-account mapping and Wingfield's 1-account mapping never collide or interfere.
 const SITE_MAP = {
   Mini: 'Mini Park',
   'Industrial A': 'Industrial Park',
   'Industrial B': 'Industrial Park',
   Rittle: 'City Deep',
+  Refinery: 'Wingfield Business Park',
 };
 
 function get(db, sql, params = []) { return db.prepare(sql).get(...params); }

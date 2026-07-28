@@ -54,15 +54,26 @@ for (const prop of properties) {
   }
   propertyDbs.set(prop.slug, propDb);
 }
-// City Deep's municipal-account statements are a separate, self-contained pipeline (own de-dup
-// key: invoice_number) - always safe to re-run on every boot, not just when empty. Municipal
-// statements are a City Deep-specific concept for now (see seed_municipal.js).
+// Each property's municipal-account statements are their own separate, self-contained pipeline
+// (own de-dup key: invoice_number per property db) - always safe to re-run on every boot, not just
+// when empty. City Deep is billed by City of Johannesburg (seed_municipal.js); Wingfield is billed
+// by City of Ekurhuleni, a different municipality with its own statement layout entirely (see
+// seed_wingfield_municipal.js).
 require('./seed_municipal').run('city-deep.db');
+require('./seed_wingfield_municipal').run('wingfield.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {
   const prop = properties.find((p) => p.slug === (user && user.currentProperty));
   return (prop || properties[0]).name;
+}
+// City Deep is billed by the City of Johannesburg, Wingfield by the City of Ekurhuleni - used only
+// for display text on the municipal statement PDF/page (see municipal_compare.js's SITE_MAP for
+// the actual account-to-site mapping, which doesn't need this - it just sums whatever's in each
+// property's own db).
+const MUNICIPALITY_BY_SLUG = { 'city-deep': 'City of Johannesburg', wingfield: 'City of Ekurhuleni' };
+function currentMunicipalityName(user) {
+  return MUNICIPALITY_BY_SLUG[(user && user.currentProperty) || DEFAULT_PROPERTY_SLUG] || 'the municipality';
 }
 
 // AsyncLocalStorage tracks which property's database is "active" for the duration of one request
@@ -448,10 +459,10 @@ route('GET', '/municipal-accounts', async (req, res, params, query) => {
 // municipal_statements row or the synthetic combined-statement object, plus whatever extra
 // context (account label/number/address, trend series, missing-accounts note) that statement
 // shape doesn't carry on its own.
-function municipalPdfData(statement, accountLabel, accountNumber, address, monthlyTrend, combinedInfo) {
+function municipalPdfData(statement, accountLabel, accountNumber, address, monthlyTrend, combinedInfo, propertyName, municipalityName) {
   const s = statement;
   return {
-    accountLabel, accountNumber, address,
+    accountLabel, accountNumber, address, propertyName, municipalityName,
     statementFor: s.statement_for, invoiceNumber: s.invoice_number, statementDate: s.statement_date,
     tariffType: s.elec_tariff_type,
     elecReadingStart: s.elec_reading_start, elecReadingEnd: s.elec_reading_end,
@@ -479,7 +490,7 @@ route('GET', '/municipal-pdf', async (req, res, params, query) => {
     if (!statementFor) return send(res, 404, 'Not found');
     const combinedInfo = municipalCompare.buildCombinedStatement(currentDb(), statementFor);
     const trend = municipalCompare.monthlyTrendAllAccounts(currentDb(), combinedInfo.statement.statement_date);
-    const data = municipalPdfData(combinedInfo.statement, 'All Accounts (Combined)', '', 'City Deep Industrial Park - all municipal accounts', trend, combinedInfo);
+    const data = municipalPdfData(combinedInfo.statement, 'All Accounts (Combined)', '', `${currentPropertyName(user)} - all municipal accounts`, trend, combinedInfo, currentPropertyName(user), currentMunicipalityName(user));
     const pdfBuf = buildMunicipalStatementPdf(data);
     audit(user.userId, 'pdf_download', 'municipal_statement', null, null, null, null, `combined:${statementFor}`);
     res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="municipal-combined-${statementFor.replace(/\s+/g, '-')}.pdf"` });
@@ -490,7 +501,7 @@ route('GET', '/municipal-pdf', async (req, res, params, query) => {
   if (!statement) return send(res, 404, 'Not found');
   const account = get('SELECT * FROM municipal_accounts WHERE id=?', [statement.municipal_account_id]);
   const trend = municipalCompare.monthlyTrendForAccount(currentDb(), account.id, statement.statement_date);
-  const data = municipalPdfData(statement, account.label, account.account_number, account.address, trend, null);
+  const data = municipalPdfData(statement, account.label, account.account_number, account.address, trend, null, currentPropertyName(user), currentMunicipalityName(user));
   const pdfBuf = buildMunicipalStatementPdf(data);
   audit(user.userId, 'pdf_download', 'municipal_statement', statement.id, null, null, null, null);
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="municipal-${account.label.replace(/\s+/g, '-')}-${statement.statement_for.replace(/\s+/g, '-')}.pdf"` });
