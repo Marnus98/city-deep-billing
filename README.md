@@ -298,6 +298,23 @@ de-dup key, own account-to-site mapping added to `municipal_compare.js`'s `SITE_
 else in that comparison module works unchanged since it already resolves against whichever
 property's database is active).
 
+**Electricity is Time-of-Use, not flat-rate.** Wingfield's account is billed on three separate
+registers - Off-peak, Standard and Peak - not the single flat energy rate an earlier version of
+this pipeline assumed. Each statement's kWh lines are classified by their own rate (Rand per kWh)
+rather than by meter-serial tag, since pdftotext's linearised text routinely splits a meter's tag
+and its reading across a page break: Off-peak is always the lowest rate, Standard the middle, Peak
+the highest, with no overlap seen across any of the 13 months (including the low-season/
+high-season tariff-year change each month picks up automatically, since it's the rate itself
+driving the sort, not a fixed threshold). This was verified against a reference table the client
+independently rebuilt from the same invoices - every month's Off-peak/Standard/Peak quantities and
+Rand amounts match exactly.
+
+**Property Rates is extracted and stored but not displayed.** Both Wingfield and City Deep still
+capture Property Rates in the database (non-destructive, in case this is ever needed), but the
+municipal-accounts page, the municipal PDF, and the "Total Charges"/"Total Bill" figures on both
+properties now exclude it - the client's call, since rates are a separate municipal charge rather
+than a utility and don't belong in a utility-billing total.
+
 Every one of the 13 months reconciles to the cent against that statement's own "TOTAL CURRENT
 LEVY" figure (the current month's own new charges, kept deliberately separate from whatever
 arrears/balance-brought-forward the same statement also shows). Two source-PDF quirks worth

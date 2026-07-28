@@ -1,18 +1,24 @@
 // seed_wingfield_municipal.js - imports wingfield_municipal_statements.json (produced by
-// extract_wingfield_municipal.py against the 12 City of Ekurhuleni PDF invoices you uploaded)
+// extract_wingfield_municipal.py against the 13 City of Ekurhuleni PDF invoices you uploaded)
 // into Wingfield's own municipal_accounts/municipal_statements tables. Mirrors seed_municipal.js's
 // structure and insertion pattern exactly - same schema, same "invoice_number is the de-dup key so
 // re-running is always safe" approach - but is its own file because Ekurhuleni's statement layout
-// (single combined account, no TOU electricity split, a flat property-rates line, no separate
-// account-per-precinct) is different enough from City of Johannesburg's that sharing one parser
-// would mean threading two municipalities' quirks through one function.
+// (single combined account, a flat property-rates line, no separate account-per-precinct) is
+// different enough from City of Johannesburg's that sharing one parser would mean threading two
+// municipalities' quirks through one function.
 //
-// Ekurhuleni quirk worth knowing: three of the twelve statements (Nov 2025, Dec 2025, Jan 2026)
+// Electricity IS Time-of-Use here (Peak/Standard/Off-peak, not flat) - corrected after the client
+// caught that an earlier pass of this pipeline had wrongly lumped all 3 registers into one "flat
+// energy" total. See extract_wingfield_municipal.py for how each kWh line is classified by its own
+// rate (unambiguous - Peak/Standard/Off-peak rates never overlap across any of the 13 months),
+// verified against a reference table the client independently rebuilt from these same invoices.
+//
+// Ekurhuleni quirk worth knowing: three of the thirteen statements (Nov 2025, Dec 2025, Jan 2026)
 // carry one-off "INTERIM"/"INTERIM REVERSAL" water & sewer adjustment lines instead of the usual
 // "WATER n kl"/"SEWER-BUSINESS n kl" lines (an estimated-reading correction, not a mistake), and
 // Oct 2025 carries a one-off "FINAL NOTICE" fee. extract_wingfield_municipal.py handles both by
 // summing whatever charge-shaped rows fall within each utility's section of the statement rather
-// than only matching specific labels - every one of the 12 months reconciles to the cent against
+// than only matching specific labels - every one of the 13 months reconciles to the cent against
 // that statement's own "TOTAL CURRENT LEVY" figure (the current month's own new charges, separate
 // from any arrears/balance-brought-forward also shown on the same statement - see README).
 const fs = require('fs');
@@ -82,7 +88,8 @@ function seedStatement(rec) {
     rec.electricity.reading_period ? rec.electricity.reading_period[1] : null,
     rec.electricity.consumption_kwh, rec.electricity.consumption_kvarh, rec.electricity.tariff_type,
     rec.electricity.excl_vat, rec.electricity.vat, rec.electricity.incl_vat,
-    0, 0, 0, 0, 0, 0, L.energy_qty || 0, L.energy || 0,
+    L.off_peak_qty || 0, L.off_peak || 0, L.peak_qty || 0, L.peak || 0,
+    L.standard_qty || 0, L.standard || 0, 0, 0,
     L.demand_qty || 0, L.demand || 0, 0, 0,
     L.service || 0, L.network_surcharge || 0,
     w.reading_period ? w.reading_period[0] : null, w.reading_period ? w.reading_period[1] : null, w.consumption_kl,

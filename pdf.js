@@ -466,7 +466,9 @@ function buildMunicipalStatementPdf(data) {
   const fmtQty = (n, unit) => n == null ? null : `${Math.abs(n) >= 1000 ? Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : n.toFixed(1)} ${unit}`;
 
   headerRow();
-  catLine('Property Rates', null, data.propertyRatesExclVat, data.propertyRatesVat, data.propertyRatesInclVat);
+  // Property Rates is intentionally left off this statement - it's a separate municipal charge,
+  // not a utility, and the client asked for it out of the "Total Charges" picture (still recorded
+  // in the DB, just not shown here or included in the total below).
   catLine(`Electricity (${data.elecReadingStart || '?'} to ${data.elecReadingEnd || '?'})`, fmtQty(data.elecConsumptionKwh, 'kWh'), data.elecExclVat, data.elecVat, data.elecInclVat);
   for (const l of data.elecLines || []) catLine(l.label, fmtQty(l.qty, l.unit || ''), l.rand, null, l.rand, { indent: true });
   catLine(`Water (${data.waterReadingStart || '?'} to ${data.waterReadingEnd || '?'})`, fmtQty(data.waterConsumptionKl, 'KL'), data.waterExclVat, data.waterVat, data.waterInclVat);

@@ -574,8 +574,13 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
   let breakdownHtml = `<div class="bg-white border rounded p-6 text-slate-400">No statements for this account yet.</div>`;
   if (statement) {
     const s = statement;
-    const totalExcl = s.property_rates_excl_vat + s.elec_excl_vat + s.water_excl_vat + s.sanitation_excl_vat + s.refuse_excl_vat + s.sundry_excl_vat;
-    const totalVat = s.property_rates_vat + s.elec_vat + s.water_vat + s.sanitation_vat + s.refuse_vat + s.sundry_vat;
+    // Property Rates is deliberately excluded from displayed totals (client's call - rates are a
+    // separate municipal charge, not a utility, and shouldn't be lumped into "Total Charges" here).
+    // Still extracted/stored in the DB (see property_rates_excl_vat etc.) so no data is lost if this
+    // decision ever changes - only the display/total is affected.
+    const totalExcl = s.elec_excl_vat + s.water_excl_vat + s.sanitation_excl_vat + s.refuse_excl_vat + s.sundry_excl_vat;
+    const totalVat = s.elec_vat + s.water_vat + s.sanitation_vat + s.refuse_vat + s.sundry_vat;
+    const totalInclVat = Math.round((totalExcl + totalVat + Number.EPSILON) * 100) / 100;
 
     // Electricity sub-rows: TOU accounts get Off-peak/Peak/Standard, flat-rate accounts get a
     // single Energy line, Demand/Reactive/Service/Network surcharge apply to either - only shown
@@ -625,14 +630,13 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
             <th class="py-1 text-right">Excl. VAT</th><th class="py-1 text-right">VAT</th><th class="py-1 text-right">Total</th>
           </tr></thead>
           <tbody>
-            ${catRow('Property Rates', null, null, s.property_rates_excl_vat, s.property_rates_vat, s.property_rates_incl_vat)}
             ${catRowHtml('Electricity' + (s.elec_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.elec_reading_start)} to ${esc(s.elec_reading_end)})</span>` : ''), s.elec_consumption_kwh, 'kWh', s.elec_excl_vat, s.elec_vat, s.elec_incl_vat)}
             ${elecSubRowsClean}
             ${catRowHtml('Water' + (s.water_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.water_reading_start)} to ${esc(s.water_reading_end)})</span>` : ''), s.water_consumption_kl, 'KL', s.water_excl_vat, s.water_vat, s.water_incl_vat)}
             ${catRowHtml('Sanitation <span class="text-slate-400 text-xs">(billed on water consumption)</span>', s.water_consumption_kl, 'KL', s.sanitation_excl_vat, s.sanitation_vat, s.sanitation_incl_vat)}
             ${catRow('Refuse', null, null, s.refuse_excl_vat, s.refuse_vat, s.refuse_incl_vat)}
             ${catRow('Sundry', null, null, s.sundry_excl_vat, s.sundry_vat, s.sundry_incl_vat)}
-            ${catRow('Total Charges', null, null, totalExcl, totalVat, s.grand_total_incl_vat, { total: true })}
+            ${catRow('Total Charges', null, null, totalExcl, totalVat, totalInclVat, { total: true })}
           </tbody>
         </table>
       </div>
@@ -714,7 +718,7 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
         <td class="px-4 py-2 text-slate-500">${esc(s.statement_date)}</td>
         <td class="px-4 py-2 text-right">${fmtNum(s.elec_consumption_kwh, 0)}</td>
         <td class="px-4 py-2 text-right">${fmtNum(s.water_consumption_kl, 0)}</td>
-        <td class="px-4 py-2 text-right font-medium">${money(s.grand_total_incl_vat)}</td>
+        <td class="px-4 py-2 text-right font-medium">${money((s.elec_incl_vat || 0) + (s.water_incl_vat || 0) + (s.sanitation_incl_vat || 0) + (s.refuse_incl_vat || 0) + (s.sundry_incl_vat || 0))}</td>
         <td class="px-4 py-2 text-right"><a class="text-blue-600 hover:underline" href="/municipal-accounts?accountId=${account.id}&statementId=${s.id}">View</a></td>
       </tr>`).join('')}
       </tbody>

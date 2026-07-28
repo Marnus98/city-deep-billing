@@ -473,10 +473,14 @@ function municipalPdfData(statement, accountLabel, accountNumber, address, month
     sanitationExclVat: s.sanitation_excl_vat, sanitationVat: s.sanitation_vat, sanitationInclVat: s.sanitation_incl_vat,
     refuseExclVat: s.refuse_excl_vat, refuseVat: s.refuse_vat, refuseInclVat: s.refuse_incl_vat,
     sundryExclVat: s.sundry_excl_vat, sundryVat: s.sundry_vat, sundryInclVat: s.sundry_incl_vat,
+    // Property Rates is still returned here (propertyRates* fields) in case something else ever
+    // needs it, but it's deliberately left out of totalExclVat/totalVat/grandTotalInclVat - the
+    // client asked for rates out of the "Total Charges" figure since it's a separate municipal
+    // charge, not a utility. pdf.js and views.js no longer render a Property Rates line either.
     propertyRatesExclVat: s.property_rates_excl_vat, propertyRatesVat: s.property_rates_vat, propertyRatesInclVat: s.property_rates_incl_vat,
-    totalExclVat: s.property_rates_excl_vat + s.elec_excl_vat + s.water_excl_vat + s.sanitation_excl_vat + s.refuse_excl_vat + s.sundry_excl_vat,
-    totalVat: s.property_rates_vat + s.elec_vat + s.water_vat + s.sanitation_vat + s.refuse_vat + s.sundry_vat,
-    grandTotalInclVat: s.grand_total_incl_vat,
+    totalExclVat: s.elec_excl_vat + s.water_excl_vat + s.sanitation_excl_vat + s.refuse_excl_vat + s.sundry_excl_vat,
+    totalVat: s.elec_vat + s.water_vat + s.sanitation_vat + s.refuse_vat + s.sundry_vat,
+    grandTotalInclVat: Math.round(((s.elec_incl_vat || 0) + (s.water_incl_vat || 0) + (s.sanitation_incl_vat || 0) + (s.refuse_incl_vat || 0) + (s.sundry_incl_vat || 0) + Number.EPSILON) * 100) / 100,
     monthlyTrend, matchedAccounts: combinedInfo ? combinedInfo.matchedAccounts : null, missingAccounts: combinedInfo ? combinedInfo.missingAccounts : null,
     generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
   };
