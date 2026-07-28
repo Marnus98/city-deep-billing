@@ -37,8 +37,8 @@ pre { white-space: pre-wrap; }
 .max-w-md { max-width: 28rem; } .max-w-sm { max-width: 24rem; } .max-w-2xl { max-width: 42rem; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .ml-auto { margin-left: auto; }
-.w-full { width: 100%; } .w-24 { width: 6rem; } .w-40 { width: 10rem; } .w-60 { width: 15rem; }
-.h-auto { height: auto; }
+.w-full { width: 100%; } .w-24 { width: 6rem; } .w-40 { width: 10rem; } .w-60 { width: 15rem; } .w-auto { width: auto; }
+.h-auto { height: auto; } .h-10 { height: 2.5rem; }
 .min-w-0 { min-width: 0; }
 .border-r { border-right: 1px solid #e2e8f0; }
 .overflow-hidden { overflow: hidden; }
@@ -78,7 +78,7 @@ pre { white-space: pre-wrap; }
 /* colors */
 .bg-white{background:#fff}
 .bg-slate-50{background:#f8fafc} .bg-slate-100{background:#f1f5f9} .bg-slate-200{background:#e2e8f0}
-.bg-slate-700{background:#334155} .bg-slate-900{background:#0f172a}
+.bg-slate-700{background:#334155} .bg-slate-800{background:#1e293b} .bg-slate-900{background:#0f172a}
 .bg-blue-100{background:#dbeafe}
 .bg-green-100{background:#dcfce7}
 .bg-amber-100{background:#fef3c7}
@@ -100,6 +100,7 @@ pre { white-space: pre-wrap; }
    must stay below the base border rules so the cascade picks them up. */
 .border-slate-200{border-color:#e2e8f0}
 .border-slate-300{border-color:#cbd5e1}
+.border-slate-600{border-color:#475569}
 
 /* components */
 .badge{display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600}
