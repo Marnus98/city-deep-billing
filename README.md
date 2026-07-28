@@ -1,7 +1,12 @@
-# City Deep Industrial Park — Tenant Utility Billing (Prototype)
+# HolmStone Utility Management Platform (Prototype)
 
 A working prototype of the billing application described in the project brief, built and
-reconciled against two real monthly workbooks (**March 2026** and **April 2026**).
+reconciled against real monthly workbooks. The platform now manages **two physical properties**
+— City Deep Industrial Park and Wingfield Business Park — each fully isolated in its own SQLite
+database file, switchable from a dropdown on the Dashboard, sharing one set of logins. See
+"Multi-property architecture" below for how the isolation works, and "Wingfield Business Park"
+for that property's own tariff structure and data quirks (its billing formula and source
+workbook layout are both different from City Deep's).
 
 ## What this is
 
@@ -52,6 +57,29 @@ Then open http://localhost:8787 and sign in with one of the seeded demo accounts
 
 **Change these passwords (and rotate `SESSION_SECRET`) before putting this anywhere near the
 open internet.**
+
+## Multi-property architecture
+
+Each property in `properties.js` gets its **own physical SQLite database file**
+(`data/city-deep.db`, `data/wingfield.db`) — there is no shared table with a `property_id` column
+that a missed `WHERE` clause could leak across. A signed-in user's session (`auth.js`) tracks
+which property they're currently viewing (`currentProperty`); switching via the Dashboard's
+dropdown (`POST /switch-property`) just updates that session field and reloads the page — nothing
+about the URL changes. Every request resolves its property's database through Node's
+`AsyncLocalStorage` (`server.js`'s `dbContext`), which safely hands each concurrent request the
+right database connection without a shared mutable variable that could race under Node's async
+request handling.
+
+Logins are the one thing genuinely shared: `data/auth.db` holds the canonical `users` table, so
+the same admin/billing/reviewer/viewer accounts work no matter which property is selected (each
+property database also carries a mirrored copy of `users`, purely to satisfy that database's own
+`audit_log.user_id` foreign key — login itself always checks `auth.db` directly).
+
+To add a third property: add an entry to `properties.js`, then build a `seed_<slug>.js` the same
+way `seed_wingfield.js` was built from `seed.js` — copy the pattern, point it at that property's
+extracted workbook JSON, adjust the calc engine if its tariff structure differs (see
+`calc_wingfield.js` vs `calc.js` for how different two properties' formulas can be), and wire
+`seedFile` in `properties.js`.
 
 ## What's implemented
 
@@ -196,6 +224,67 @@ over would close this gap.
   historical readings, tariffs and calculations should be imported for any future month you want
   to bring in the same way — re-run `extract.py` against a new workbook and pass its output
   through the same pipeline.
+
+## Wingfield Business Park
+
+Wingfield's own database (`data/wingfield.db`), tariff engine (`calc_wingfield.js`) and importer
+(`seed_wingfield.js`) are entirely separate from City Deep's — its source workbooks have a
+different sheet layout and a genuinely different, simpler tariff structure:
+
+- **Electricity**: a flat monthly basic charge + a capacity charge (R/Amp of the tenant's breaker
+  rating) + a single active energy rate per kWh. The source workbook's own Tariff sheet already
+  resolves winter/summer into one "Active Tariff" cell each month, which is used as-is rather than
+  re-deriving the season split. No stepped blocks, no demand kVA/kVArh charges, no network levy —
+  none of those exist in Wingfield's tariff.
+- **Water**: usage (R/kL) + sewage (R/kL) on the same reading, same as City Deep.
+
+Seeded with the same 13 months as City Deep (July 2025 - July 2026), extracted by
+`extract_wingfield.py` into `wingfield_data/wingfield_YYYY-MM.json`.
+
+**Bulk/reference meters excluded from tenant billing** (per your confirmation for the electrical
+ones, extended to water's equivalent for consistency): `Main Council Meter` and
+`Subatation Totals` (electrical), and `Council` (water — its meter serials match the raw Water
+sheet's own "Council High/Low flow" and "Council check meter" labels, and its scale, ~R126,000/
+month, is clearly bulk supply rather than a tenant). Their raw readings are still imported as
+`role='bulk'` meters so nothing is silently dropped — they just never generate a tenant bill.
+
+**Tenant name aliasing** (`TENANT_NAME_ALIASES` in `seed_wingfield.js`) — the Electrical Billing
+and Water Billing sheets spell a few real tenants differently, confirmed by cross-checking meter
+serials/locations rather than guessed: `Card Plus` ↔ `Cards Plus`, `TRSAV` ↔ `TRVSA` (a
+transposition typo on one side of the two sheets — which spelling is "correct" isn't determinable
+from the data, `TRVSA` was picked arbitrarily but applied consistently), `Common area` ↔
+`Common Area/Refinery`, and `Arch International Logistics (Pyt) Ltd` (one month's Electrical
+Billing spelling) ↔ `Arch International Logistics` (every other month/sheet).
+
+**Sub-metered credit/recharge lines**: a handful of meters physically sit on one tenant's
+distribution board but are billed to a different tenant (e.g. an MTN or Vodacom antenna wired
+through another tenant's DB). The source sheet shows this as two rows: a positive charge under
+the real payer, and an equal-and-opposite negative line inside the host tenant's own block. This
+is detected automatically from the row's own charge polarity (not a hardcoded meter list) and
+reproduced as a `sign: -1` line item, mirroring the same convention `calc.js` already uses for
+City Deep's solar credit meters.
+
+### Reconciliation results (Wingfield)
+
+Across 313 tenant/period/utility rows (14-15 tenants × 2 utilities × 13 months): **264 match the
+workbook's own totals exactly**, **19 are within a few cents** (floating-point accumulation), and
+**30 are flagged** — every one attributable to one of two confirmed source-workbook defects, not a
+parsing or calculation error on this app's side:
+
+1. **The August 2025 workbook** ("Wingfield Park Aug 2025 Final Rev2.xlsx") has broken/shifted
+   formulas across both its Electrical Billing and Water Billing "Total" columns for that one
+   month only — electrical totals cache as R0 for nearly every tenant, and water totals are
+   short by a consistent factor (confirmed by tracing individual meter rows: the sheet's own
+   "sanitation" and "total" columns are actually holding that month's water-usage and sanitation
+   Rand amounts one column over from where every other month has them). This app's independently
+   computed bill is the only reliable total for that month; the workbook's own cached figure
+   should not be trusted for August 2025.
+2. **The "Common area" water block, most months from January 2026 onward** — the workbook's own
+   totals-row SUM formula doesn't extend down far enough to catch the "Fire Water A"/"Fire Water
+   B" meter rows, which were evidently added to the sheet below the original formula's range at
+   some point. Confirmed by summing the block's own individual meter rows by hand: they add up to
+   this app's computed total, not the workbook's cached one. Off by R400-4,000/month depending on
+   how many Fire Water meters had nonzero readings that month.
 
 ## Deployment (making this a real hosted URL)
 

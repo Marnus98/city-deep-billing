@@ -19,9 +19,10 @@ short. No git command line needed — everything below is clicking in a browser.
 3. Pick the `city-deep-billing` repo you just created. Render will read the included
    `render.yaml` and configure everything itself (Node web service, free plan, start command).
 4. Click **Apply** / **Deploy**. First deploy takes 1–2 minutes.
-5. When it's done, Render gives you a URL like `https://city-deep-billing.onrender.com` — that's
-   your live app. The database seeds itself automatically on first boot (13 months of data, July
-   2025 - July 2026).
+5. When it's done, Render gives you a URL like `https://holmstone-utility-management-platform.onrender.com`
+   — that's your live app. Both properties' databases seed themselves automatically on first boot
+   (13 months each, July 2025 - July 2026) — City Deep Industrial Park and Wingfield Business
+   Park, switchable from the dropdown on the Dashboard.
 
 Sign in with `admin` / `admin123` (see README for all 4 demo logins) — **change these passwords
 first thing**, there's no edit-user screen yet so for now that means editing the `seedUsers()`
@@ -31,10 +32,10 @@ list in `seed.js`, committing, and letting Render redeploy.
 
 - Render's free web services **spin down after 15 minutes of no traffic** and take ~30–60
   seconds to wake back up on the next visit. That's normal, not a bug.
-- Free plan storage is **ephemeral** — if Render restarts the container, your data resets back to
-  the March/April seed data on next boot. For anything you actually rely on day to day, upgrade
-  to a paid instance with a persistent disk (a few dollars/month) - then the app remembers new
-  readings and bills you capture between restarts.
+- Free plan storage is **ephemeral** — if Render restarts the container, both properties' data
+  resets back to the imported 13-month seed on next boot. For anything you actually rely on day to
+  day, upgrade to a paid instance with a persistent disk (a few dollars/month) - then the app
+  remembers new readings and bills you capture between restarts.
 - If you outgrow SQLite (e.g. once several people are using this at once), Render also offers a
   free PostgreSQL instance you can switch to later — ask me and I'll wire it up.
 

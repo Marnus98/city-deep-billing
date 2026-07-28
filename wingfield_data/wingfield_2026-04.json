@@ -1,0 +1,2447 @@
+{
+ "label": "2026-04",
+ "file": "WINGFIELD PARK APRIL 2026.xlsx",
+ "period": {
+  "start": "2026-03-05",
+  "end": "2026-04-06"
+ },
+ "tariff_raw": {
+  "B2": {
+   "label": "Electrical",
+   "B": null
+  },
+  "B3": {
+   "label": "Basic charge: R61.55/month",
+   "B": 64.334
+  },
+  "B4": {
+   "label": "Capacity charge: R20.76/Amp",
+   "B": 29.5268
+  },
+  "B5": {
+   "label": "Energy charge: Low season: R2.4870/kWh ",
+   "B": 3.0864
+  },
+  "B6": {
+   "label": "Energy charge: High season: R3.1385/kWh",
+   "B": 3.9688
+  },
+  "B8": {
+   "label": "Active Tarriff",
+   "B": 3.0864
+  },
+  "B11": {
+   "label": "Water",
+   "B": null
+  },
+  "B12": {
+   "label": "Usage (0-5000kl): R39.17/kl",
+   "B": 49.11
+  },
+  "B13": {
+   "label": "Sewage(0-5000kl): R16.07/kl",
+   "B": 18.91
+  }
+ },
+ "elect_meter_info": [
+  {
+   "serial": "15523700",
+   "make": "Hexing",
+   "model": "HXE310",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "*",
+   "billing_rx": "*",
+   "start_kwh": 8826.13,
+   "end_kwh": 8878.56,
+   "usage_kwh": 157290.00000000087,
+   "tenant_alloc": "Council",
+   "location": "Bulk",
+   "cb_rating": "MV",
+   "notes": "The CT's & Rx cannot be confirmed (6.6kV & 30/5CT)"
+  },
+  {
+   "serial": "ELON087031",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "1600/5",
+   "billing_rx": 320,
+   "start_kwh": 8545.2,
+   "end_kwh": 8596.1,
+   "usage_kwh": 16287.999999999884,
+   "tenant_alloc": "Substation 1 Incomer ",
+   "location": "Substation 1",
+   "cb_rating": "1600A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087531",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 168015.63,
+   "end_kwh": 169619.88,
+   "usage_kwh": 1604.25,
+   "tenant_alloc": "Pump room, Plugs, Lights",
+   "location": "Substation 1",
+   "cb_rating": "40A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087025",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 10701.9,
+   "end_kwh": 10761,
+   "usage_kwh": 7092.000000000044,
+   "tenant_alloc": "Ptyprops 348 (Pty) Ltd (Block H)",
+   "location": "Substation 1",
+   "cb_rating": "630A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087136",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 10862,
+   "end_kwh": 10926,
+   "usage_kwh": 7680,
+   "tenant_alloc": "Safe Quip/Refinery (Block D)",
+   "location": "Substation 1",
+   "cb_rating": "315A",
+   "notes": "Calculation to be made, ELON087136 minus ELON086668 = SA Tyre"
+  },
+  {
+   "serial": "ELON071496",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "300/5",
+   "billing_rx": 60,
+   "start_kwh": 19542.5,
+   "end_kwh": 19660.6,
+   "usage_kwh": 7085.999999999913,
+   "tenant_alloc": "Block H Incomer",
+   "location": "Block H",
+   "cb_rating": "630A",
+   "notes": null
+  },
+  {
+   "serial": "ELON072218",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "100/5",
+   "billing_rx": 20,
+   "start_kwh": 490.6,
+   "end_kwh": 490.6,
+   "usage_kwh": 0,
+   "tenant_alloc": "Spare ",
+   "location": "Block H",
+   "cb_rating": "100A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086672",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 289621,
+   "end_kwh": 292223.3,
+   "usage_kwh": 2602.2999999999884,
+   "tenant_alloc": "Ptyprops 348 (Pty) Ltd (Block H)",
+   "location": "Block H",
+   "cb_rating": "100A",
+   "notes": null
+  },
+  {
+   "serial": "ELON072242",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "300/5",
+   "billing_rx": 60,
+   "start_kwh": 19972,
+   "end_kwh": 20098.5,
+   "usage_kwh": 7590,
+   "tenant_alloc": "Block D Incomer",
+   "location": "Block D",
+   "cb_rating": "300A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086668",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 62042.2,
+   "end_kwh": 62434.7,
+   "usage_kwh": 392.5,
+   "tenant_alloc": "Safe Quip (Ground Floor)",
+   "location": "Block D",
+   "cb_rating": "100A",
+   "notes": null
+  },
+  {
+   "serial": "ELON071992",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "150/5",
+   "billing_rx": 30,
+   "start_kwh": 313,
+   "end_kwh": 318,
+   "usage_kwh": 150,
+   "tenant_alloc": "Refinery First Floor",
+   "location": "Block D",
+   "cb_rating": "120A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087022",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "1600/5",
+   "billing_rx": 320,
+   "start_kwh": 18709.4,
+   "end_kwh": 18794.4,
+   "usage_kwh": 27200,
+   "tenant_alloc": "Substation 2 Incomer 1",
+   "location": "Substation 2 ",
+   "cb_rating": "1600A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087014",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "1600/5",
+   "billing_rx": 320,
+   "start_kwh": 19774.5,
+   "end_kwh": 19860.4,
+   "usage_kwh": 27488.000000000466,
+   "tenant_alloc": "Substation 2 Incomer 2",
+   "location": "Substation 2 ",
+   "cb_rating": "1600A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087016",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 0.9,
+   "end_kwh": 0.9,
+   "usage_kwh": 0,
+   "tenant_alloc": "Plant Room Disconected ",
+   "location": "Substation 2 ",
+   "cb_rating": "630A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087028",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "800/5",
+   "billing_rx": 160,
+   "start_kwh": 35437.3,
+   "end_kwh": 35498.6,
+   "usage_kwh": 9807.999999999302,
+   "tenant_alloc": "Block B Feeder",
+   "location": "Substation 2 ",
+   "cb_rating": "800A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087017",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 18265.7,
+   "end_kwh": 18421.8,
+   "usage_kwh": 18731.999999999825,
+   "tenant_alloc": "The Core Comp Bus (Block C)",
+   "location": "Substation 2 ",
+   "cb_rating": "630A",
+   "notes": null
+  },
+  {
+   "serial": "ELON085505",
+   "make": "ECHELON",
+   "model": "83332-1IAA",
+   "current_rating": "100A",
+   "phases": 1,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 4192.2,
+   "end_kwh": 4198.8,
+   "usage_kwh": 6.600000000000364,
+   "tenant_alloc": "Common Area ",
+   "location": "Substation 2 ",
+   "cb_rating": "40A",
+   "notes": null
+  },
+  {
+   "serial": "ELON085535",
+   "make": "ECHELON",
+   "model": "83332-1IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 0.2,
+   "end_kwh": 0.2,
+   "usage_kwh": 0,
+   "tenant_alloc": "Common Area (No Load)",
+   "location": "Substation 2 ",
+   "cb_rating": "16A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086998",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "800/5",
+   "billing_rx": 160,
+   "start_kwh": 15220.4,
+   "end_kwh": 15316.9,
+   "usage_kwh": 15440,
+   "tenant_alloc": "Block F Offices",
+   "location": "Substation 2 ",
+   "cb_rating": "800A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086993",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 15621.4,
+   "end_kwh": 15713.3,
+   "usage_kwh": 11027.999999999956,
+   "tenant_alloc": "Block G Feeder",
+   "location": "Substation 2 ",
+   "cb_rating": "400A",
+   "notes": null
+  },
+  {
+   "serial": "ELON088370",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 9312.71,
+   "end_kwh": 9366.02,
+   "usage_kwh": 6397.200000000157,
+   "tenant_alloc": "Block C Incomer",
+   "location": "Block C",
+   "cb_rating": "600A",
+   "notes": null
+  },
+  {
+   "serial": "ELON068518",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 2,
+   "end_kwh": 2,
+   "usage_kwh": 0,
+   "tenant_alloc": "Common Area",
+   "location": "Block C",
+   "cb_rating": "100A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087559",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 959563.17,
+   "end_kwh": 972998.82,
+   "usage_kwh": 13435.649999999907,
+   "tenant_alloc": "The Core Comp Bus ",
+   "location": "Block C",
+   "cb_rating": "100A",
+   "notes": "Office the Core Computer Business"
+  },
+  {
+   "serial": "ELON086989",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "800/5",
+   "billing_rx": 160,
+   "start_kwh": 18448.7,
+   "end_kwh": 18462.2,
+   "usage_kwh": 2160,
+   "tenant_alloc": "Kellogg Company DB3 Warehouse",
+   "location": "Block B",
+   "cb_rating": "800A",
+   "notes": "Calculation to be made, ELON086989 minus ELON087220 = Kellogg Company Of SA"
+  },
+  {
+   "serial": "ELON087220",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "150/5",
+   "billing_rx": 30,
+   "start_kwh": 18491,
+   "end_kwh": 18629.2,
+   "usage_kwh": 4146.000000000022,
+   "tenant_alloc": "The Core Comp Bus  (Office)",
+   "location": "Block B",
+   "cb_rating": "150A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086995",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 0,
+   "end_kwh": 0,
+   "usage_kwh": 0,
+   "tenant_alloc": "Common Area",
+   "location": "Block B",
+   "cb_rating": "*",
+   "notes": null
+  },
+  {
+   "serial": "NES005663",
+   "make": null,
+   "model": null,
+   "current_rating": "600A",
+   "phases": 3,
+   "ct_ratio": null,
+   "billing_rx": 320,
+   "start_kwh": 5100.29,
+   "end_kwh": 5186.37,
+   "usage_kwh": 27545.599999999977,
+   "tenant_alloc": "Kellogg Company DB2 Warehouse",
+   "location": "Block B",
+   "cb_rating": "200A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087053",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "1600/5",
+   "billing_rx": 320,
+   "start_kwh": 17122.1,
+   "end_kwh": 17184.9,
+   "usage_kwh": 20096.00000000093,
+   "tenant_alloc": "Substation 3 Incomer",
+   "location": "Substation 3",
+   "cb_rating": "1600A",
+   "notes": null
+  },
+  {
+   "serial": "ELON044318",
+   "make": "ECHELON",
+   "model": "83332-1IAA",
+   "current_rating": "100A",
+   "phases": 1,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 236,
+   "end_kwh": 236,
+   "usage_kwh": 0,
+   "tenant_alloc": "Common Area",
+   "location": "Substation 3",
+   "cb_rating": "40A",
+   "notes": null
+  },
+  {
+   "serial": "ELON085451",
+   "make": "ECHELON",
+   "model": "83332-1IAA",
+   "current_rating": "100A",
+   "phases": 1,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 58,
+   "end_kwh": 69.5,
+   "usage_kwh": 11.5,
+   "tenant_alloc": "Common Area",
+   "location": "Substation 3",
+   "cb_rating": "16A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086628",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 6990.5,
+   "end_kwh": 7019.6,
+   "usage_kwh": 29.100000000000364,
+   "tenant_alloc": "Common Area",
+   "location": "Substation 3",
+   "cb_rating": "100A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087037",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 15761.2,
+   "end_kwh": 15860.6,
+   "usage_kwh": 11927.999999999956,
+   "tenant_alloc": "Block E (ODC)",
+   "location": "Substation 3",
+   "cb_rating": "630A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086980",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 18244.9,
+   "end_kwh": 18295.4,
+   "usage_kwh": 6060,
+   "tenant_alloc": "Block A Kellogg",
+   "location": "Substation 3",
+   "cb_rating": "630A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087060",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 12239.8,
+   "end_kwh": 12258.4,
+   "usage_kwh": 2232.0000000000437,
+   "tenant_alloc": "Block F Warehouse",
+   "location": "Substation 3",
+   "cb_rating": "630A",
+   "notes": null
+  },
+  {
+   "serial": "ELON071164",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "800/5",
+   "billing_rx": 160,
+   "start_kwh": 8053.4,
+   "end_kwh": 8149.9,
+   "usage_kwh": 15440,
+   "tenant_alloc": "Block F Office Incomer",
+   "location": "Block F Office",
+   "cb_rating": "800A",
+   "notes": "Calculation to be made, ELON071164 minus ELON072253 = Professional Central Management"
+  },
+  {
+   "serial": "ELON072253",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "150/5",
+   "billing_rx": 30,
+   "start_kwh": 21759.1,
+   "end_kwh": 22140.1,
+   "usage_kwh": 11430,
+   "tenant_alloc": "Cards Plus (Office)",
+   "location": "Block F Office",
+   "cb_rating": "150A",
+   "notes": "Calculation to be made, ELON072253 minus 11105466215 = Block F / Office / Vacant"
+  },
+  {
+   "serial": "NES019081",
+   "make": "CBI old (11105466215)",
+   "model": 330,
+   "current_rating": "80A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 54945.79,
+   "end_kwh": 56424.8,
+   "usage_kwh": 1479.010000000002,
+   "tenant_alloc": "Vodacom Antenna",
+   "location": "Block F Office (Card Plus DB)",
+   "cb_rating": "63A",
+   "notes": "New meter"
+  },
+  {
+   "serial": "ELON054422 DISC",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "200/5",
+   "billing_rx": 40,
+   "start_kwh": 15641.41,
+   "end_kwh": 15641.46,
+   "usage_kwh": 1.9999999999708962,
+   "tenant_alloc": "Common Area",
+   "location": "Block F Office",
+   "cb_rating": "200A",
+   "notes": "The landlord want to know how rms bill this meter out"
+  },
+  {
+   "serial": "ELON087041",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 5812.4,
+   "end_kwh": 5822.7,
+   "usage_kwh": 1236.0000000000218,
+   "tenant_alloc": "Arch International Logistics warehouse ",
+   "location": "Block G",
+   "cb_rating": "600A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087086",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "300/5",
+   "billing_rx": 60,
+   "start_kwh": 17016.7,
+   "end_kwh": 17132.5,
+   "usage_kwh": 6947.999999999956,
+   "tenant_alloc": "The Core Comp Bus (Block GB)",
+   "location": "Block G",
+   "cb_rating": "300A",
+   "notes": null
+  },
+  {
+   "serial": "ELON083890",
+   "make": "ECHELON",
+   "model": "83332-3IAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 229338.7,
+   "end_kwh": 232173,
+   "usage_kwh": 2834.2999999999884,
+   "tenant_alloc": "TRSAV (Office)",
+   "location": "Block G",
+   "cb_rating": "100A",
+   "notes": "Calculation to be made, ELON083890 minus NES18300008730 = Block G / Office / Vacant"
+  },
+  {
+   "serial": "NES18300008730",
+   "make": "NES",
+   "model": "83334-3IABAA",
+   "current_rating": "100A",
+   "phases": 3,
+   "ct_ratio": "DOL",
+   "billing_rx": 1,
+   "start_kwh": 141711,
+   "end_kwh": 143469,
+   "usage_kwh": 1758,
+   "tenant_alloc": "MTN Antenna",
+   "location": "Block G (TRSAV DB)",
+   "cb_rating": "32A",
+   "notes": "Fed below Block G /Office"
+  },
+  {
+   "serial": "ELON088299",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "600/5",
+   "billing_rx": 120,
+   "start_kwh": 14016.22,
+   "end_kwh": 14034.88,
+   "usage_kwh": 2239.1999999999825,
+   "tenant_alloc": "Block F Warehouse Incomer",
+   "location": "Block F warehouse",
+   "cb_rating": "600A",
+   "notes": null
+  },
+  {
+   "serial": "ELON086996",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "800/5",
+   "billing_rx": 160,
+   "start_kwh": 11332.3,
+   "end_kwh": 11370,
+   "usage_kwh": 6032.000000000116,
+   "tenant_alloc": "Block A Incomer",
+   "location": "Block A",
+   "cb_rating": "800A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087213 0FF",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "200/5",
+   "billing_rx": 40,
+   "start_kwh": 1613.5,
+   "end_kwh": 1630.5,
+   "usage_kwh": 680,
+   "tenant_alloc": "Block A Aircon (disconnected)",
+   "location": "Block A",
+   "cb_rating": "175A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087001",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "100/5",
+   "billing_rx": 20,
+   "start_kwh": 7517.3,
+   "end_kwh": 7517.3,
+   "usage_kwh": 0,
+   "tenant_alloc": "Kellogg (DB1C) Block A",
+   "location": "Block A",
+   "cb_rating": "125A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087000",
+   "make": "ECHELON",
+   "model": "83522-3IAA",
+   "current_rating": "5A",
+   "phases": 3,
+   "ct_ratio": "100/5",
+   "billing_rx": 20,
+   "start_kwh": 31322.2,
+   "end_kwh": 31490.8,
+   "usage_kwh": 3371.999999999971,
+   "tenant_alloc": "Kellogg Office ",
+   "location": "Block A",
+   "cb_rating": "125A",
+   "notes": null
+  },
+  {
+   "serial": "ELON087048",
+   "make": null,
+   "model": null,
+   "current_rating": null,
+   "phases": null,
+   "ct_ratio": null,
+   "billing_rx": null,
+   "start_kwh": 15735.2,
+   "end_kwh": 15806.7,
+   "usage_kwh": 71.5,
+   "tenant_alloc": null,
+   "location": null,
+   "cb_rating": null,
+   "notes": null
+  },
+  {
+   "serial": "ELON087055",
+   "make": null,
+   "model": null,
+   "current_rating": null,
+   "phases": null,
+   "ct_ratio": null,
+   "billing_rx": null,
+   "start_kwh": 22227.9,
+   "end_kwh": 22305.6,
+   "usage_kwh": 77.69999999999709,
+   "tenant_alloc": null,
+   "location": null,
+   "cb_rating": null,
+   "notes": null
+  },
+  {
+   "serial": "ELON086977",
+   "make": null,
+   "model": null,
+   "current_rating": null,
+   "phases": null,
+   "ct_ratio": null,
+   "billing_rx": null,
+   "start_kwh": 164.8,
+   "end_kwh": 164.8,
+   "usage_kwh": 0,
+   "tenant_alloc": null,
+   "location": null,
+   "cb_rating": null,
+   "notes": null
+  },
+  {
+   "serial": "Lear Security Meter Entrance",
+   "make": null,
+   "model": null,
+   "current_rating": null,
+   "phases": null,
+   "ct_ratio": null,
+   "billing_rx": null,
+   "start_kwh": 1297.8,
+   "end_kwh": 1351.9,
+   "usage_kwh": 54.100000000000136,
+   "tenant_alloc": "Lear Security Meter ",
+   "location": "Lear Security Meter ",
+   "cb_rating": "25A",
+   "notes": null
+  },
+  {
+   "serial": "NEW Alarm Meter at the back of the building - Next to freeway",
+   "make": null,
+   "model": null,
+   "current_rating": null,
+   "phases": null,
+   "ct_ratio": null,
+   "billing_rx": null,
+   "start_kwh": 948,
+   "end_kwh": 996,
+   "usage_kwh": 48,
+   "tenant_alloc": null,
+   "location": null,
+   "cb_rating": null,
+   "notes": null
+  },
+  {
+   "serial": "Lear Security Meter Exit",
+   "make": null,
+   "model": null,
+   "current_rating": null,
+   "phases": null,
+   "ct_ratio": null,
+   "billing_rx": null,
+   "start_kwh": 679,
+   "end_kwh": 719.4,
+   "usage_kwh": 40.39999999999998,
+   "tenant_alloc": null,
+   "location": null,
+   "cb_rating": null,
+   "notes": null
+  }
+ ],
+ "water_meter_info": [
+  {
+   "location": null,
+   "tenant_alloc": "Council High flow",
+   "space_alloc": "Bulk",
+   "make": "Sensus",
+   "serial": "100087357",
+   "billing_rx": 1,
+   "start_m3": 179322,
+   "end_m3": null,
+   "usage_m3": -179322
+  },
+  {
+   "location": "Outside the premisses at the back of Block D",
+   "tenant_alloc": "Council Low flow",
+   "space_alloc": "Bulk",
+   "make": "Sensus",
+   "serial": "60351776",
+   "billing_rx": 1,
+   "start_m3": 37148,
+   "end_m3": null,
+   "usage_m3": -37148
+  },
+  {
+   "location": "Inside the premisses at the back of Block D",
+   "tenant_alloc": "Council check meter High flow",
+   "space_alloc": "Bulk",
+   "make": "Sensus",
+   "serial": "8SEN0118757810",
+   "billing_rx": 1,
+   "start_m3": 37242,
+   "end_m3": 38984,
+   "usage_m3": 1742
+  },
+  {
+   "location": "Inside the premisses at the back of Block D",
+   "tenant_alloc": "Council check meter Low flow",
+   "space_alloc": "Bulk",
+   "make": "Sensus",
+   "serial": "CRICW617N",
+   "billing_rx": 1,
+   "start_m3": 20761.768,
+   "end_m3": 20864.93,
+   "usage_m3": 103.16200000000026
+  },
+  {
+   "location": "Block D Upstairs Offices",
+   "tenant_alloc": " Safe Quip/342/Gatt",
+   "space_alloc": "Block D",
+   "make": "Elster",
+   "serial": "B-XUK371",
+   "billing_rx": 1,
+   "start_m3": 9502,
+   "end_m3": 9522,
+   "usage_m3": 20
+  },
+  {
+   "location": "Block D ",
+   "tenant_alloc": "Safe Equip",
+   "space_alloc": "Block D",
+   "make": null,
+   "serial": "CN240013596",
+   "billing_rx": null,
+   "start_m3": 48.6427,
+   "end_m3": 50.076,
+   "usage_m3": 1.4333000000000027
+  },
+  {
+   "location": "At the back of the wearehous at block D",
+   "tenant_alloc": " Safe Quip/342/Gatt",
+   "space_alloc": "Block D",
+   "make": "Elster",
+   "serial": "C-XUK485",
+   "billing_rx": 1,
+   "start_m3": 17586,
+   "end_m3": 17720,
+   "usage_m3": 134
+  },
+  {
+   "location": "At the back of the wearehous at block H",
+   "tenant_alloc": "TBC",
+   "space_alloc": "Block H",
+   "make": "Elster",
+   "serial": "B-XBA486",
+   "billing_rx": 1,
+   "start_m3": null,
+   "end_m3": null,
+   "usage_m3": 0
+  },
+  {
+   "location": "At the back of the wearehous at block H",
+   "tenant_alloc": "Common Area (Refinery)",
+   "space_alloc": "Block H / Gate house",
+   "make": "Elster",
+   "serial": "B-XUV018",
+   "billing_rx": 1,
+   "start_m3": 5862,
+   "end_m3": 5901,
+   "usage_m3": 39
+  },
+  {
+   "location": "At the back of the wearehous at block H",
+   "tenant_alloc": "Ptyprops 348 (Pty) Ltd",
+   "space_alloc": "Block H",
+   "make": "Elster",
+   "serial": "B-XUK367",
+   "billing_rx": 1,
+   "start_m3": 10943,
+   "end_m3": 10975,
+   "usage_m3": 32
+  },
+  {
+   "location": "At the back of the wearehous at block H",
+   "tenant_alloc": "Common Area (Refinery)",
+   "space_alloc": "Change room",
+   "make": "Elster",
+   "serial": "B-XUU984",
+   "billing_rx": 1,
+   "start_m3": 5433,
+   "end_m3": 5447,
+   "usage_m3": 14
+  },
+  {
+   "location": "At the back of the warehouse at block H",
+   "tenant_alloc": "Arch International Logistics",
+   "space_alloc": "Block G1",
+   "make": "Elster",
+   "serial": "220024735",
+   "billing_rx": 1,
+   "start_m3": 546.742,
+   "end_m3": 576.062,
+   "usage_m3": 29.32000000000005
+  },
+  {
+   "location": "Inside the fire shaft at block G1",
+   "tenant_alloc": null,
+   "space_alloc": null,
+   "make": "Elster",
+   "serial": "SN241000057",
+   "billing_rx": null,
+   "start_m3": 838,
+   "end_m3": 934,
+   "usage_m3": 96
+  },
+  {
+   "location": "At the back of the kitchen at block G1",
+   "tenant_alloc": "TRSAV",
+   "space_alloc": "G1",
+   "make": "Elster",
+   "serial": "M150102678",
+   "billing_rx": 1,
+   "start_m3": 2476.0166,
+   "end_m3": 2479.79,
+   "usage_m3": 3.773400000000038
+  },
+  {
+   "location": "At the back of the kitchen at block F",
+   "tenant_alloc": "Card Plus",
+   "space_alloc": "Block F",
+   "make": "Elster",
+   "serial": "50236304",
+   "billing_rx": 1,
+   "start_m3": 9241,
+   "end_m3": 9311,
+   "usage_m3": 70
+  },
+  {
+   "location": "At the back of the kitchen at block F",
+   "tenant_alloc": "Card Plus",
+   "space_alloc": "Block F",
+   "make": "Elster",
+   "serial": "B-XBA485",
+   "billing_rx": 1,
+   "start_m3": 1428.0452,
+   "end_m3": 1482.623,
+   "usage_m3": 54.577800000000025
+  },
+  {
+   "location": "At the back of the kitchen at block E",
+   "tenant_alloc": "Overseas Development ",
+   "space_alloc": "Bock E",
+   "make": "Elster",
+   "serial": "C-VRA4469",
+   "billing_rx": 1,
+   "start_m3": 0.1559,
+   "end_m3": 0.1559,
+   "usage_m3": 0
+  },
+  {
+   "location": "At the back of the kitchen at block E",
+   "tenant_alloc": "Overseas Development ",
+   "space_alloc": "Bock E",
+   "make": "Elster",
+   "serial": "B-XUK364",
+   "billing_rx": 1,
+   "start_m3": 6720,
+   "end_m3": 6742,
+   "usage_m3": 22
+  },
+  {
+   "location": "At the back of the kitchen at block E",
+   "tenant_alloc": "Overseas Development ",
+   "space_alloc": "Bock E",
+   "make": "Elster",
+   "serial": "B-XUK487",
+   "billing_rx": 1,
+   "start_m3": 13250,
+   "end_m3": 13310,
+   "usage_m3": 60
+  },
+  {
+   "location": "Inside the Gate house at the exit",
+   "tenant_alloc": "Common Area (Refinery)",
+   "space_alloc": "Gate house",
+   "make": "Elster",
+   "serial": "201068805",
+   "billing_rx": 1,
+   "start_m3": 822.2637,
+   "end_m3": 834.153,
+   "usage_m3": 11.889300000000048
+  },
+  {
+   "location": "At the back of the kitchen at block B",
+   "tenant_alloc": "Kellogg Company",
+   "space_alloc": "Block B",
+   "make": "Elster",
+   "serial": "VCG774",
+   "billing_rx": 1,
+   "start_m3": 465.2791,
+   "end_m3": 536.107,
+   "usage_m3": 70.82789999999994
+  },
+  {
+   "location": "At the back of the kitchen at block B",
+   "tenant_alloc": "The Core Computer Business",
+   "space_alloc": "Block B",
+   "make": "Elster",
+   "serial": "B-YJA173",
+   "billing_rx": 1,
+   "start_m3": 2397.866,
+   "end_m3": 2397.86,
+   "usage_m3": -0.005999999999858119
+  },
+  {
+   "location": "At the back of the kitchen at block A",
+   "tenant_alloc": "Kellogg Company",
+   "space_alloc": "Block A",
+   "make": "Elster",
+   "serial": "B-XUR347",
+   "billing_rx": 1,
+   "start_m3": 17877,
+   "end_m3": 17880,
+   "usage_m3": 3
+  },
+  {
+   "location": "At the back of the kitchen at block A",
+   "tenant_alloc": "Kellogg Company",
+   "space_alloc": "Block A",
+   "make": "Elster",
+   "serial": "B-XUN973",
+   "billing_rx": 1,
+   "start_m3": 8014,
+   "end_m3": 8019,
+   "usage_m3": 5
+  },
+  {
+   "location": "Inside the wearehouse of Block B",
+   "tenant_alloc": "Kellogg Company",
+   "space_alloc": "Block B",
+   "make": "Elster",
+   "serial": "339810",
+   "billing_rx": 1,
+   "start_m3": 7.997,
+   "end_m3": 7.999,
+   "usage_m3": 0.0019999999999997797
+  },
+  {
+   "location": "At the back of the kitchen at block C",
+   "tenant_alloc": "The Core Computer Business",
+   "space_alloc": "Block C",
+   "make": "Elster",
+   "serial": "B-XUK500",
+   "billing_rx": 1,
+   "start_m3": 22439,
+   "end_m3": 22590,
+   "usage_m3": 151
+  },
+  {
+   "location": null,
+   "tenant_alloc": "Fire Water A",
+   "space_alloc": "Fire water storage",
+   "make": "Ferrel",
+   "serial": "25040263",
+   "billing_rx": null,
+   "start_m3": 21,
+   "end_m3": 31,
+   "usage_m3": 10
+  },
+  {
+   "location": null,
+   "tenant_alloc": "Fire Water B",
+   "space_alloc": "Fire water storage",
+   "make": "Ferrel",
+   "serial": "10817",
+   "billing_rx": null,
+   "start_m3": 0,
+   "end_m3": 0,
+   "usage_m3": 0
+  }
+ ],
+ "electrical_billing": [
+  {
+   "name": "Kellogg Company Of SA",
+   "header_row": 3,
+   "meters": [
+    {
+     "row": 4,
+     "serial": "ELON086980",
+     "start": 18244.9,
+     "end": 18295.4,
+     "consumption": 6060,
+     "tenant_label": "Block A Kellogg",
+     "location": "Substation 3",
+     "breaker": 630,
+     "basic_charge": 64.334,
+     "capacity_charge": 18601.884000000002,
+     "energy_charge": 18703.584,
+     "common_area": null,
+     "row_total": 37369.801999999996
+    },
+    {
+     "row": 5,
+     "serial": "NES005663",
+     "start": 5100.29,
+     "end": 5186.37,
+     "consumption": 27545.599999999977,
+     "tenant_label": "Kellogg Company DB2 Warehouse",
+     "location": "Block B",
+     "breaker": 200,
+     "basic_charge": 64.334,
+     "capacity_charge": 5905.360000000001,
+     "energy_charge": 85016.73983999992,
+     "common_area": null,
+     "row_total": 90986.43383999993
+    },
+    {
+     "row": 6,
+     "serial": "ELON086989",
+     "start": 18448.7,
+     "end": 18462.2,
+     "consumption": 2160,
+     "tenant_label": "Kellogg Company DB3 Warehouse",
+     "location": "Block B",
+     "breaker": 800,
+     "basic_charge": 64.334,
+     "capacity_charge": 23621.440000000002,
+     "energy_charge": 6666.624,
+     "common_area": null,
+     "row_total": 30352.398
+    }
+   ],
+   "totals": {
+    "row": 7,
+    "basic_charge": 128.668,
+    "capacity_charge": 29526.800000000003,
+    "energy_charge": 91683.36383999992,
+    "common_area": 0,
+    "row_total": 158708.6338399999
+   }
+  },
+  {
+   "name": "The Core Computer Business",
+   "header_row": 10,
+   "meters": [
+    {
+     "row": 11,
+     "serial": "ELON087017",
+     "start": 18265.7,
+     "end": 18421.8,
+     "consumption": 18731.999999999825,
+     "tenant_label": "The Core Comp Bus (Block C)",
+     "location": "Substation 2 ",
+     "breaker": 630,
+     "basic_charge": 64.334,
+     "capacity_charge": 18601.884000000002,
+     "energy_charge": 57814.44479999946,
+     "common_area": null,
+     "row_total": 76480.66279999947
+    },
+    {
+     "row": 12,
+     "serial": "ELON087220",
+     "start": 18491,
+     "end": 18629.2,
+     "consumption": 4146.000000000022,
+     "tenant_label": "The Core Comp Bus  (Office)",
+     "location": "Block B",
+     "breaker": 150,
+     "basic_charge": 64.334,
+     "capacity_charge": 4429.02,
+     "energy_charge": 12796.214400000066,
+     "common_area": null,
+     "row_total": 17289.568400000066
+    },
+    {
+     "row": 13,
+     "serial": "ELON087086",
+     "start": 17016.7,
+     "end": 17132.5,
+     "consumption": 6947.999999999956,
+     "tenant_label": "The Core Comp Bus (Block GB)",
+     "location": "Block G",
+     "breaker": 300,
+     "basic_charge": 64.334,
+     "capacity_charge": 8858.04,
+     "energy_charge": 21444.307199999865,
+     "common_area": null,
+     "row_total": 30366.681199999868
+    }
+   ],
+   "totals": {
+    "row": 14,
+    "basic_charge": 193.002,
+    "capacity_charge": 31888.944000000003,
+    "energy_charge": 92054.9663999994,
+    "common_area": 0,
+    "row_total": 124136.91239999939
+   }
+  },
+  {
+   "name": "Cards Plus",
+   "header_row": 17,
+   "meters": [
+    {
+     "row": 18,
+     "serial": "ELON072253",
+     "start": 21759.1,
+     "end": 22140.1,
+     "consumption": 11430,
+     "tenant_label": "Cards Plus (Office)",
+     "location": "Block F Office",
+     "breaker": 150,
+     "basic_charge": 64.334,
+     "capacity_charge": 4429.02,
+     "energy_charge": 35277.551999999996,
+     "common_area": null,
+     "row_total": 39770.905999999995
+    },
+    {
+     "row": 19,
+     "serial": "NES019081",
+     "start": 54945.79,
+     "end": 56424.8,
+     "consumption": 1479.010000000002,
+     "tenant_label": "Vodacom Antenna",
+     "location": "Block F Office (Card Plus DB)",
+     "breaker": 63,
+     "basic_charge": null,
+     "capacity_charge": null,
+     "energy_charge": -4564.816464000006,
+     "common_area": null,
+     "row_total": -4564.816464000006
+    }
+   ],
+   "totals": {
+    "row": 20,
+    "basic_charge": 64.334,
+    "capacity_charge": 4429.02,
+    "energy_charge": 30712.73553599999,
+    "common_area": 0,
+    "row_total": 35206.08953599999
+   }
+  },
+  {
+   "name": "Overseas Development",
+   "header_row": 22,
+   "meters": [
+    {
+     "row": 23,
+     "serial": "ELON087037",
+     "start": 15761.2,
+     "end": 15860.6,
+     "consumption": 11927.999999999956,
+     "tenant_label": "Block E (ODC)",
+     "location": "Substation 3",
+     "breaker": 630,
+     "basic_charge": 64.334,
+     "capacity_charge": 18601.884000000002,
+     "energy_charge": 36814.57919999986,
+     "common_area": null,
+     "row_total": 55480.79719999986
+    }
+   ],
+   "totals": {
+    "row": 24,
+    "basic_charge": 64.334,
+    "capacity_charge": 18601.884000000002,
+    "energy_charge": 36814.57919999986,
+    "common_area": 0,
+    "row_total": 55480.79719999986
+   }
+  },
+  {
+   "name": "Ptyprops 348 (Pty) Ltd",
+   "header_row": 27,
+   "meters": [
+    {
+     "row": 28,
+     "serial": "ELON087025",
+     "start": 10701.9,
+     "end": 10761,
+     "consumption": 7092.000000000044,
+     "tenant_label": "Ptyprops 348 (Pty) Ltd (Block H)",
+     "location": "Substation 1",
+     "breaker": 630,
+     "basic_charge": 64.334,
+     "capacity_charge": 18601.884000000002,
+     "energy_charge": 21888.748800000132,
+     "common_area": null,
+     "row_total": 40554.96680000013
+    }
+   ],
+   "totals": {
+    "row": 29,
+    "basic_charge": 64.334,
+    "capacity_charge": 18601.884000000002,
+    "energy_charge": 21888.748800000132,
+    "common_area": 0,
+    "row_total": 40554.96680000013
+   }
+  },
+  {
+   "name": "Vodacom",
+   "header_row": 32,
+   "meters": [
+    {
+     "row": 33,
+     "serial": "NES019081",
+     "start": 54945.79,
+     "end": 56424.8,
+     "consumption": 1479.010000000002,
+     "tenant_label": "Vodacom Antenna",
+     "location": "Block F Office (Card Plus DB)",
+     "breaker": 63,
+     "basic_charge": 64.334,
+     "capacity_charge": 1860.1884,
+     "energy_charge": 4564.816464000006,
+     "common_area": null,
+     "row_total": 6489.338864000006
+    }
+   ],
+   "totals": {
+    "row": 34,
+    "basic_charge": 64.334,
+    "capacity_charge": 1860.1884,
+    "energy_charge": 4564.816464000006,
+    "common_area": 0,
+    "row_total": 6489.338864000006
+   }
+  },
+  {
+   "name": "MTN",
+   "header_row": 37,
+   "meters": [
+    {
+     "row": 38,
+     "serial": "NES18300008730",
+     "start": 141711,
+     "end": 143469,
+     "consumption": 1758,
+     "tenant_label": "MTN Antenna",
+     "location": "Block G (TRSAV DB)",
+     "breaker": 32,
+     "basic_charge": 64.334,
+     "capacity_charge": 944.8576,
+     "energy_charge": 5425.8912,
+     "common_area": null,
+     "row_total": 6435.0828
+    }
+   ],
+   "totals": {
+    "row": 39,
+    "basic_charge": 64.334,
+    "capacity_charge": 944.8576,
+    "energy_charge": 5425.8912,
+    "common_area": 0,
+    "row_total": 6435.0828
+   }
+  },
+  {
+   "name": "TRVSA",
+   "header_row": 42,
+   "meters": [
+    {
+     "row": 43,
+     "serial": "ELON083890",
+     "start": 229338.7,
+     "end": 232173,
+     "consumption": 2834.2999999999884,
+     "tenant_label": "TRSAV (Office)",
+     "location": "Block G",
+     "breaker": 100,
+     "basic_charge": 64.334,
+     "capacity_charge": 2952.6800000000003,
+     "energy_charge": 8747.783519999963,
+     "common_area": null,
+     "row_total": 11764.797519999964
+    },
+    {
+     "row": 44,
+     "serial": "NES18300008730",
+     "start": 141711,
+     "end": 143469,
+     "consumption": 1758,
+     "tenant_label": "MTN Antenna",
+     "location": "Block G (TRSAV DB)",
+     "breaker": 32,
+     "basic_charge": null,
+     "capacity_charge": null,
+     "energy_charge": -5425.8912,
+     "common_area": null,
+     "row_total": -5425.8912
+    }
+   ],
+   "totals": {
+    "row": 45,
+    "basic_charge": 0,
+    "capacity_charge": 0,
+    "energy_charge": 3321.8923199999626,
+    "common_area": 0,
+    "row_total": 6338.906319999964
+   }
+  },
+  {
+   "name": "Arch International Logistics",
+   "header_row": 47,
+   "meters": [
+    {
+     "row": 48,
+     "serial": "ELON087041",
+     "start": 5812.4,
+     "end": 5822.7,
+     "consumption": 1236.0000000000218,
+     "tenant_label": "Arch International Logistics warehouse ",
+     "location": "Block G",
+     "breaker": 600,
+     "basic_charge": 64.334,
+     "capacity_charge": 17716.08,
+     "energy_charge": 3814.790400000067,
+     "common_area": null,
+     "row_total": 21595.204400000068
+    }
+   ],
+   "totals": {
+    "row": 49,
+    "basic_charge": 64.334,
+    "capacity_charge": 17716.08,
+    "energy_charge": 3814.790400000067,
+    "common_area": 0,
+    "row_total": 21595.204400000068
+   }
+  },
+  {
+   "name": "Safe Quip",
+   "header_row": 51,
+   "meters": [
+    {
+     "row": 52,
+     "serial": "ELON087136",
+     "start": 10862,
+     "end": 10926,
+     "consumption": 7680,
+     "tenant_label": "Safe Quip/Refinery (Block D)",
+     "location": "Substation 1",
+     "breaker": 315,
+     "basic_charge": 64.334,
+     "capacity_charge": 9300.942000000001,
+     "energy_charge": 23703.552,
+     "common_area": null,
+     "row_total": 33068.828
+    },
+    {
+     "row": 53,
+     "serial": "ELON071992",
+     "start": 313,
+     "end": 318,
+     "consumption": 150,
+     "tenant_label": "Refinery First Floor",
+     "location": "Block D",
+     "breaker": 120,
+     "basic_charge": null,
+     "capacity_charge": null,
+     "energy_charge": -462.96,
+     "common_area": null,
+     "row_total": -462.96
+    }
+   ],
+   "totals": {
+    "row": 54,
+    "basic_charge": 64.334,
+    "capacity_charge": 9300.942000000001,
+    "energy_charge": 23240.592,
+    "common_area": 0,
+    "row_total": 32605.868000000002
+   }
+  },
+  {
+   "name": "342 Logistics",
+   "header_row": 56,
+   "meters": [
+    {
+     "row": 57,
+     "serial": "ELON087060",
+     "start": 12239.8,
+     "end": 12258.4,
+     "consumption": 2232.0000000000437,
+     "tenant_label": "Block F Warehouse",
+     "location": "Substation 3",
+     "breaker": 630,
+     "basic_charge": 64.334,
+     "capacity_charge": 18601.884000000002,
+     "energy_charge": 6888.8448000001345,
+     "common_area": null,
+     "row_total": 25555.062800000134
+    },
+    {
+     "row": 58,
+     "serial": "ELON071164",
+     "start": 8053.4,
+     "end": 8149.9,
+     "consumption": 15440,
+     "tenant_label": "Block F Office Incomer",
+     "location": "Block F Office",
+     "breaker": 150,
+     "basic_charge": 64.334,
+     "capacity_charge": 4429.02,
+     "energy_charge": 47654.015999999996,
+     "common_area": null,
+     "row_total": 52147.369999999995
+    },
+    {
+     "row": 59,
+     "serial": "ELON072253",
+     "start": 21759.1,
+     "end": 22140.1,
+     "consumption": 11430,
+     "tenant_label": "Cards Plus (Office)",
+     "location": "Block F Office",
+     "breaker": 150,
+     "basic_charge": null,
+     "capacity_charge": null,
+     "energy_charge": -35277.551999999996,
+     "common_area": null,
+     "row_total": -35277.551999999996
+    },
+    {
+     "row": 60,
+     "serial": "Lear Security Meter Entrance",
+     "start": 1297.8,
+     "end": 1351.9,
+     "consumption": 54.100000000000136,
+     "tenant_label": "Lear Security Meter ",
+     "location": "Lear Security Meter ",
+     "breaker": 25,
+     "basic_charge": null,
+     "capacity_charge": null,
+     "energy_charge": -166.9742400000004,
+     "common_area": null,
+     "row_total": -166.9742400000004
+    }
+   ],
+   "totals": {
+    "row": 61,
+    "basic_charge": 128.668,
+    "capacity_charge": 23030.904000000002,
+    "energy_charge": 19098.334560000138,
+    "common_area": 0,
+    "row_total": 42257.90656000013
+   }
+  },
+  {
+   "name": "Main Council Meter",
+   "header_row": 64,
+   "meters": [
+    {
+     "row": 65,
+     "serial": "15523700",
+     "start": 8826.13,
+     "end": 8878.56,
+     "consumption": 157290.00000000087,
+     "tenant_label": "Council",
+     "location": "Bulk",
+     "breaker": 1600,
+     "basic_charge": 64.334,
+     "capacity_charge": 47242.880000000005,
+     "energy_charge": 485459.85600000265,
+     "common_area": null,
+     "row_total": 532767.0700000026
+    }
+   ],
+   "totals": {
+    "row": 66,
+    "basic_charge": 64.334,
+    "capacity_charge": 47242.880000000005,
+    "energy_charge": 485459.85600000265,
+    "common_area": 0,
+    "row_total": 532767.0700000026
+   }
+  },
+  {
+   "name": "Subatation Totals ",
+   "header_row": 68,
+   "meters": [
+    {
+     "row": 69,
+     "serial": "ELON087031",
+     "start": 8545.2,
+     "end": 8596.1,
+     "consumption": 16287.999999999884,
+     "tenant_label": "Substation 1 Incomer ",
+     "location": "Substation 1",
+     "breaker": 1600,
+     "basic_charge": 64.334,
+     "capacity_charge": 47242.880000000005,
+     "energy_charge": 50271.283199999634,
+     "common_area": null,
+     "row_total": 97578.49719999963
+    },
+    {
+     "row": 70,
+     "serial": "ELON087053",
+     "start": 17122.1,
+     "end": 17184.9,
+     "consumption": 20096.00000000093,
+     "tenant_label": "Substation 3 Incomer",
+     "location": "Substation 3",
+     "breaker": 1600,
+     "basic_charge": 64.334,
+     "capacity_charge": 47242.880000000005,
+     "energy_charge": 62024.29440000287,
+     "common_area": null,
+     "row_total": 109331.50840000287
+    },
+    {
+     "row": 71,
+     "serial": "ELON087022",
+     "start": 18709.4,
+     "end": 18794.4,
+     "consumption": 27200,
+     "tenant_label": "Substation 2 Incomer 1",
+     "location": "Substation 2 ",
+     "breaker": 1600,
+     "basic_charge": 64.334,
+     "capacity_charge": 47242.880000000005,
+     "energy_charge": 83950.08,
+     "common_area": null,
+     "row_total": 131257.294
+    },
+    {
+     "row": 72,
+     "serial": "ELON087014",
+     "start": 19774.5,
+     "end": 19860.4,
+     "consumption": 27488.000000000466,
+     "tenant_label": "Substation 2 Incomer 2",
+     "location": "Substation 2 ",
+     "breaker": 1600,
+     "basic_charge": 64.334,
+     "capacity_charge": 47242.880000000005,
+     "energy_charge": 84838.96320000144,
+     "common_area": null,
+     "row_total": 132146.17720000143
+    }
+   ],
+   "totals": {
+    "row": 73,
+    "basic_charge": 257.336,
+    "capacity_charge": 188971.52000000002,
+    "energy_charge": 281084.62080000393,
+    "common_area": 0,
+    "row_total": 470313.4768000039
+   }
+  },
+  {
+   "name": "Common Area/Refinery",
+   "header_row": 75,
+   "meters": [
+    {
+     "row": 76,
+     "serial": "ELON087531",
+     "start": 168015.63,
+     "end": 169619.88,
+     "consumption": 1604.25,
+     "tenant_label": "Pump room, Plugs, Lights",
+     "location": "Substation 1",
+     "breaker": 40,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 4951.3571999999995,
+     "common_area": null,
+     "row_total": 5015.691199999999
+    },
+    {
+     "row": 77,
+     "serial": "ELON085505",
+     "start": 4192.2,
+     "end": 4198.8,
+     "consumption": 6.600000000000364,
+     "tenant_label": "Common Area ",
+     "location": "Substation 2 ",
+     "breaker": 40,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 20.37024000000112,
+     "common_area": null,
+     "row_total": 84.70424000000112
+    },
+    {
+     "row": 78,
+     "serial": "ELON068518",
+     "start": 2,
+     "end": 2,
+     "consumption": 0,
+     "tenant_label": "Common Area",
+     "location": "Block C",
+     "breaker": 100,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 0,
+     "common_area": null,
+     "row_total": 64.334
+    },
+    {
+     "row": 79,
+     "serial": "ELON086995",
+     "start": 0,
+     "end": 0,
+     "consumption": 0,
+     "tenant_label": "Common Area",
+     "location": "Block B",
+     "breaker": 0,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 0,
+     "common_area": null,
+     "row_total": 64.334
+    },
+    {
+     "row": 80,
+     "serial": "ELON044318",
+     "start": 236,
+     "end": 236,
+     "consumption": 0,
+     "tenant_label": "Common Area",
+     "location": "Substation 3",
+     "breaker": 40,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 0,
+     "common_area": null,
+     "row_total": 64.334
+    },
+    {
+     "row": 81,
+     "serial": "ELON054422 DISC",
+     "start": 15641.41,
+     "end": 15641.46,
+     "consumption": 1.9999999999708962,
+     "tenant_label": "Common Area",
+     "location": "Block F Office",
+     "breaker": 200,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 6.172799999910174,
+     "common_area": null,
+     "row_total": 70.50679999991017
+    },
+    {
+     "row": 82,
+     "serial": "ELON085451",
+     "start": 58,
+     "end": 69.5,
+     "consumption": 11.5,
+     "tenant_label": "Common Area",
+     "location": "Substation 3",
+     "breaker": 16,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 35.4936,
+     "common_area": null,
+     "row_total": 99.8276
+    },
+    {
+     "row": 83,
+     "serial": "ELON085535",
+     "start": 0.2,
+     "end": 0.2,
+     "consumption": 0,
+     "tenant_label": "Common Area (No Load)",
+     "location": "Substation 2 ",
+     "breaker": 16,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 0,
+     "common_area": null,
+     "row_total": 64.334
+    },
+    {
+     "row": 84,
+     "serial": "ELON086628",
+     "start": 6990.5,
+     "end": 7019.6,
+     "consumption": 29.100000000000364,
+     "tenant_label": "Common Area",
+     "location": "Substation 3",
+     "breaker": 100,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 89.81424000000112,
+     "common_area": null,
+     "row_total": 154.14824000000112
+    },
+    {
+     "row": 85,
+     "serial": "ELON087016",
+     "start": 0.9,
+     "end": 0.9,
+     "consumption": 0,
+     "tenant_label": "Plant Room Disconected ",
+     "location": "Substation 2 ",
+     "breaker": 630,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 0,
+     "common_area": null,
+     "row_total": 64.334
+    },
+    {
+     "row": 86,
+     "serial": "ELON071992",
+     "start": 313,
+     "end": 318,
+     "consumption": 150,
+     "tenant_label": "Refinery First Floor",
+     "location": "Block D",
+     "breaker": 120,
+     "basic_charge": 64.334,
+     "capacity_charge": null,
+     "energy_charge": 462.96,
+     "common_area": null,
+     "row_total": 527.294
+    }
+   ],
+   "totals": {
+    "row": 87,
+    "basic_charge": 707.6740000000002,
+    "capacity_charge": 0,
+    "energy_charge": 5566.168079999912,
+    "common_area": 0,
+    "row_total": 6273.84207999991
+   }
+  }
+ ],
+ "water_billing": [
+  {
+   "name": "Kellogg Company Of SA",
+   "header_row": 4,
+   "meters": [
+    {
+     "row": 5,
+     "serial": "B-XUR347",
+     "start": 17877,
+     "end": 17880,
+     "consumption": 3,
+     "tenant_label": "Kellogg Company",
+     "water_charge": 147.32999999999998,
+     "sanitation_charge": 56.730000000000004,
+     "row_total": 204.06
+    },
+    {
+     "row": 6,
+     "serial": "B-XUN973",
+     "start": 8014,
+     "end": 8019,
+     "consumption": 5,
+     "tenant_label": "Kellogg Company",
+     "water_charge": 245.55,
+     "sanitation_charge": 94.55,
+     "row_total": 340.1
+    },
+    {
+     "row": 7,
+     "serial": "339810",
+     "start": 7.997,
+     "end": 7.999,
+     "consumption": 0.0019999999999997797,
+     "tenant_label": "Kellogg Company",
+     "water_charge": 0.09821999999998918,
+     "sanitation_charge": 0.037819999999995836,
+     "row_total": 0.136039999999985
+    },
+    {
+     "row": 8,
+     "serial": "VCG774",
+     "start": 465.2791,
+     "end": 536.107,
+     "consumption": 70.82789999999994,
+     "tenant_label": "Kellogg Company",
+     "water_charge": 3478.3581689999974,
+     "sanitation_charge": 1339.3555889999989,
+     "row_total": 4817.713757999996
+    }
+   ],
+   "totals": {
+    "row": 9,
+    "water_charge": 3871.3363889999973,
+    "sanitation_charge": 1490.6734089999989,
+    "row_total": 5362.009797999996
+   }
+  },
+  {
+   "name": "The Core Computer Business",
+   "header_row": 12,
+   "meters": [
+    {
+     "row": 13,
+     "serial": "B-XUK500",
+     "start": 22439,
+     "end": 22590,
+     "consumption": 151,
+     "tenant_label": "The Core Computer Business",
+     "water_charge": 7415.61,
+     "sanitation_charge": 2855.41,
+     "row_total": 10271.02
+    },
+    {
+     "row": 14,
+     "serial": "B-YJA173",
+     "start": 2397.866,
+     "end": 2397.86,
+     "consumption": -0.005999999999858119,
+     "tenant_label": "The Core Computer Business",
+     "water_charge": -0.2946599999930322,
+     "sanitation_charge": -0.11345999999731703,
+     "row_total": -0.40811999999034926
+    }
+   ],
+   "totals": {
+    "row": 15,
+    "water_charge": 7415.3153400000065,
+    "sanitation_charge": 2855.2965400000026,
+    "row_total": 10270.61188000001
+   }
+  },
+  {
+   "name": "TRSAV",
+   "header_row": 18,
+   "meters": [
+    {
+     "row": 19,
+     "serial": "M150102678",
+     "start": 2476.0166,
+     "end": 2479.79,
+     "consumption": 3.773400000000038,
+     "tenant_label": "TRSAV",
+     "water_charge": 185.31167400000186,
+     "sanitation_charge": 71.35499400000072,
+     "row_total": 256.6666680000026
+    }
+   ],
+   "totals": {
+    "row": 20,
+    "water_charge": 185.31167400000186,
+    "sanitation_charge": 71.35499400000072,
+    "row_total": 256.6666680000026
+   }
+  },
+  {
+   "name": "Overseas Development ",
+   "header_row": 23,
+   "meters": [
+    {
+     "row": 24,
+     "serial": "C-VRA4469",
+     "start": 0.1559,
+     "end": 0.1559,
+     "consumption": 0,
+     "tenant_label": "Overseas Development ",
+     "water_charge": 0,
+     "sanitation_charge": 0,
+     "row_total": 0
+    },
+    {
+     "row": 25,
+     "serial": "B-XUK364",
+     "start": 6720,
+     "end": 6742,
+     "consumption": 22,
+     "tenant_label": "Overseas Development ",
+     "water_charge": 1080.42,
+     "sanitation_charge": 416.02,
+     "row_total": 1496.44
+    },
+    {
+     "row": 26,
+     "serial": "B-XUK487",
+     "start": 13250,
+     "end": 13310,
+     "consumption": 60,
+     "tenant_label": "Overseas Development ",
+     "water_charge": 2946.6,
+     "sanitation_charge": 1134.6,
+     "row_total": 4081.2
+    }
+   ],
+   "totals": {
+    "row": 27,
+    "water_charge": 4027.02,
+    "sanitation_charge": 1550.62,
+    "row_total": 5577.639999999999
+   }
+  },
+  {
+   "name": "Card Plus",
+   "header_row": 30,
+   "meters": [
+    {
+     "row": 31,
+     "serial": "B-XBA485",
+     "start": 1428.0452,
+     "end": 1482.623,
+     "consumption": 27.605451240000015,
+     "tenant_label": "Card Plus",
+     "water_charge": 1355.7037103964008,
+     "sanitation_charge": 522.0190829484003,
+     "row_total": 1877.7227933448012
+    }
+   ],
+   "totals": {
+    "row": 32,
+    "water_charge": 1355.7037103964008,
+    "sanitation_charge": 522.0190829484003,
+    "row_total": 1877.7227933448012
+   }
+  },
+  {
+   "name": "Ptyprops 348 (Pty) Ltd",
+   "header_row": 35,
+   "meters": [
+    {
+     "row": 36,
+     "serial": "B-XUK367",
+     "start": 10943,
+     "end": 10975,
+     "consumption": 32,
+     "tenant_label": "Ptyprops 348 (Pty) Ltd",
+     "water_charge": 1571.52,
+     "sanitation_charge": 605.12,
+     "row_total": 2176.64
+    }
+   ],
+   "totals": {
+    "row": 37,
+    "water_charge": 1571.52,
+    "sanitation_charge": 605.12,
+    "row_total": 2176.64
+   }
+  },
+  {
+   "name": "Arch International Logistics",
+   "header_row": 40,
+   "meters": [
+    {
+     "row": 41,
+     "serial": "220024735",
+     "start": 546.742,
+     "end": 576.062,
+     "consumption": 29.32000000000005,
+     "tenant_label": "Arch International Logistics",
+     "water_charge": 1439.9052000000024,
+     "sanitation_charge": 554.441200000001,
+     "row_total": 1994.3464000000035
+    }
+   ],
+   "totals": {
+    "row": 42,
+    "water_charge": 1439.9052000000024,
+    "sanitation_charge": 554.441200000001,
+    "row_total": 1994.3464000000035
+   }
+  },
+  {
+   "name": "Gatt Africa Civils CC",
+   "header_row": 44,
+   "meters": [
+    {
+     "row": 45,
+     "serial": "B-XUK371",
+     "start": 9502,
+     "end": 9522,
+     "consumption": 0.132,
+     "tenant_label": " Safe Quip/342/Gatt",
+     "water_charge": 6.48252,
+     "sanitation_charge": 2.4961200000000003,
+     "row_total": 8.97864
+    },
+    {
+     "row": 46,
+     "serial": "C-XUK485",
+     "start": 17586,
+     "end": 17720,
+     "consumption": 0.8844,
+     "tenant_label": " Safe Quip/342/Gatt",
+     "water_charge": 43.432883999999994,
+     "sanitation_charge": 16.724004,
+     "row_total": 60.156887999999995
+    }
+   ],
+   "totals": {
+    "row": 47,
+    "water_charge": 49.915403999999995,
+    "sanitation_charge": 19.220124000000002,
+    "row_total": 69.135528
+   }
+  },
+  {
+   "name": "Safe Quip",
+   "header_row": 49,
+   "meters": [
+    {
+     "row": 50,
+     "serial": "B-XUK371",
+     "start": 9502,
+     "end": 9522,
+     "consumption": 1.082,
+     "tenant_label": " Safe Quip/342/Gatt",
+     "water_charge": 53.13702,
+     "sanitation_charge": 20.460620000000002,
+     "row_total": 73.59764
+    },
+    {
+     "row": 51,
+     "serial": "C-XUK485",
+     "start": 17586,
+     "end": 17720,
+     "consumption": 7.2494000000000005,
+     "tenant_label": " Safe Quip/342/Gatt",
+     "water_charge": 356.018034,
+     "sanitation_charge": 137.08615400000002,
+     "row_total": 493.104188
+    }
+   ],
+   "totals": {
+    "row": 52,
+    "water_charge": 409.155054,
+    "sanitation_charge": 157.54677400000003,
+    "row_total": 566.701828
+   }
+  },
+  {
+   "name": "342 Logistics",
+   "header_row": 54,
+   "meters": [
+    {
+     "row": 55,
+     "serial": "B-XUK371",
+     "start": 9502,
+     "end": 9522,
+     "consumption": 7.8180000000000005,
+     "tenant_label": " Safe Quip/342/Gatt",
+     "water_charge": 383.94198,
+     "sanitation_charge": 147.83838,
+     "row_total": 531.78036
+    },
+    {
+     "row": 56,
+     "serial": "C-XUK485",
+     "start": 17586,
+     "end": 17720,
+     "consumption": 52.3806,
+     "tenant_label": " Safe Quip/342/Gatt",
+     "water_charge": 2572.411266,
+     "sanitation_charge": 990.517146,
+     "row_total": 3562.928412
+    },
+    {
+     "row": 57,
+     "serial": "50236304",
+     "start": 9241,
+     "end": 9311,
+     "consumption": 70,
+     "tenant_label": "Card Plus",
+     "water_charge": 3437.7,
+     "sanitation_charge": 1323.7,
+     "row_total": 4761.4
+    }
+   ],
+   "totals": {
+    "row": 58,
+    "water_charge": 6394.0532459999995,
+    "sanitation_charge": 2462.055526,
+    "row_total": 8856.108772
+   }
+  },
+  {
+   "name": "Common area",
+   "header_row": 61,
+   "meters": [
+    {
+     "row": 62,
+     "serial": "201068805",
+     "start": 822.2637,
+     "end": 834.153,
+     "consumption": 11.889300000000048,
+     "tenant_label": "Common Area (Refinery)",
+     "water_charge": 583.8835230000024,
+     "sanitation_charge": 224.8266630000009,
+     "row_total": 808.7101860000032
+    },
+    {
+     "row": 63,
+     "serial": "B-XUV018",
+     "start": 5862,
+     "end": 5901,
+     "consumption": 39,
+     "tenant_label": "Common Area (Refinery)",
+     "water_charge": 1915.29,
+     "sanitation_charge": 737.49,
+     "row_total": 2652.7799999999997
+    },
+    {
+     "row": 64,
+     "serial": "B-XUU984",
+     "start": 5433,
+     "end": 5447,
+     "consumption": 14,
+     "tenant_label": "Common Area (Refinery)",
+     "water_charge": 687.54,
+     "sanitation_charge": 264.74,
+     "row_total": 952.28
+    },
+    {
+     "row": 65,
+     "serial": "25040263",
+     "start": 21,
+     "end": 31,
+     "consumption": 10,
+     "tenant_label": "Fire Water A",
+     "water_charge": 491.1,
+     "sanitation_charge": 189.1,
+     "row_total": 680.2
+    },
+    {
+     "row": 66,
+     "serial": "10817",
+     "start": 0,
+     "end": 0,
+     "consumption": 0,
+     "tenant_label": "Fire Water B",
+     "water_charge": 0,
+     "sanitation_charge": 0,
+     "row_total": 0
+    }
+   ],
+   "totals": {
+    "row": 67,
+    "water_charge": 3186.713523000002,
+    "sanitation_charge": 1227.056663000001,
+    "row_total": 4413.7701860000025
+   }
+  },
+  {
+   "name": "Council",
+   "header_row": 70,
+   "meters": [
+    {
+     "row": 71,
+     "serial": "100087357",
+     "start": 179322,
+     "end": 0,
+     "consumption": -179322,
+     "tenant_label": "Council High flow",
+     "water_charge": -8806503.42,
+     "sanitation_charge": -3390979.02,
+     "row_total": -12197482.44
+    },
+    {
+     "row": 72,
+     "serial": "60351776",
+     "start": 37148,
+     "end": 0,
+     "consumption": -37148,
+     "tenant_label": "Council Low flow",
+     "water_charge": -1824338.28,
+     "sanitation_charge": -702468.68,
+     "row_total": -2526806.96
+    },
+    {
+     "row": 73,
+     "serial": "8SEN0118757810",
+     "start": 37242,
+     "end": 38984,
+     "consumption": 1742,
+     "tenant_label": "Council check meter High flow",
+     "water_charge": 85549.62,
+     "sanitation_charge": 32941.22,
+     "row_total": 118490.84
+    },
+    {
+     "row": 74,
+     "serial": "CRICW617N",
+     "start": 20761.768,
+     "end": 20864.93,
+     "consumption": 103.16200000000026,
+     "tenant_label": "Council check meter Low flow",
+     "water_charge": 5066.285820000013,
+     "sanitation_charge": 1950.793420000005,
+     "row_total": 7017.079240000017
+    }
+   ],
+   "totals": {
+    "row": 75,
+    "water_charge": -10540225.79418,
+    "sanitation_charge": -4058555.68658,
+    "row_total": -14598781.480759999
+   }
+  },
+  {
+   "name": "Unallocated",
+   "header_row": 77,
+   "meters": [
+    {
+     "row": 78,
+     "serial": "B-XBA486",
+     "start": 0,
+     "end": 0,
+     "consumption": 0,
+     "tenant_label": "TBC",
+     "water_charge": 0,
+     "sanitation_charge": 0,
+     "row_total": 0
+    }
+   ],
+   "totals": {
+    "row": 79,
+    "water_charge": 0,
+    "sanitation_charge": 0,
+    "row_total": 0
+   }
+  }
+ ]
+}

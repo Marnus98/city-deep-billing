@@ -1,6 +1,8 @@
 // views.js - server-rendered HTML. Plain template-literal functions (no templating engine
 // dependency). Tailwind is loaded from the CDN by the *browser* viewing the page - that's
 // independent of this sandbox's own package-registry access, so it's safe to rely on here.
+const properties = require('./properties');
+
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -19,12 +21,22 @@ function layout({ title, user, active, body }) {
     ['/municipal-accounts', 'Municipality'],
     ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
   ];
+  // Property switcher - auto-submits on change (same pattern as the Municipality Accounts page's
+  // account selector). POSTs to /switch-property, which updates the session's currentProperty
+  // (see auth.js/server.js) so every subsequent request resolves to that property's own database.
+  const propertySwitcher = user ? `
+    <form method="post" action="/switch-property">
+      <select name="property" onchange="this.form.submit()"
+        class="bg-slate-800 text-white text-sm rounded px-2 py-1.5 border border-slate-600 cursor-pointer">
+        ${properties.map((p) => `<option value="${p.slug}" ${p.slug === user.currentProperty ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+      </select>
+    </form>` : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>${esc(title)} - City Deep Billing</title>
+<title>${esc(title)} - HolmStone Utility Management Platform</title>
 <link rel="stylesheet" href="/style.css"/>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -32,7 +44,8 @@ ${user ? `
 <div class="bg-slate-900 text-white">
   <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-6">
-      <span class="font-bold text-lg">City Deep Billing</span>
+      <span class="font-bold text-lg">HolmStone Utility Management Platform</span>
+      ${propertySwitcher}
       <nav class="flex gap-4 text-sm">
         ${nav.map(([href, label]) => `<a href="${href}" class="${active === href ? 'text-white font-semibold' : 'text-slate-300 hover:text-white'}">${label}</a>`).join('')}
       </nav>
@@ -51,11 +64,11 @@ ${body}
 }
 
 function loginPage(error) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Sign in - City Deep Billing</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Sign in - HolmStone Utility Management Platform</title>
   <link rel="stylesheet" href="/style.css"/></head>
   <body class="bg-slate-100 min-h-screen flex items-center justify-center">
   <div class="bg-white rounded-xl shadow p-8 w-full max-w-sm">
-    <h1 class="text-xl font-bold mb-1">City Deep Billing</h1>
+    <h1 class="text-xl font-bold mb-1">HolmStone Utility Management Platform</h1>
     <p class="text-sm text-slate-500 mb-6">Sign in to continue</p>
     ${error ? `<div class="bg-red-50 text-red-700 text-sm rounded p-2 mb-4">${esc(error)}</div>` : ''}
     <form method="post" action="/login" class="space-y-3">

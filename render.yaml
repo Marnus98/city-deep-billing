@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: city-deep-billing
+    name: holmstone-utility-management-platform
     env: node
     plan: free
     buildCommand: npm install

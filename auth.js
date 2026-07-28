@@ -26,12 +26,27 @@ function verifyPassword(password, salt, hash) {
   return computed.length === hash.length && crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
 }
 
-function createSession(user) {
+// `currentProperty` (a slug from properties.js) rides along on the in-memory session so a single
+// login can browse whichever property the nav dropdown last selected, without touching the DB -
+// see server.js's /switch-property route and getRequestPropertyDb().
+function createSession(user, defaultPropertySlug) {
   const token = crypto.randomBytes(24).toString('hex');
-  sessions.set(token, { userId: user.id, username: user.username, role: user.role, fullName: user.full_name, createdAt: Date.now() });
+  sessions.set(token, {
+    userId: user.id, username: user.username, role: user.role, fullName: user.full_name,
+    createdAt: Date.now(), currentProperty: defaultPropertySlug,
+  });
   return token;
 }
 function destroySession(token) { sessions.delete(token); }
+
+function setCurrentProperty(req, slug) {
+  const raw = getCookie(req, 'sid');
+  const token = unsign(raw);
+  const session = token && sessions.get(token);
+  if (!session) return false;
+  session.currentProperty = slug;
+  return true;
+}
 
 function getCookie(req, name) {
   const header = req.headers.cookie;
@@ -64,7 +79,7 @@ const CAN_FINALISE = new Set(['admin', 'reviewer']);
 const CAN_MANAGE = new Set(['admin']);
 
 module.exports = {
-  verifyPassword, createSession, destroySession, currentUser,
+  verifyPassword, createSession, destroySession, currentUser, setCurrentProperty,
   setSessionCookie, clearSessionCookie, getCookie,
   CAN_EDIT, CAN_FINALISE, CAN_MANAGE,
 };

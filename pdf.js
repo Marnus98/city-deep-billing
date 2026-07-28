@@ -326,6 +326,7 @@ function buildBillingSlipPdf(data) {
   const doc = new PDFDoc();
   const left = 42, right = PAGE_W - 42;
   let y = PAGE_H - 50;
+  const propertyName = (data.propertyName || 'CITY DEEP INDUSTRIAL PARK').toUpperCase();
 
   // Logo, top-right corner - sized so it (and its whitespace-trimmed bounding box) sits entirely
   // above the two-column tenant-info rows below, never overlapping them (see the y-jump right
@@ -334,7 +335,7 @@ function buildBillingSlipPdf(data) {
   const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
   doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
 
-  doc.text(left, y, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); y -= 14;
+  doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
   doc.text(left, y, 'Utility Billing Statement', { size: 10 });
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9); // clear the logo before the header divider
   doc.line(left, y, right, y); y -= 18;
@@ -382,7 +383,7 @@ function buildBillingSlipPdf(data) {
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
     doc.newPage();
     let ty = PAGE_H - 50;
-    doc.text(left, ty, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); ty -= 14;
+    doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
     doc.text(left, ty, `Utility Cost Excluding VAT - ${data.tenantName}`, { size: 11, bold: true }); ty -= 8;
     doc.line(left, ty, right, ty); ty -= 30;
     drawTripleTrendCharts(doc, { x: left + 46, y: ty, width: right - left - 46, series: data.monthlyTrend });
@@ -390,7 +391,7 @@ function buildBillingSlipPdf(data) {
     // Third page: consumption (kWh / kL) trend, independent of tariff/Rand value entirely.
     doc.newPage();
     let cy = PAGE_H - 50;
-    doc.text(left, cy, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); cy -= 14;
+    doc.text(left, cy, propertyName, { size: 16, bold: true }); cy -= 14;
     doc.text(left, cy, `Consumption Trend - ${data.tenantName}`, { size: 11, bold: true }); cy -= 8;
     doc.line(left, cy, right, cy); cy -= 30;
     drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend });
@@ -426,8 +427,9 @@ function buildMunicipalStatementPdf(data) {
   const doc = new PDFDoc();
   const left = 42, right = PAGE_W - 42;
   let y = PAGE_H - 50;
+  const propertyName = (data.propertyName || 'CITY DEEP INDUSTRIAL PARK').toUpperCase();
 
-  doc.text(left, y, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); y -= 14;
+  doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
   doc.text(left, y, 'Municipal Account Statement (City of Johannesburg)', { size: 10 }); y -= 8;
   doc.line(left, y, right, y); y -= 18;
 
@@ -483,7 +485,7 @@ function buildMunicipalStatementPdf(data) {
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
     doc.newPage();
     let ty = PAGE_H - 50;
-    doc.text(left, ty, 'CITY DEEP INDUSTRIAL PARK', { size: 16, bold: true }); ty -= 14;
+    doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
     doc.text(left, ty, `Municipal Utility Cost Excluding VAT - ${data.accountLabel}`, { size: 11, bold: true }); ty -= 8;
     doc.line(left, ty, right, ty); ty -= 30;
     drawTripleTrendCharts(doc, { x: left + 40, y: ty, width: right - left - 40, series: data.monthlyTrend });

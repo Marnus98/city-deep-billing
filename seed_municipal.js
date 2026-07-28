@@ -19,8 +19,10 @@ const fs = require('fs');
 const path = require('path');
 const { open, migrate } = require('./db');
 
-const db = open();
-migrate(db);
+// City Deep-specific pipeline (COJ municipal accounts belong to City Deep's own property db) -
+// `db` is opened lazily inside main(dbFile), same pattern as seed.js, so requiring this module
+// doesn't implicitly touch any database until run(dbFile) is actually called.
+let db;
 
 function run(sql, params = []) { return db.prepare(sql).run(...params); }
 function get(sql, params = []) { return db.prepare(sql).get(...params); }
@@ -112,7 +114,9 @@ function seedStatement(rec) {
   return existing ? 'updated' : 'created';
 }
 
-function main() {
+function main(dbFile = 'city-deep.db') {
+  db = open(dbFile);
+  migrate(db);
   const jsonPath = path.join(__dirname, 'municipal_statements.json');
   if (!fs.existsSync(jsonPath)) { console.log('No municipal_statements.json found - skipping municipal import.'); return; }
   const records = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));

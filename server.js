@@ -4,6 +4,7 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 const querystring = require('querystring');
+const { AsyncLocalStorage } = require('async_hooks');
 const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
@@ -11,28 +12,75 @@ const { buildBillingSlipPdf, buildMunicipalStatementPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
+const properties = require('./properties');
+const { seedUsers } = require('./shared_seed_users');
 
-const db = open();
-migrate(db);
 const PORT = process.env.PORT || 8787;
+const DEFAULT_PROPERTY_SLUG = properties[0].slug;
 
-// Auto-seed on first boot so a fresh deploy (e.g. a host with an ephemeral filesystem, or
-// simply the first time this repo is cloned) works with nothing more than `node server.js` -
-// no separate SSH/console step required.
-const tenantCount = db.prepare('SELECT COUNT(*) c FROM tenants').get().c;
-if (tenantCount === 0) {
-  console.log('Empty database detected - running initial seed (March + April 2026 import)...');
-  require('./seed').run();
-  console.log('Initial seed complete.');
+// ---------------- multi-property database wiring ----------------
+// Every property (see properties.js) gets its own completely separate SQLite file, opened once
+// here and cached in `propertyDbs`. There is deliberately no shared table with a property_id
+// column anywhere - the isolation between City Deep and Wingfield (and whatever's added later)
+// is physical (different files), not a WHERE clause someone could forget.
+//
+// The one exception is logins: `authDb` holds a single shared `users` table so one set of
+// credentials works across every property (see the /login route below, and shared_seed_users.js
+// for why each property db *also* gets a matching local copy of the same users, purely to satisfy
+// its own audit_log.user_id foreign key).
+const authDb = open('auth.db');
+migrate(authDb);
+if (seedUsers(authDb)) console.log('Seeded shared platform logins (auth.db).');
+
+const propertyDbs = new Map(); // slug -> DatabaseSync
+for (const prop of properties) {
+  let propDb = open(prop.dbFile);
+  migrate(propDb);
+  const isEmpty = propDb.prepare('SELECT COUNT(*) c FROM tenants').get().c === 0;
+  if (isEmpty) {
+    propDb.close();
+    let seedModule = null;
+    try { seedModule = require(prop.seedFile); } catch (err) {
+      console.log(`No seed script for "${prop.name}" yet (${err.code === 'MODULE_NOT_FOUND' ? prop.seedFile + ' not created' : err.message}) - starting empty.`);
+    }
+    if (seedModule && seedModule.run) {
+      console.log(`Empty database detected for "${prop.name}" - running initial seed...`);
+      propDb = seedModule.run(prop.dbFile);
+      console.log(`Initial seed complete for "${prop.name}".`);
+    } else {
+      propDb = open(prop.dbFile);
+      migrate(propDb);
+    }
+  }
+  propertyDbs.set(prop.slug, propDb);
 }
-// Separate, self-contained pipeline (own de-dup key: invoice_number) - always safe to re-run, so
-// just run it on every boot rather than gating on an empty-table check. Picks up any newly-added
-// months in municipal_statements.json automatically on the next deploy.
-require('./seed_municipal').run();
+// City Deep's municipal-account statements are a separate, self-contained pipeline (own de-dup
+// key: invoice_number) - always safe to re-run on every boot, not just when empty. Municipal
+// statements are a City Deep-specific concept for now (see seed_municipal.js).
+require('./seed_municipal').run('city-deep.db');
 
-function get(sql, params = []) { return db.prepare(sql).get(...params); }
-function all(sql, params = []) { return db.prepare(sql).all(...params); }
-function run(sql, params = []) { return db.prepare(sql).run(...params); }
+function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
+function currentPropertyName(user) {
+  const prop = properties.find((p) => p.slug === (user && user.currentProperty));
+  return (prop || properties[0]).name;
+}
+
+// AsyncLocalStorage tracks which property's database is "active" for the duration of one request
+// (set by the dispatcher at the bottom of this file, per-request, from the session's
+// currentProperty) - so the ~80 existing get()/all()/run() call sites throughout this file don't
+// need to be touched or passed a db handle explicitly, but two concurrent requests for two
+// different properties can never see each other's connection (unlike a plain shared module-level
+// variable, which a naive reassignment could race under Node's async interleaving).
+const dbContext = new AsyncLocalStorage();
+function currentDb() {
+  const db = dbContext.getStore();
+  if (!db) throw new Error('No active property database in this request context - route handler ran outside the dispatcher\'s dbContext.run().');
+  return db;
+}
+
+function get(sql, params = []) { return currentDb().prepare(sql).get(...params); }
+function all(sql, params = []) { return currentDb().prepare(sql).all(...params); }
+function run(sql, params = []) { return currentDb().prepare(sql).run(...params); }
 
 function audit(userId, action, entityType, entityId, field, oldValue, newValue, reason) {
   run('INSERT INTO audit_log (user_id, action, entity_type, entity_id, field, old_value, new_value, reason) VALUES (?,?,?,?,?,?,?,?)',
@@ -137,11 +185,14 @@ route('GET', '/login', async (req, res) => {
 });
 route('POST', '/login', async (req, res) => {
   const body = await readBody(req);
-  const u = get('SELECT * FROM users WHERE username=?', [body.username || '']);
+  // Always checked against the shared authDb, never the currently-active property's db (which
+  // pre-login is just whatever DEFAULT_PROPERTY_SLUG happens to be) - see the authDb comment
+  // near the top of this file for why that distinction matters.
+  const u = authDb.prepare('SELECT * FROM users WHERE username=?').get(body.username || '');
   if (!u || !auth.verifyPassword(body.password || '', u.salt, u.password_hash)) {
     return send(res, 401, views.loginPage('Invalid username or password.'));
   }
-  const token = auth.createSession(u);
+  const token = auth.createSession(u, DEFAULT_PROPERTY_SLUG);
   auth.setSessionCookie(res, token);
   audit(u.id, 'login', 'user', u.id, null, null, null, null);
   redirect(res, '/dashboard');
@@ -150,6 +201,17 @@ route('GET', '/logout', async (req, res) => {
   const raw = auth.getCookie(req, 'sid');
   auth.clearSessionCookie(res);
   redirect(res, '/login');
+});
+
+// The nav dropdown (see views.js layout()) POSTs here on change - updates which property db the
+// session's subsequent requests resolve to (see dbContext above) and bounces back to the
+// referring page so switching properties feels like a toggle, not a navigation.
+route('POST', '/switch-property', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const body = await readBody(req);
+  const slug = properties.some((p) => p.slug === body.property) ? body.property : DEFAULT_PROPERTY_SLUG;
+  auth.setCurrentProperty(req, slug);
+  redirect(res, req.headers.referer || '/dashboard');
 });
 
 route('GET', '/dashboard', async (req, res, params, query) => {
@@ -274,7 +336,7 @@ route('POST', '/readings/:periodId', async (req, res, params) => {
       [a.meter_id, period.id, startReading, Number(endVal), startKvarh, kvarhEnd ? Number(kvarhEnd) : null, kva ? Number(kva) : 0, 'manual', user.userId]);
     saved++;
   }
-  const result = billing.generateBillsForPeriod(db, period.id);
+  const result = billing.generateBillsForPeriod(currentDb(), period.id);
   audit(user.userId, 'capture_readings', 'billing_period', period.id, null, null, `${saved} readings saved, ${result.billsCreated} bills generated`, null);
   send(res, 200, views.readingsResultPage({ user, period, result }));
 });
@@ -335,7 +397,7 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
     elecConsumption: bill.electricity_consumption_kwh.toFixed(2), waterConsumption: bill.water_consumption_m3.toFixed(2),
     elecLineItems: elecItems, waterLineItems: waterItems,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
-    status: bill.status, generatedAt: bill.generated_at, monthlyTrend,
+    status: bill.status, generatedAt: bill.generated_at, monthlyTrend, propertyName: currentPropertyName(user),
   });
   audit(user.userId, 'pdf_download', 'bill', bill.id, null, null, null, null);
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${bill.invoice_number}.pdf"` });
@@ -346,7 +408,7 @@ route('GET', '/solar-billing-slips', async (req, res, params, query) => {
   const user = requireLogin(req, res); if (!user) return;
   const allPeriods = all('SELECT * FROM billing_periods ORDER BY start_date DESC');
   const period = query.periodId ? get('SELECT * FROM billing_periods WHERE id=?', [query.periodId]) : latestPeriod();
-  const slips = period ? solar.getSolarSlips(db, period.id) : [];
+  const slips = period ? solar.getSolarSlips(currentDb(), period.id) : [];
   send(res, 200, views.solarBillingSlipsPage({ user, period, allPeriods, slips }));
 });
 
@@ -356,13 +418,13 @@ route('GET', '/municipal-accounts', async (req, res, params, query) => {
   if (!accounts.length) return send(res, 200, views.municipalAccountsPage({ user, accounts, account: null, statements: [], statement: null, comparison: null, isCombined: false }));
 
   if (query.accountId === 'all') {
-    const labels = municipalCompare.allStatementLabels(db);
+    const labels = municipalCompare.allStatementLabels(currentDb());
     const statementFor = query.statementFor || (labels.length ? labels[0].statement_for : null);
     let statement = null, comparison = null, combinedInfo = null;
     if (statementFor) {
-      combinedInfo = municipalCompare.buildCombinedStatement(db, statementFor);
+      combinedInfo = municipalCompare.buildCombinedStatement(currentDb(), statementFor);
       statement = combinedInfo.statement;
-      comparison = municipalCompare.buildComparisonAll(db, statement);
+      comparison = municipalCompare.buildComparisonAll(currentDb(), statement);
     }
     const pdfUrl = statementFor ? `/municipal-pdf?accountId=all&statementFor=${encodeURIComponent(statementFor)}` : null;
     return send(res, 200, views.municipalAccountsPage({
@@ -377,7 +439,7 @@ route('GET', '/municipal-accounts', async (req, res, params, query) => {
   const statements = all('SELECT * FROM municipal_statements WHERE municipal_account_id=? ORDER BY statement_date', [account.id]);
   const statementId = query.statementId ? Number(query.statementId) : (statements.length ? statements[statements.length - 1].id : null);
   const statement = statements.find((s) => s.id === statementId) || statements[statements.length - 1] || null;
-  const comparison = statement ? municipalCompare.buildComparison(db, statement, account.label) : null;
+  const comparison = statement ? municipalCompare.buildComparison(currentDb(), statement, account.label) : null;
   const pdfUrl = statement ? `/municipal-pdf?statementId=${statement.id}` : null;
   send(res, 200, views.municipalAccountsPage({ user, accounts, account, statements, statement, comparison, isCombined: false, pdfUrl }));
 });
@@ -415,8 +477,8 @@ route('GET', '/municipal-pdf', async (req, res, params, query) => {
   if (query.accountId === 'all') {
     const statementFor = query.statementFor;
     if (!statementFor) return send(res, 404, 'Not found');
-    const combinedInfo = municipalCompare.buildCombinedStatement(db, statementFor);
-    const trend = municipalCompare.monthlyTrendAllAccounts(db, combinedInfo.statement.statement_date);
+    const combinedInfo = municipalCompare.buildCombinedStatement(currentDb(), statementFor);
+    const trend = municipalCompare.monthlyTrendAllAccounts(currentDb(), combinedInfo.statement.statement_date);
     const data = municipalPdfData(combinedInfo.statement, 'All Accounts (Combined)', '', 'City Deep Industrial Park - all municipal accounts', trend, combinedInfo);
     const pdfBuf = buildMunicipalStatementPdf(data);
     audit(user.userId, 'pdf_download', 'municipal_statement', null, null, null, null, `combined:${statementFor}`);
@@ -427,7 +489,7 @@ route('GET', '/municipal-pdf', async (req, res, params, query) => {
   const statement = get('SELECT * FROM municipal_statements WHERE id=?', [Number(query.statementId)]);
   if (!statement) return send(res, 404, 'Not found');
   const account = get('SELECT * FROM municipal_accounts WHERE id=?', [statement.municipal_account_id]);
-  const trend = municipalCompare.monthlyTrendForAccount(db, account.id, statement.statement_date);
+  const trend = municipalCompare.monthlyTrendForAccount(currentDb(), account.id, statement.statement_date);
   const data = municipalPdfData(statement, account.label, account.account_number, account.address, trend, null);
   const pdfBuf = buildMunicipalStatementPdf(data);
   audit(user.userId, 'pdf_download', 'municipal_statement', statement.id, null, null, null, null);
@@ -484,7 +546,14 @@ const server = http.createServer(async (req, res) => {
       if (!m) continue;
       const params = {};
       r.keys.forEach((k, i) => { params[k] = m[i + 1]; });
-      return await r.handler(req, res, params, parsed.query);
+      // Resolve which property's database this request should see BEFORE the handler runs, from
+      // the session's currentProperty (set at login / by /switch-property) - anonymous requests
+      // (login page, static assets) just get the default property's db, which they never
+      // actually query. dbContext.run() keeps this pinned for the whole handler, including across
+      // any `await`s inside it, without a shared mutable variable two concurrent requests could race.
+      const sessionUser = auth.currentUser(req);
+      const propDb = getPropertyDb((sessionUser && sessionUser.currentProperty) || DEFAULT_PROPERTY_SLUG);
+      return await dbContext.run(propDb, () => r.handler(req, res, params, parsed.query));
     }
     send(res, 404, views.layout({ title: 'Not found', user: auth.currentUser(req), active: null, body: '<div class="bg-white border rounded p-6">404 - page not found.</div>' }));
   } catch (err) {
@@ -493,4 +562,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`City Deep Billing prototype listening on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`HolmStone Utility Management Platform listening on http://localhost:${PORT} (properties: ${properties.map((p) => p.slug).join(', ')})`));

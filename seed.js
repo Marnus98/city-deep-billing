@@ -1,41 +1,31 @@
 // seed.js - imports the parsed March/April workbook JSON (produced by extract.py) into the
 // SQLite database, computing bills with calc.js as it goes, and storing the workbook's own
 // totals in excel_reference for the reconciliation report.
+//
+// This is City Deep's property-specific seed script (see properties.js). `db` is opened lazily
+// inside main(dbFile) rather than at module load time, because the multi-property platform now
+// requires('./seed') without necessarily wanting City Deep's database opened - only run(dbFile)
+// (or `node seed.js`, which defaults to City Deep's own file) actually opens anything.
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const { open, migrate } = require('./db');
 const calc = require('./calc');
+const { seedUsers: seedUsersShared } = require('./shared_seed_users');
 
-const db = open();
-migrate(db);
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-  return { salt, hash };
-}
+let db;
 
 function run(sql, params = []) { return db.prepare(sql).run(...params); }
 function get(sql, params = []) { return db.prepare(sql).get(...params); }
 function all(sql, params = []) { return db.prepare(sql).all(...params); }
 
 // ---------- Users ----------
+// Credentials themselves live in shared_seed_users.js (one place, shared with auth.db and every
+// other property's seed script) - this just inserts them into City Deep's own db too, so its
+// local audit_log.user_id foreign key has a matching row (see shared_seed_users.js for why).
 function seedUsers() {
-  const existing = get('SELECT COUNT(*) c FROM users').c;
-  if (existing > 0) return;
-  const users = [
-    ['admin', 'admin123', 'admin', 'System Administrator'],
-    ['billing', 'billing123', 'billing', 'Billing Clerk'],
-    ['reviewer', 'reviewer123', 'reviewer', 'Billing Reviewer'],
-    ['viewer', 'viewer123', 'readonly', 'Read Only User'],
-  ];
-  for (const [username, pw, role, full_name] of users) {
-    const { salt, hash } = hashPassword(pw);
-    run('INSERT INTO users (username, password_hash, salt, role, full_name) VALUES (?,?,?,?,?)',
-      [username, hash, salt, role, full_name]);
+  if (seedUsersShared(db)) {
+    console.log('Seeded users: admin/admin123, billing/billing123, reviewer/reviewer123, viewer/viewer123');
   }
-  console.log('Seeded users: admin/admin123, billing/billing123, reviewer/reviewer123, viewer/viewer123');
 }
 
 // ---------- Tariffs ----------
@@ -367,7 +357,11 @@ const MONTH_FILES = [
   'march.json', 'april.json', 'may2026.json', 'june2026.json', 'july2026.json',
 ];
 
-function main() {
+// `dbFile` picks which property database this seeds (see properties.js) - defaults to City
+// Deep's own file so `node seed.js` with no arguments still works exactly as before.
+function main(dbFile = 'city-deep.db') {
+  db = open(dbFile);
+  migrate(db);
   const months = MONTH_FILES
     .map((f) => JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8')))
     .sort((a, b) => a.period.start.localeCompare(b.period.start));
@@ -384,12 +378,13 @@ function main() {
     db.exec('ROLLBACK');
     throw err;
   }
-  console.log(`Seed complete (${months.length} months).`);
+  console.log(`Seed complete (${months.length} months) into ${dbFile}.`);
+  return db;
 }
 
-// Allow `require('./seed').run(db)` from server.js for auto-seed-on-first-boot (handy on hosts
-// with an ephemeral filesystem, e.g. a free-tier deploy with no persistent disk attached), as
-// well as `node seed.js` for a manual/standalone run.
+// Allow `require('./seed').run(dbFile)` from server.js for auto-seed-on-first-boot (handy on
+// hosts with an ephemeral filesystem, e.g. a free-tier deploy with no persistent disk attached),
+// as well as `node seed.js` for a manual/standalone run.
 if (require.main === module) {
   main();
   db.close();

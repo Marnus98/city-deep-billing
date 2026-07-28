@@ -1,15 +1,22 @@
 // db.js - persistent SQLite storage using Node's built-in node:sqlite module.
 // No external dependencies. Node >= 22.5 required (node:sqlite is stable enough for this prototype;
 // see README for the production-recommended swap to PostgreSQL).
+//
+// Multi-property note: this platform now manages more than one physical property (see
+// properties.js), and each one gets its own completely separate database FILE via open(fileName) -
+// there is no shared "property_id" column anywhere to forget in a WHERE clause. The one exception
+// is the small `auth.db` (opened the same way, by server.js) which holds only the shared `users`
+// table so one login works across every property - see server.js's getPropertyDb()/authDb.
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'data', 'billing.db');
+const DATA_DIR = path.join(__dirname, 'data');
+const DB_PATH = path.join(DATA_DIR, 'billing.db'); // legacy default, kept for any script still calling open() with no args
 
-function open() {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  const db = new DatabaseSync(DB_PATH);
+function open(fileName = 'billing.db') {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const db = new DatabaseSync(path.join(DATA_DIR, fileName));
   db.exec('PRAGMA foreign_keys = ON;');
   return db;
 }
