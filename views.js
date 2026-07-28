@@ -24,13 +24,34 @@ function layout({ title, user, active, body }) {
   // Property switcher - auto-submits on change (same pattern as the Municipality Accounts page's
   // account selector). POSTs to /switch-property, which updates the session's currentProperty
   // (see auth.js/server.js) so every subsequent request resolves to that property's own database.
+  // Sits to the left of the platform name in the sidebar header, per request.
   const propertySwitcher = user ? `
     <form method="post" action="/switch-property">
       <select name="property" onchange="this.form.submit()"
-        class="bg-slate-800 text-white text-sm rounded px-2 py-1.5 border border-slate-600 cursor-pointer">
+        class="bg-white text-slate-700 text-xs rounded px-2 py-1.5 border border-slate-300 cursor-pointer w-full">
         ${properties.map((p) => `<option value="${p.slug}" ${p.slug === user.currentProperty ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
       </select>
     </form>` : '';
+  // Left sidebar: logo + property switcher/platform name up top, the nav links running vertically
+  // underneath (previously a horizontal bar along the top of every page), user info/logout pinned
+  // to the bottom. Replaces the old top navbar entirely.
+  const sidebar = user ? `
+  <aside class="w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-screen">
+    <div class="p-4 border-b border-slate-200">
+      <img src="/logo.png" alt="HolmStone" class="w-full h-auto mb-3"/>
+      <div class="flex items-start gap-2">
+        <div class="w-24 shrink-0">${propertySwitcher}</div>
+        <div class="text-xs font-semibold text-slate-500 leading-tight pt-1.5">HolmStone Utility Management Platform</div>
+      </div>
+    </div>
+    <nav class="flex-1 py-2 overflow-y-auto">
+      ${nav.map(([href, label]) => `<a href="${href}" class="block px-4 py-2 text-sm ${active === href ? 'bg-slate-900 text-white font-semibold' : 'text-slate-600 hover:bg-slate-50'}">${label}</a>`).join('')}
+    </nav>
+    <div class="p-4 border-t border-slate-200 text-xs">
+      <div class="text-slate-500 mb-2">${esc(user.fullName)} <span class="badge bg-slate-100 text-slate-600">${esc(user.role)}</span></div>
+      <a href="/logout" class="text-blue-600 hover:underline">Log out</a>
+    </div>
+  </aside>` : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -40,24 +61,13 @@ function layout({ title, user, active, body }) {
 <link rel="stylesheet" href="/style.css"/>
 </head>
 <body class="bg-slate-50 text-slate-800">
-${user ? `
-<div class="bg-slate-900 text-white">
-  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-6">
-      <span class="font-bold text-lg">HolmStone Utility Management Platform</span>
-      ${propertySwitcher}
-      <nav class="flex gap-4 text-sm">
-        ${nav.map(([href, label]) => `<a href="${href}" class="${active === href ? 'text-white font-semibold' : 'text-slate-300 hover:text-white'}">${label}</a>`).join('')}
-      </nav>
-    </div>
-    <div class="flex items-center gap-3 text-sm">
-      <span class="text-slate-300">${esc(user.fullName)} <span class="badge bg-slate-700 text-slate-100">${esc(user.role)}</span></span>
-      <a href="/logout" class="text-slate-300 hover:text-white">Log out</a>
-    </div>
+<div class="flex">
+${sidebar}
+<div class="flex-1 min-w-0">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+  ${body}
   </div>
-</div>` : ''}
-<div class="max-w-7xl mx-auto px-4 py-6">
-${body}
+</div>
 </div>
 </body>
 </html>`;
@@ -68,8 +78,9 @@ function loginPage(error) {
   <link rel="stylesheet" href="/style.css"/></head>
   <body class="bg-slate-100 min-h-screen flex items-center justify-center">
   <div class="bg-white rounded-xl shadow p-8 w-full max-w-sm">
-    <h1 class="text-xl font-bold mb-1">HolmStone Utility Management Platform</h1>
-    <p class="text-sm text-slate-500 mb-6">Sign in to continue</p>
+    <img src="/logo.png" alt="HolmStone" class="w-40 h-auto mx-auto mb-4"/>
+    <h1 class="text-lg font-bold mb-1 text-center">Utility Management Platform</h1>
+    <p class="text-sm text-slate-500 mb-6 text-center">Sign in to continue</p>
     ${error ? `<div class="bg-red-50 text-red-700 text-sm rounded p-2 mb-4">${esc(error)}</div>` : ''}
     <form method="post" action="/login" class="space-y-3">
       <div><label class="text-sm font-medium">Username</label>
