@@ -2321,12 +2321,12 @@
   {
    "location": "Unit 1 - Kimmo",
    "tenant_alloc": "Unit 1 - Kimmo",
-   "serial": "190726259",
+   "serial": "SN240700267",
    "reading_type": "Manual",
    "billing_rx": 1,
-   "start_m3": 5189,
-   "end_m3": 5236,
-   "usage_m3": 47,
+   "start_m3": 796.5,
+   "end_m3": 824,
+   "usage_m3": 27.5,
    "notes": null
   },
   {
@@ -5215,30 +5215,31 @@
    "meters": [
     {
      "row": 5,
-     "serial": "190726259",
-     "start": 5189,
-     "end": 5236,
-     "consumption_m3": 47,
+     "serial": "SN240700267",
+     "start": 796.5,
+     "end": 824,
+     "consumption_m3": 27.5,
      "tenant_label": "Unit 1 - Kimmo",
      "common_area_pct": 0.0729,
      "meter_split": 1,
-     "billable_consumption": 47,
-     "water_charge": 3464.84,
-     "water_surcharge": 69.29679999999999,
-     "sanitation_charge": 2757.02,
-     "sanitation_surcharge": 55.1404,
+     "billable_consumption": 27.5,
+     "water_charge": 2027.3,
+     "water_surcharge": 40.546,
+     "sanitation_charge": 1613.1499999999999,
+     "sanitation_surcharge": 32.263,
      "water_levy": 47.08902600000001,
-     "row_total": 6393.3862260000005
+     "row_total": 3760.348026,
+     "_meter_serial_changed_note": "Old meter 190726259 (5189->5236, 47 m3) was replaced; this month's Water Billing sheet bills Kimmo off the new meter SN240700267 (796.5->824, 27.5 m3) instead - confirmed with the client, not an extraction error."
     }
    ],
    "totals": {
     "row": 6,
-    "water_charge": 3464.84,
-    "water_surcharge": 69.29679999999999,
-    "sanitation_charge": 2757.02,
-    "sanitation_surcharge": 55.1404,
+    "water_charge": 2027.3,
+    "water_surcharge": 40.546,
+    "sanitation_charge": 1613.1499999999999,
+    "sanitation_surcharge": 32.263,
     "water_levy": 47.08902600000001,
-    "row_total": 6393.3862260000005
+    "row_total": 3760.348026
    }
   },
   {
