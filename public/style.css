@@ -37,8 +37,10 @@ pre { white-space: pre-wrap; }
 .max-w-md { max-width: 28rem; } .max-w-sm { max-width: 24rem; } .max-w-2xl { max-width: 42rem; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .ml-auto { margin-left: auto; }
-.w-full { width: 100%; } .w-24 { width: 6rem; } .w-40 { width: 10rem; } .w-60 { width: 15rem; } .w-auto { width: auto; }
+.w-full { width: 100%; } .w-10 { width: 2.5rem; } .w-24 { width: 6rem; } .w-32 { width: 8rem; } .w-40 { width: 10rem; } .w-60 { width: 15rem; } .w-auto { width: auto; }
 .h-auto { height: auto; } .h-10 { height: 2.5rem; }
+.object-cover { object-fit: cover; }
+.hidden { display: none; }
 .min-w-0 { min-width: 0; }
 .border-r { border-right: 1px solid #e2e8f0; }
 .overflow-hidden { overflow: hidden; }

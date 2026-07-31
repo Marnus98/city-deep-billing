@@ -5,8 +5,8 @@
   "description": "HolmStone Utility Management Platform - multi-property tenant utility billing (City Deep Industrial Park, Wingfield Business Park) - zero external dependencies (see README).",
   "engines": { "node": ">=22.5.0" },
   "scripts": {
-    "seed": "node seed.js",
-    "seed:wingfield": "node seed_wingfield.js",
+    "seed": "node city-deep/seed.js",
+    "seed:wingfield": "node wingfield/seed_wingfield.js",
     "start": "node server.js"
   },
   "dependencies": {}

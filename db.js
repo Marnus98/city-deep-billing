@@ -126,6 +126,8 @@ function migrate(db) {
     source TEXT NOT NULL DEFAULT 'excel_import' CHECK(source IN ('excel_import','manual','automated','estimate','correction')),
     overridden INTEGER NOT NULL DEFAULT 0,
     notes TEXT,
+    photo_path TEXT, -- web path to a photo of the meter dial taken when this reading was captured
+                      -- (manual entries only - see server.js POST /readings/:periodId)
     entered_by INTEGER REFERENCES users(id),
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(meter_id, billing_period_id)
@@ -245,6 +247,9 @@ function migrate(db) {
   if (!cols.includes('allocation_pct_kvarh')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kvarh REAL');
   if (!cols.includes('allocation_pct_kva')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kva REAL');
   if (!cols.includes('capacity_charge_override')) db.exec('ALTER TABLE meter_assignments ADD COLUMN capacity_charge_override REAL');
+
+  const mrCols = db.prepare("PRAGMA table_info(meter_readings)").all().map((c) => c.name);
+  if (!mrCols.includes('photo_path')) db.exec('ALTER TABLE meter_readings ADD COLUMN photo_path TEXT');
 
   const msCols = db.prepare("PRAGMA table_info(municipal_statements)").all().map((c) => c.name);
   const newMsCols = [

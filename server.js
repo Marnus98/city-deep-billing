@@ -59,8 +59,8 @@ for (const prop of properties) {
 // when empty. City Deep is billed by City of Johannesburg (seed_municipal.js); Wingfield is billed
 // by City of Ekurhuleni, a different municipality with its own statement layout entirely (see
 // seed_wingfield_municipal.js).
-require('./seed_municipal').run('city-deep.db');
-require('./seed_wingfield_municipal').run('wingfield.db');
+require('./city-deep/seed_municipal').run('city-deep.db');
+require('./wingfield/seed_wingfield_municipal').run('wingfield.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {
@@ -110,6 +110,65 @@ function readBody(req) {
     req.on('data', (c) => { data += c; if (data.length > 1e6) req.destroy(); });
     req.on('end', () => resolve(querystring.parse(data)));
   });
+}
+
+// Reads the full request body into one Buffer, capped at maxBytes (default ~25MB - generous
+// enough for a handful of phone photos of meter dials in one submission, without letting a
+// request grow unbounded). Used by readMultipartBody below; kept separate from readBody() (which
+// stays a string accumulator for normal form posts) because file uploads need raw bytes, not text.
+function readRawBody(req, maxBytes = 25 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > maxBytes) { req.destroy(); reject(new Error('Upload too large')); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+// Minimal hand-rolled multipart/form-data parser (no external dependency, consistent with the
+// rest of this app) - just enough to support the meter-reading photo upload form. Returns
+// { fields: { name: stringValue }, files: { name: { filename, contentType, data: Buffer } } }.
+// Relies on the multipart spec's guarantee that the browser-chosen boundary string can't appear
+// inside any part's own content, so a plain Buffer.indexOf search for it is safe.
+async function readMultipartBody(req) {
+  const contentType = req.headers['content-type'] || '';
+  const boundaryMatch = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  const fields = {}, files = {};
+  if (!boundaryMatch) return { fields, files };
+  const boundary = Buffer.from(`--${boundaryMatch[1] || boundaryMatch[2]}`);
+  const buf = await readRawBody(req);
+
+  let pos = buf.indexOf(boundary);
+  if (pos === -1) return { fields, files };
+  pos += boundary.length;
+  while (true) {
+    if (buf[pos] === 0x2d && buf[pos + 1] === 0x2d) break; // "--" -> final boundary, done
+    pos += 2; // skip the CRLF right after the boundary
+    const next = buf.indexOf(boundary, pos);
+    if (next === -1) break;
+    const part = buf.slice(pos, next - 2); // -2 strips the CRLF just before the next boundary
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd !== -1) {
+      const headerText = part.slice(0, headerEnd).toString('utf8');
+      const body = part.slice(headerEnd + 4);
+      const nameMatch = /name="([^"]*)"/.exec(headerText);
+      const filenameMatch = /filename="([^"]*)"/.exec(headerText);
+      const ctMatch = /Content-Type:\s*([^\r\n]+)/i.exec(headerText);
+      const name = nameMatch ? nameMatch[1] : null;
+      if (name && filenameMatch && filenameMatch[1]) {
+        files[name] = { filename: filenameMatch[1], contentType: ctMatch ? ctMatch[1].trim() : 'application/octet-stream', data: body };
+      } else if (name) {
+        fields[name] = body.toString('utf8');
+      }
+    }
+    pos = next + boundary.length;
+  }
+  return { fields, files };
 }
 
 function requireLogin(req, res) {
@@ -314,6 +373,11 @@ route('GET', '/readings/:periodId', async (req, res, params) => {
       showDemand: a.utility_type === 'electricity' && a.tariff_code === 1 && !a.energy_only,
       priorEnd: existingReading ? existingReading.start_reading : (prior ? prior.end_reading : ''),
       priorEndKvarh: existingReading ? existingReading.start_reading_kvarh : (prior ? prior.end_reading_kvarh : ''),
+      photoPath: existingReading ? existingReading.photo_path : null,
+      // Only a *manually* captured reading is safe to offer "Delete" on - an excel_import
+      // reading is a historical, reconciled figure from an uploaded workbook, not test data (see
+      // POST /readings/:periodId/delete/:meterId below, which enforces this server-side too).
+      canDelete: !!existingReading && existingReading.source === 'manual',
     };
     if (!byTenant.has(a.t_id)) { const g = { tenant: { id: a.t_id, name: a.tenant_name }, meters: [] }; byTenant.set(a.t_id, g); groups.push(g); }
     byTenant.get(a.t_id).meters.push(row);
@@ -326,8 +390,13 @@ route('POST', '/readings/:periodId', async (req, res, params) => {
   if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
   const period = get('SELECT * FROM billing_periods WHERE id=?', [params.periodId]);
   if (!period) return send(res, 404, 'Not found');
-  const body = await readBody(req);
+  // The capture form now posts multipart/form-data (so it can carry an optional meter photo
+  // alongside the reading numbers) - fall back to the old urlencoded parser for safety if a
+  // client ever posts here without a file input at all.
+  const isMultipart = /^multipart\/form-data/i.test(req.headers['content-type'] || '');
+  const { fields: body, files } = isMultipart ? await readMultipartBody(req) : { fields: await readBody(req), files: {} };
   const assignments = all('SELECT meter_id FROM meter_assignments WHERE effective_to IS NULL');
+  const propertySlug = user.currentProperty || DEFAULT_PROPERTY_SLUG;
   let saved = 0;
   for (const a of assignments) {
     const endVal = body[`end_${a.meter_id}`];
@@ -338,18 +407,53 @@ route('POST', '/readings/:periodId', async (req, res, params) => {
     const existing = get('SELECT * FROM meter_readings WHERE meter_id=? AND billing_period_id=?', [a.meter_id, period.id]);
     const startReading = startVal !== undefined && startVal !== '' ? Number(startVal) : (existing ? existing.start_reading : 0);
     const startKvarh = existing ? existing.start_reading_kvarh : null;
-    run(`INSERT INTO meter_readings (meter_id, billing_period_id, start_reading, end_reading, start_reading_kvarh, end_reading_kvarh, kva_reading, source, entered_by)
-         VALUES (?,?,?,?,?,?,?,?,?)
+    const uploadedPhoto = files[`photo_${a.meter_id}`];
+    const newPhotoPath = uploadedPhoto ? saveMeterPhoto(propertySlug, a.meter_id, period.id, uploadedPhoto) : null;
+    if (newPhotoPath && existing && existing.photo_path) deleteMeterPhoto(existing.photo_path); // replaced, not added to
+    const photoPath = newPhotoPath || (existing ? existing.photo_path : null);
+    run(`INSERT INTO meter_readings (meter_id, billing_period_id, start_reading, end_reading, start_reading_kvarh, end_reading_kvarh, kva_reading, source, entered_by, photo_path)
+         VALUES (?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(meter_id, billing_period_id) DO UPDATE SET
            start_reading=excluded.start_reading, end_reading=excluded.end_reading,
            start_reading_kvarh=excluded.start_reading_kvarh, end_reading_kvarh=excluded.end_reading_kvarh,
-           kva_reading=excluded.kva_reading, source=excluded.source, entered_by=excluded.entered_by`,
-      [a.meter_id, period.id, startReading, Number(endVal), startKvarh, kvarhEnd ? Number(kvarhEnd) : null, kva ? Number(kva) : 0, 'manual', user.userId]);
+           kva_reading=excluded.kva_reading, source=excluded.source, entered_by=excluded.entered_by,
+           photo_path=excluded.photo_path`,
+      [a.meter_id, period.id, startReading, Number(endVal), startKvarh, kvarhEnd ? Number(kvarhEnd) : null, kva ? Number(kva) : 0, 'manual', user.userId, photoPath]);
     saved++;
   }
   const result = billing.generateBillsForPeriod(currentDb(), period.id);
   audit(user.userId, 'capture_readings', 'billing_period', period.id, null, null, `${saved} readings saved, ${result.billsCreated} bills generated`, null);
   send(res, 200, views.readingsResultPage({ user, period, result }));
+});
+
+// Deletes a single manually-captured reading - built for testing the manual-capture flow (add a
+// reading, see how the bill comes out, delete it, try again) without leaving stray draft bills
+// or orphaned photo files behind. Deliberately refuses to touch anything sourced from an Excel
+// import: those are historical, reconciled figures, not test data, and this button never even
+// renders for them (see readingsCapturePage's canDelete) - this check is the server-side backstop.
+route('POST', '/readings/:periodId/delete/:meterId', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const period = get('SELECT * FROM billing_periods WHERE id=?', [params.periodId]);
+  if (!period) return send(res, 404, 'Not found');
+  const meterId = Number(params.meterId);
+  const reading = get('SELECT * FROM meter_readings WHERE meter_id=? AND billing_period_id=?', [meterId, period.id]);
+  if (reading && reading.source === 'manual') {
+    deleteMeterPhoto(reading.photo_path);
+    const assignment = get('SELECT tenant_id FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL', [meterId]);
+    run('DELETE FROM meter_readings WHERE meter_id=? AND billing_period_id=?', [meterId, period.id]);
+    if (assignment) {
+      // Whatever bill this tenant had for this period was computed partly (or entirely) from the
+      // reading just deleted, so it's stale either way - clear it out rather than leave a bill on
+      // the books that no longer matches any captured reading. generateBillsForPeriod below will
+      // rebuild it cleanly from whatever readings (if any) remain for this tenant.
+      run('DELETE FROM bill_line_items WHERE bill_id IN (SELECT id FROM bills WHERE tenant_id=? AND billing_period_id=?)', [assignment.tenant_id, period.id]);
+      run('DELETE FROM bills WHERE tenant_id=? AND billing_period_id=?', [assignment.tenant_id, period.id]);
+    }
+    billing.generateBillsForPeriod(currentDb(), period.id);
+    audit(user.userId, 'delete_reading', 'meter_reading', meterId, null, null, null, `Deleted manual reading for meter ${meterId}, period ${period.label}`);
+  }
+  redirect(res, `/readings/${period.id}`);
 });
 
 route('GET', '/billing', async (req, res) => {
@@ -538,7 +642,38 @@ route('GET', '/audit-log', async (req, res) => {
 
 // ---------------- dispatcher ----------------
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const MIME = { '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
+const MIME = {
+  '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.heic': 'image/heic', '.svg': 'image/svg+xml',
+};
+
+// Saves an uploaded meter-photo file (see readMultipartBody) under public/meter-photos/<property
+// slug>/ - inside PUBLIC_DIR so tryServeStatic() below already knows how to serve it back out,
+// with no extra route needed. Namespaced by property slug purely so City Deep's and Wingfield's
+// photos don't land in the same folder; not a security boundary (nothing here is served
+// selectively by login). Returns the web path to store in meter_readings.photo_path, or null if
+// there's nothing usable to save (empty part, non-image content-type).
+function saveMeterPhoto(propertySlug, meterId, periodId, file) {
+  if (!file || !file.data || !file.data.length) return null;
+  if (file.contentType && !file.contentType.startsWith('image/')) return null;
+  const extMatch = /\.[a-zA-Z0-9]+$/.exec(file.filename || '');
+  const ext = (extMatch ? extMatch[0] : '.jpg').toLowerCase();
+  const dir = path.join(PUBLIC_DIR, 'meter-photos', propertySlug);
+  fs.mkdirSync(dir, { recursive: true });
+  const name = `meter-${meterId}-period-${periodId}-${Date.now()}${ext}`;
+  fs.writeFileSync(path.join(dir, name), file.data);
+  return `/meter-photos/${propertySlug}/${name}`;
+}
+
+// Best-effort delete of a previously-saved meter photo (used when a manual reading is deleted).
+// Never throws - a missing file (already cleaned up, or a path that turns out to be outside
+// PUBLIC_DIR for any reason) just means there's nothing to remove.
+function deleteMeterPhoto(webPath) {
+  if (!webPath) return;
+  const filePath = path.join(PUBLIC_DIR, webPath.replace(/^\/+/, ''));
+  if (!filePath.startsWith(PUBLIC_DIR)) return;
+  try { fs.unlinkSync(filePath); } catch (err) { /* already gone - fine */ }
+}
 function tryServeStatic(pathname, res) {
   const safe = path.normalize(pathname).replace(/^(\.\.[/\\])+/, '');
   const filePath = path.join(PUBLIC_DIR, safe);

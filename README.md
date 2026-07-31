@@ -42,9 +42,13 @@ properly and will fail with a `disk I/O error`. Copy this whole folder somewhere
 
 ```bash
 cd city-deep-billing
-node seed.js      # creates data/billing.db and imports March + April
-node server.js    # starts the app on http://localhost:8787
+node server.js    # starts the app on http://localhost:8787 - auto-seeds both properties'
+                  # databases on first boot (data/city-deep.db, data/wingfield.db) if empty
 ```
+
+(`npm run seed` / `npm run seed:wingfield` also exist if you ever want to re-run a property's
+importer on its own, without booting the whole server - see "Repo layout" below for where each
+one lives.)
 
 Then open http://localhost:8787 and sign in with one of the seeded demo accounts:
 
@@ -75,11 +79,44 @@ the same admin/billing/reviewer/viewer accounts work no matter which property is
 property database also carries a mirrored copy of `users`, purely to satisfy that database's own
 `audit_log.user_id` foreign key — login itself always checks `auth.db` directly).
 
-To add a third property: add an entry to `properties.js`, then build a `seed_<slug>.js` the same
-way `seed_wingfield.js` was built from `seed.js` — copy the pattern, point it at that property's
-extracted workbook JSON, adjust the calc engine if its tariff structure differs (see
-`calc_wingfield.js` vs `calc.js` for how different two properties' formulas can be), and wire
-`seedFile` in `properties.js`.
+Each property's own code and data lives in its own top-level folder — `city-deep/` and
+`wingfield/` — rather than everything being interleaved in one flat directory. Only genuinely
+shared platform code (`server.js`, `views.js`, `db.js`, `billing.js`, `calc.js`, `pdf.js`,
+`properties.js`, etc.) lives at the repo root; see "Repo layout" below.
+
+To add a third property: add an entry to `properties.js`, then build a `<slug>/` folder the same
+way `wingfield/` was built from `city-deep/` — copy the pattern (its own `seed_<slug>.js`, its own
+`imports/` folder for the extracted workbook JSON), adjust the calc engine if its tariff structure
+differs (see `wingfield/calc_wingfield.js` vs the root `calc.js` for how different two properties'
+formulas can be), and wire `seedFile` in `properties.js`.
+
+## Repo layout
+
+```
+server.js, views.js, db.js, auth.js, billing.js, calc.js, pdf.js,      <- shared platform code
+properties.js, municipal_compare.js, shared_seed_users.js, logo_asset.js, solar.js
+package.json, render.yaml, README.md, DEPLOY.md
+
+city-deep/
+  seed.js                    <- City Deep's importer (node city-deep/seed.js, or npm run seed)
+  seed_municipal.js          <- City of Johannesburg municipal-statement importer
+  sample_billing_slip_Kimmo_April2026.pdf
+  imports/                   <- extracted workbook JSON, one file per month + municipal_statements.json
+
+wingfield/
+  seed_wingfield.js          <- Wingfield's importer (node wingfield/seed_wingfield.js, or npm run seed:wingfield)
+  seed_wingfield_municipal.js  <- City of Ekurhuleni municipal-statement importer
+  calc_wingfield.js          <- Wingfield's own tariff/calc engine (its formulas differ from City Deep's)
+  extract_wingfield_municipal.py
+  imports/                   <- extracted workbook JSON, one file per month + wingfield_municipal_statements.json
+
+data/                        <- runtime-only: SQLite database files, created on first boot, not committed
+public/                      <- static assets (logo, stylesheet), served as-is
+```
+
+Bottom line: if a file is specific to one property (its importer, its raw workbook JSON, its own
+tariff quirks), it lives inside that property's folder. If it's shared platform code every
+property's requests run through, it stays at the root.
 
 ## What's implemented
 
@@ -124,10 +161,9 @@ proving the calculation engine and core workflows against real data. Not yet bui
   reversal/amendment) — the `bills.status` column and states exist in the schema; only the
   read-side is wired up. Bills generated via the reading-capture flow default to `draft`.
 - ZIP-of-all-slips download and the combined monthly pack.
-- Excel import *wizard* (this prototype imports via a one-off script, `extract.py` +
-  `seed.js`, rather than an in-app upload flow).
+- Excel import *wizard* (this prototype imports via a one-off script per property, e.g.
+  `city-deep/seed.js`, rather than an in-app upload flow).
 - CSV/Excel export and consumption-trend charts.
-- Photo/document attachments on readings.
 
 None of this requires new architecture — it's the same tables, the same `calc.js` engine, and
 the same page layout pattern already in `views.js`.
@@ -170,8 +206,8 @@ brief's instruction not to change existing logic without explanation:
 Two things were fixed rather than reproduced, because they were data-entry inconsistencies
 rather than intentional business rules: a handful of tenant names were spelled slightly
 differently between the Electrical Billing and Water Billing sheets (e.g. "SANSKAR Teading" vs
-"SANSKAR Trading") — these are merged via an explicit alias map in `seed.js` so electricity and
-water don't create two tenant records for one real tenant.
+"SANSKAR Trading") — these are merged via an explicit alias map in `city-deep/seed.js` so
+electricity and water don't create two tenant records for one real tenant.
 
 ## Reconciliation results
 
@@ -217,19 +253,20 @@ over would close this gap.
 
 ## Source data provenance
 
-- `extract.py` (run against the two uploaded workbooks) produced `march.json` and `april.json` —
-  a faithful structured dump of every tenant block, meter row, and the workbook's own cached
-  formula results, used both to seed the database and as the reconciliation "ground truth."
-- `seed.js` is idempotent-per-run (deletes and rebuilds bills each time) and shows exactly how
-  historical readings, tariffs and calculations should be imported for any future month you want
-  to bring in the same way — re-run `extract.py` against a new workbook and pass its output
-  through the same pipeline.
+- `extract.py` (run against each uploaded workbook) produced the JSON files under
+  `city-deep/imports/` — a faithful structured dump of every tenant block, meter row, and the
+  workbook's own cached formula results, used both to seed the database and as the reconciliation
+  "ground truth."
+- `city-deep/seed.js` is idempotent-per-run (deletes and rebuilds bills each time) and shows
+  exactly how historical readings, tariffs and calculations should be imported for any future
+  month you want to bring in the same way — re-run `extract.py` against a new workbook and drop
+  its output into `city-deep/imports/`.
 
 ## Wingfield Business Park
 
-Wingfield's own database (`data/wingfield.db`), tariff engine (`calc_wingfield.js`) and importer
-(`seed_wingfield.js`) are entirely separate from City Deep's — its source workbooks have a
-different sheet layout and a genuinely different, simpler tariff structure:
+Wingfield's own database (`data/wingfield.db`), tariff engine (`wingfield/calc_wingfield.js`) and
+importer (`wingfield/seed_wingfield.js`) are entirely separate from City Deep's — its source
+workbooks have a different sheet layout and a genuinely different, simpler tariff structure:
 
 - **Electricity**: a flat monthly basic charge + a capacity charge (R/Amp of the tenant's breaker
   rating) + a single active energy rate per kWh. The source workbook's own Tariff sheet already
@@ -239,7 +276,7 @@ different sheet layout and a genuinely different, simpler tariff structure:
 - **Water**: usage (R/kL) + sewage (R/kL) on the same reading, same as City Deep.
 
 Seeded with the same 13 months as City Deep (July 2025 - July 2026), extracted by
-`extract_wingfield.py` into `wingfield_data/wingfield_YYYY-MM.json`.
+`extract_wingfield.py` into `wingfield/imports/wingfield_YYYY-MM.json`.
 
 **Bulk/reference meters excluded from tenant billing** (per your confirmation for the electrical
 ones, extended to water's equivalent for consistency): `Main Council Meter` and
@@ -248,7 +285,7 @@ sheet's own "Council High/Low flow" and "Council check meter" labels, and its sc
 month, is clearly bulk supply rather than a tenant). Their raw readings are still imported as
 `role='bulk'` meters so nothing is silently dropped — they just never generate a tenant bill.
 
-**Tenant name aliasing** (`TENANT_NAME_ALIASES` in `seed_wingfield.js`) — the Electrical Billing
+**Tenant name aliasing** (`TENANT_NAME_ALIASES` in `wingfield/seed_wingfield.js`) — the Electrical Billing
 and Water Billing sheets spell a few real tenants differently, confirmed by cross-checking meter
 serials/locations rather than guessed: `Card Plus` ↔ `Cards Plus`, `TRSAV` ↔ `TRVSA` (a
 transposition typo on one side of the two sheets — which spelling is "correct" isn't determinable
@@ -292,8 +329,8 @@ Wingfield's bulk municipal supply is billed by a completely different municipali
 Deep's (City of Ekurhuleni, not City of Johannesburg), on one combined account (2210755502,
 "Refinery Prop Inv") rather than City Deep's 4 separate precinct accounts - property rates,
 electricity, water, sewerage and refuse all appear on the one PDF each month. Imported from 13
-monthly PDF invoices (June 2025 - June 2026) via `extract_wingfield_municipal.py` +
-`seed_wingfield_municipal.js`, following the same pattern as City Deep's `seed_municipal.js` (own
+monthly PDF invoices (June 2025 - June 2026) via `wingfield/extract_wingfield_municipal.py` +
+`wingfield/seed_wingfield_municipal.js`, following the same pattern as City Deep's `city-deep/seed_municipal.js` (own
 de-dup key, own account-to-site mapping added to `municipal_compare.js`'s `SITE_MAP`, everything
 else in that comparison module works unchanged since it already resolves against whichever
 property's database is active).

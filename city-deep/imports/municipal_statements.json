@@ -1,0 +1,2069 @@
+[
+ {
+  "file": "/tmp/muni/09)_ACCOUNT_559304053_-_Sep_25.txt",
+  "account": "559304053",
+  "statement_for": "October 2025",
+  "statement_date": "2025/10/06",
+  "invoice_number": "600002661562",
+  "due_date": "2025/10/21",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1346369.75,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 78627.0,
+   "consumption_kvarh": 132279.1,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 4717.62,
+    "surcharge_tou": 0.0,
+    "off_peak": 61160.78,
+    "off_peak_qty": 35777.0,
+    "peak": 44837.25,
+    "peak_qty": 15179.0,
+    "standard": 61537.54,
+    "standard_qty": 27671.0,
+    "reactive": 46117.59,
+    "reactive_qty": 108691.0,
+    "demand": 237498.92,
+    "demand_qty": 600.533
+   },
+   "excl_vat": 467527.78,
+   "vat": 70129.17,
+   "incl_vat": 537656.95,
+   "reading_period": [
+    "2025/09/02",
+    "2025/09/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 6416.79,
+   "reading_period": [
+    "2025/08/24",
+    "2025/09/25"
+   ],
+   "water_excl_vat": 460544.50999999995,
+   "sanitation_excl_vat": 74665.97,
+   "vat": 80281.57,
+   "incl_vat": 615492.05
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 19930.98,
+   "vat": 2989.65,
+   "incl_vat": 22920.63
+  }
+ },
+ {
+  "file": "/tmp/muni/10)_ACCOUNT_559304053_-_Oct_25.txt",
+  "account": "559304053",
+  "statement_for": "November 2025",
+  "statement_date": "2025/11/05",
+  "invoice_number": "600002673962",
+  "due_date": "2025/11/20",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1451106.94,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 198663.0,
+   "consumption_kvarh": 147406.9,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 11919.78,
+    "surcharge_tou": 0.0,
+    "off_peak": 150514.64,
+    "off_peak_qty": 88046.0,
+    "peak": 99091.53,
+    "peak_qty": 33546.0,
+    "standard": 171398.2,
+    "standard_qty": 77071.0,
+    "reactive": 37256.93,
+    "reactive_qty": 87808.0,
+    "demand": 247965.96,
+    "demand_qty": 627.0
+   },
+   "excl_vat": 729805.12,
+   "vat": 109470.77,
+   "incl_vat": 839275.89,
+   "reading_period": [
+    "2025/09/26",
+    "2025/10/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 4601.154,
+   "reading_period": [
+    "2025/09/23",
+    "2025/10/23"
+   ],
+   "water_excl_vat": 329800.60000000003,
+   "sanitation_excl_vat": 32563.78,
+   "vat": 54354.66,
+   "incl_vat": 416719.04
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 21575.559999999998,
+   "vat": 3236.33,
+   "incl_vat": 24811.89
+  }
+ },
+ {
+  "file": "/tmp/muni/11)_ACCOUNT_559304053_-_Nov_25.txt",
+  "account": "559304053",
+  "statement_for": "December 2025",
+  "statement_date": "2025/12/04",
+  "invoice_number": "600002684778",
+  "due_date": "2025/12/19",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1456638.91,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 173998.2,
+   "consumption_kvarh": 127816.5,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 10439.89,
+    "surcharge_tou": 0.0,
+    "off_peak": 140239.69,
+    "off_peak_qty": 82035.5,
+    "peak": 86957.2,
+    "peak_qty": 29438.1,
+    "standard": 139048.46,
+    "standard_qty": 62524.6,
+    "reactive": 32084.31,
+    "reactive_qty": 75617.04,
+    "demand": 259039.4,
+    "demand_qty": 655.0
+   },
+   "excl_vat": 679467.03,
+   "vat": 101920.05,
+   "incl_vat": 781387.08,
+   "reading_period": [
+    "2025/10/26",
+    "2025/11/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 5123.964,
+   "reading_period": [
+    "2025/10/23",
+    "2025/11/26"
+   ],
+   "water_excl_vat": 367448.13999999996,
+   "sanitation_excl_vat": 49941.38,
+   "vat": 62608.44,
+   "incl_vat": 479997.96
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 21698.91,
+   "vat": 3254.84,
+   "incl_vat": 24953.75
+  }
+ },
+ {
+  "file": "/tmp/muni/12)_ACCOUNT_559304053_-_Dec_25.txt",
+  "account": "559304053",
+  "statement_for": "January 2026",
+  "statement_date": "2026/01/06",
+  "invoice_number": "600002697720",
+  "due_date": "2026/01/21",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1407495.94,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 238631.8,
+   "consumption_kvarh": 132177.9,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 14317.91,
+    "surcharge_tou": 0.0,
+    "off_peak": 210147.98,
+    "off_peak_qty": 122929.5,
+    "peak": 102875.18,
+    "peak_qty": 34826.9,
+    "standard": 179858.8,
+    "standard_qty": 80875.4,
+    "reactive": 25707.64,
+    "reactive_qty": 60588.36,
+    "demand": 273672.16,
+    "demand_qty": 692.0
+   },
+   "excl_vat": 818237.75,
+   "vat": 122735.66,
+   "incl_vat": 940973.41,
+   "reading_period": [
+    "2025/11/26",
+    "2025/12/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 2886.964,
+   "reading_period": [
+    "2025/11/22",
+    "2025/12/21"
+   ],
+   "water_excl_vat": 206624.27,
+   "sanitation_excl_vat": 30175.479999999996,
+   "vat": 35519.96,
+   "incl_vat": 272319.71
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 20784.95,
+   "vat": 3117.75,
+   "incl_vat": 23902.7
+  }
+ },
+ {
+  "file": "/tmp/muni/01)_ACCOUNT_559304053_-_Jan_26.txt",
+  "account": "559304053",
+  "statement_for": "February 2026",
+  "statement_date": "2026/02/04",
+  "invoice_number": "600002707329",
+  "due_date": "2026/02/19",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1364540.89,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 181160.0,
+   "consumption_kvarh": 103019.8,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 10869.6,
+    "surcharge_tou": 0.0,
+    "off_peak": 166554.88,
+    "off_peak_qty": 97429.0,
+    "peak": 80641.47,
+    "peak_qty": 27300.0,
+    "standard": 125496.9,
+    "standard_qty": 56431.0,
+    "reactive": 20651.44,
+    "reactive_qty": 48671.8,
+    "demand": 237498.92,
+    "demand_qty": 600.533
+   },
+   "excl_vat": 653371.29,
+   "vat": 98005.69,
+   "incl_vat": 751376.98,
+   "reading_period": [
+    "2025/12/26",
+    "2026/02/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 4543.956,
+   "reading_period": [
+    "2025/12/17",
+    "2026/01/20"
+   ],
+   "water_excl_vat": 326030.56000000006,
+   "sanitation_excl_vat": 38948.2,
+   "vat": 54746.82,
+   "incl_vat": 419725.58
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 20120.18,
+   "vat": 3018.03,
+   "incl_vat": 23138.21
+  }
+ },
+ {
+  "file": "/tmp/muni/02)_IND_4053_MAR_26_-_Feb_26.txt",
+  "account": "559304053",
+  "statement_for": "March 2026",
+  "statement_date": "2026/03/05",
+  "invoice_number": "600002720653",
+  "due_date": "2026/03/20",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1355159.98,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 202219.0,
+   "consumption_kvarh": 132798.5,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 12133.14,
+    "surcharge_tou": 0.0,
+    "off_peak": 162142.66,
+    "off_peak_qty": 94848.0,
+    "peak": 98001.54,
+    "peak_qty": 33177.0,
+    "standard": 165000.04,
+    "standard_qty": 74194.0,
+    "reactive": 30605.95,
+    "reactive_qty": 72132.8,
+    "demand": 264180.64,
+    "demand_qty": 668.0
+   },
+   "excl_vat": 743722.05,
+   "vat": 111558.31,
+   "incl_vat": 855280.36,
+   "reading_period": [
+    "2026/02/02",
+    "2026/03/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 3178.918,
+   "reading_period": [
+    "2026/01/20",
+    "2026/02/26"
+   ],
+   "water_excl_vat": 227973.48,
+   "sanitation_excl_vat": 38681.92,
+   "vat": 39998.31,
+   "incl_vat": 306653.71
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 19935.46,
+   "vat": 2990.33,
+   "incl_vat": 22925.79
+  }
+ },
+ {
+  "file": "/tmp/muni/03)_COJ_2026-04-07_559304053_-_Mar_25.txt",
+  "account": "559304053",
+  "statement_for": "April 2026",
+  "statement_date": "2026/04/07",
+  "invoice_number": "600002733114",
+  "due_date": "2026/04/22",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1324775.89,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 189070.0,
+   "consumption_kvarh": 121095.0,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 11344.2,
+    "surcharge_tou": 0.0,
+    "off_peak": 154429.39,
+    "off_peak_qty": 90336.0,
+    "peak": 93080.34,
+    "peak_qty": 31511.0,
+    "standard": 149497.23,
+    "standard_qty": 67223.0,
+    "reactive": 27313.89,
+    "reactive_qty": 64374.0,
+    "demand": 275649.56,
+    "demand_qty": 697.0
+   },
+   "excl_vat": 722972.69,
+   "vat": 108445.9,
+   "incl_vat": 831418.59,
+   "reading_period": [
+    "2026/03/02",
+    "2026/04/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 3836.153,
+   "reading_period": [
+    "2025/12/17",
+    "2026/03/27"
+   ],
+   "water_excl_vat": 274742.3,
+   "sanitation_excl_vat": 160033.15,
+   "vat": 38644.7,
+   "incl_vat": 296276.02
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 23978.92,
+   "vat": 3493.19,
+   "incl_vat": 26781.16
+  }
+ },
+ {
+  "file": "/tmp/muni/04)_COJ_2026-05-08_559304053_-_Apr_25.txt",
+  "account": "559304053",
+  "statement_for": "May 2026",
+  "statement_date": "2026/05/08",
+  "invoice_number": "600002747438",
+  "due_date": "2026/05/25",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1436425.53,
+  "property_rates": {
+   "excl_vat": 169096.07,
+   "vat": 0.0,
+   "incl_vat": 169096.07
+  },
+  "electricity": {
+   "consumption_kwh": 261929.0,
+   "consumption_kvarh": 159439.1,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 15715.74,
+    "surcharge_tou": 0.0,
+    "off_peak": 199214.87,
+    "off_peak_qty": 116534.0,
+    "peak": 134290.2,
+    "peak_qty": 45462.0,
+    "standard": 222241.0,
+    "standard_qty": 99933.0,
+    "reactive": 34309.07,
+    "reactive_qty": 80860.4,
+    "demand": 292259.72,
+    "demand_qty": 739.0
+   },
+   "excl_vat": 909688.68,
+   "vat": 136453.3,
+   "incl_vat": 1046141.98,
+   "reading_period": [
+    "2026/04/02",
+    "2026/05/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1885.756,
+   "reading_period": [
+    "2026/03/28",
+    "2026/04/25"
+   ],
+   "water_excl_vat": 134378.23,
+   "sanitation_excl_vat": 35660.9,
+   "vat": 25505.87,
+   "incl_vat": 195545.0
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 21250.809999999998,
+   "vat": 3187.62,
+   "incl_vat": 24438.43
+  }
+ },
+ {
+  "file": "/tmp/muni/09)_ACCOUNT_559304060__-_Sep_25.txt",
+  "account": "559304060",
+  "statement_for": "October 2025",
+  "statement_date": "2025/10/14",
+  "invoice_number": "600002665796",
+  "due_date": "2025/10/28",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 704767.49,
+  "property_rates": {
+   "excl_vat": 167034.0,
+   "vat": 0.0,
+   "incl_vat": 167034.0
+  },
+  "electricity": {
+   "consumption_kwh": 32997.619,
+   "consumption_kvarh": 10530.388,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 4246.99,
+    "network_surcharge": 1979.86,
+    "surcharge_tou": 0.0,
+    "off_peak": 18537.82,
+    "off_peak_qty": 10844.0,
+    "peak": 33576.34,
+    "peak_qty": 11366.781,
+    "standard": 23988.85,
+    "standard_qty": 10786.838,
+    "reactive": 267.78,
+    "reactive_qty": 631.102,
+    "demand": 179838.75,
+    "demand_qty": 425.0
+   },
+   "excl_vat": 262436.39,
+   "vat": 39365.46,
+   "incl_vat": 301801.85,
+   "reading_period": [
+    "2025/09/02",
+    "2025/09/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1568.0,
+   "reading_period": [
+    "2025/08/24",
+    "2025/09/25"
+   ],
+   "water_excl_vat": 112147.40000000001,
+   "sanitation_excl_vat": 82868.8,
+   "vat": 29252.43,
+   "incl_vat": 224268.63
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 9094.74,
+   "vat": 1364.22,
+   "incl_vat": 10458.96
+  }
+ },
+ {
+  "file": "/tmp/muni/11)_ACCOUNT_559304060__-_Nov_2025.txt",
+  "account": "559304060",
+  "statement_for": "December 2025",
+  "statement_date": "2025/12/11",
+  "invoice_number": "600002691399",
+  "due_date": "2025/12/11",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 1806936.88,
+  "property_rates": {
+   "excl_vat": 501102.0,
+   "vat": 0.0,
+   "incl_vat": 501102.0
+  },
+  "electricity": {
+   "consumption_kwh": 66727.643,
+   "consumption_kvarh": 23693.374,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 8493.98,
+    "network_surcharge": 4003.66,
+    "surcharge_tou": 0.0,
+    "off_peak": 28859.78,
+    "off_peak_qty": 16882.0,
+    "peak": 75546.76,
+    "peak_qty": 25575.258,
+    "standard": 53974.91,
+    "standard_qty": 24270.385000000002,
+    "reactive": 1559.34,
+    "reactive_qty": 3675.08,
+    "demand": 410920.97,
+    "demand_qty": 971.1
+   },
+   "excl_vat": 583359.4,
+   "vat": 87503.91,
+   "incl_vat": 670863.31,
+   "reading_period": [
+    "2025/09/02",
+    "2025/10/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 4236.0,
+   "reading_period": [
+    "2025/08/24",
+    "2025/11/26"
+   ],
+   "water_excl_vat": 302741.51999999996,
+   "sanitation_excl_vat": 223872.59999999998,
+   "vat": 78992.12,
+   "incl_vat": 605606.24
+  },
+  "refuse": {
+   "excl_vat": 3141.0,
+   "vat": 471.15,
+   "incl_vat": 3612.15
+  },
+  "sundry": {
+   "excl_vat": 22075.24,
+   "vat": 3359.12,
+   "incl_vat": 25753.18
+  }
+ },
+ {
+  "file": "/tmp/muni/11)_ACCOUNT_559304060__-_Nov_25.txt",
+  "account": "559304060",
+  "statement_for": "December 2025",
+  "statement_date": "2025/12/31",
+  "invoice_number": "600002694504",
+  "due_date": "2025/12/31",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 2198904.4,
+  "property_rates": {
+   "excl_vat": 501102.0,
+   "vat": 0.0,
+   "incl_vat": 501102.0
+  },
+  "electricity": {
+   "consumption_kwh": 108614.081,
+   "consumption_kvarh": 37133.201,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 12740.97,
+    "network_surcharge": 6516.85,
+    "surcharge_tou": 0.0,
+    "off_peak": 52129.49,
+    "off_peak_qty": 30494.0,
+    "peak": 118399.88999999998,
+    "peak_qty": 40082.564,
+    "standard": 84591.63,
+    "standard_qty": 38037.515,
+    "reactive": 1930.1299999999999,
+    "reactive_qty": 4548.975,
+    "demand": 640945.3099999999,
+    "demand_qty": 1514.7
+   },
+   "excl_vat": 917254.27,
+   "vat": 137588.14,
+   "incl_vat": 1054842.41,
+   "reading_period": [
+    "2025/09/02",
+    "2025/11/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 4236.0,
+   "reading_period": [
+    "2025/08/24",
+    "2025/11/26"
+   ],
+   "water_excl_vat": 302741.51999999996,
+   "sanitation_excl_vat": 223872.59999999998,
+   "vat": 78992.12,
+   "incl_vat": 605606.24
+  },
+  "refuse": {
+   "excl_vat": 3141.0,
+   "vat": 471.15,
+   "incl_vat": 3612.15
+  },
+  "sundry": {
+   "excl_vat": 28702.88,
+   "vat": 4401.08,
+   "incl_vat": 33741.6
+  }
+ },
+ {
+  "file": "/tmp/muni/12)_ACCOUNT_559304060__-_Dec_25.txt",
+  "account": "559304060",
+  "statement_for": "January 2026",
+  "statement_date": "2026/01/15",
+  "invoice_number": "600002702711",
+  "due_date": "2026/01/30",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 690095.44,
+  "property_rates": {
+   "excl_vat": 167034.0,
+   "vat": 0.0,
+   "incl_vat": 167034.0
+  },
+  "electricity": {
+   "consumption_kwh": 39300.14,
+   "consumption_kvarh": 15461.285,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 4246.99,
+    "network_surcharge": 2358.01,
+    "surcharge_tou": 0.0,
+    "off_peak": 11578.44,
+    "off_peak_qty": 6773.0,
+    "peak": 49298.59,
+    "peak_qty": 16689.322,
+    "standard": 35221.72,
+    "standard_qty": 15837.818,
+    "reactive": 1557.71,
+    "reactive_qty": 3671.243,
+    "demand": 240349.2,
+    "demand_qty": 568.0
+   },
+   "excl_vat": 344610.66,
+   "vat": 51691.6,
+   "incl_vat": 396302.26,
+   "reading_period": [
+    "2025/11/26",
+    "2026/01/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 809.0,
+   "reading_period": [
+    "2025/11/27",
+    "2025/12/16"
+   ],
+   "water_excl_vat": 57585.56,
+   "sanitation_excl_vat": 42755.65,
+   "vat": 15051.18,
+   "incl_vat": 115392.39
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 8837.16,
+   "vat": 1325.58,
+   "incl_vat": 10162.74
+  }
+ },
+ {
+  "file": "/tmp/muni/01)_ACCOUNT_559304060__-_Jan_26.txt",
+  "account": "559304060",
+  "statement_for": "February 2026",
+  "statement_date": "2026/02/13",
+  "invoice_number": "600002714171",
+  "due_date": "2026/03/02",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 755967.94,
+  "property_rates": {
+   "excl_vat": 167034.0,
+   "vat": 0.0,
+   "incl_vat": 167034.0
+  },
+  "electricity": {
+   "consumption_kwh": 40217.78,
+   "consumption_kvarh": 13277.9,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 4246.99,
+    "network_surcharge": 2413.07,
+    "surcharge_tou": 0.0,
+    "off_peak": 20999.5,
+    "off_peak_qty": 12284.0,
+    "peak": 42336.83,
+    "peak_qty": 14332.519,
+    "standard": 30247.84,
+    "standard_qty": 13601.261,
+    "reactive": 514.49,
+    "reactive_qty": 1212.566,
+    "demand": 250970.27,
+    "demand_qty": 593.1
+   },
+   "excl_vat": 351728.99,
+   "vat": 52759.35,
+   "incl_vat": 404488.34,
+   "reading_period": [
+    "2026/01/02",
+    "2026/02/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1200.979,
+   "reading_period": [
+    "2025/12/17",
+    "2026/01/19"
+   ],
+   "water_excl_vat": 85909.49,
+   "sanitation_excl_vat": 63471.76,
+   "vat": 22407.18,
+   "incl_vat": 171788.43
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 9959.23,
+   "vat": 1493.89,
+   "incl_vat": 11453.12
+  }
+ },
+ {
+  "file": "/tmp/muni/02)_IND_4060_MAR_26_-_Feb_26.txt",
+  "account": "559304060",
+  "statement_for": "March 2026",
+  "statement_date": "2026/03/10",
+  "invoice_number": "600002724492",
+  "due_date": "2026/03/25",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 809219.03,
+  "property_rates": {
+   "excl_vat": 167034.0,
+   "vat": 0.0,
+   "incl_vat": 167034.0
+  },
+  "electricity": {
+   "consumption_kwh": 43679.443,
+   "consumption_kvarh": 11554.176,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 4246.99,
+    "network_surcharge": 2620.77,
+    "surcharge_tou": 0.0,
+    "off_peak": 33116.43,
+    "off_peak_qty": 19372.0,
+    "peak": 36840.7,
+    "peak_qty": 12471.885,
+    "standard": 26321.1,
+    "standard_qty": 11835.558,
+    "reactive": 0.0,
+    "reactive_qty": 11554.176,
+    "demand": 258206.13,
+    "demand_qty": 610.2
+   },
+   "excl_vat": 361352.12,
+   "vat": 54202.82,
+   "incl_vat": 415554.94,
+   "reading_period": [
+    "2026/02/02",
+    "2026/03/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1489.058,
+   "reading_period": [
+    "2026/01/20",
+    "2026/02/24"
+   ],
+   "water_excl_vat": 106462.81,
+   "sanitation_excl_vat": 78696.73,
+   "vat": 27773.94,
+   "incl_vat": 212933.48
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 10863.1,
+   "vat": 1629.46,
+   "incl_vat": 12492.56
+  }
+ },
+ {
+  "file": "/tmp/muni/03)_COJ_2026-04-08_559304060_-_Mar_25.txt",
+  "account": "559304060",
+  "statement_for": "April 2026",
+  "statement_date": "2026/04/08",
+  "invoice_number": "600002733274",
+  "due_date": "2026/04/23",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 708164.0,
+  "property_rates": {
+   "excl_vat": 167034.0,
+   "vat": 0.0,
+   "incl_vat": 167034.0
+  },
+  "electricity": {
+   "consumption_kwh": 40460.994,
+   "consumption_kvarh": 15059.082,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 4246.99,
+    "network_surcharge": 2427.66,
+    "surcharge_tou": 0.0,
+    "off_peak": 15009.41,
+    "off_peak_qty": 8780.0,
+    "peak": 48016.16,
+    "peak_qty": 16255.174,
+    "standard": 34305.48,
+    "standard_qty": 15425.82,
+    "reactive": 1239.29,
+    "reactive_qty": 2920.784,
+    "demand": 232267.04,
+    "demand_qty": 548.9
+   },
+   "excl_vat": 337512.03,
+   "vat": 50626.8,
+   "incl_vat": 388138.83,
+   "reading_period": [
+    "2026/03/02",
+    "2026/04/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 3513.0,
+   "reading_period": [
+    "2025/12/17",
+    "2026/03/27"
+   ],
+   "water_excl_vat": 252206.85,
+   "sanitation_excl_vat": 335705.19,
+   "vat": 18426.74,
+   "incl_vat": 141271.68
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 22059.82,
+   "vat": 1371.58,
+   "incl_vat": 10515.44
+  }
+ },
+ {
+  "file": "/tmp/muni/04)_COJ_2026-05-12_559304060_-_Apr_25.txt",
+  "account": "559304060",
+  "statement_for": "May 2026",
+  "statement_date": "2026/05/12",
+  "invoice_number": "600002748439",
+  "due_date": "2026/05/27",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 6767773.91,
+  "property_rates": {
+   "excl_vat": 1503306.0,
+   "vat": 0.0,
+   "incl_vat": 1503306.0
+  },
+  "electricity": {
+   "consumption_kwh": 20816.0,
+   "consumption_kvarh": 3689.0,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 50306.29999999999,
+    "network_surcharge": 13128.66,
+    "surcharge_tou": 0.0,
+    "off_peak": 199850.31999999998,
+    "off_peak_qty": 115514.99799999999,
+    "peak": 29621.7,
+    "peak_qty": 10028.0,
+    "standard": 209349.97,
+    "standard_qty": 93267.99799999999,
+    "reactive": 0.0,
+    "reactive_qty": 11241.0,
+    "demand": 2465878.8,
+    "demand_qty": 5898.099999999999
+   },
+   "excl_vat": 2968135.75,
+   "vat": 445220.36,
+   "incl_vat": 3413356.11,
+   "reading_period": [
+    "2025/05/30",
+    "2026/05/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 11842.0,
+   "reading_period": [
+    "2025/07/25",
+    "2026/04/25"
+   ],
+   "water_excl_vat": 1029129.02,
+   "sanitation_excl_vat": 910186.68,
+   "vat": 221137.3,
+   "incl_vat": 1695385.9
+  },
+  "refuse": {
+   "excl_vat": 9423.0,
+   "vat": 6948.46,
+   "incl_vat": 53272.03
+  },
+  "sundry": {
+   "excl_vat": 88452.66000000002,
+   "vat": 13363.57,
+   "incl_vat": 102453.87
+  }
+ },
+ {
+  "file": "/tmp/muni/09)_ACCOUNT_559304078_-_Sep_25.txt",
+  "account": "559304078",
+  "statement_for": "October 2025",
+  "statement_date": "2025/10/03",
+  "invoice_number": "600002660358",
+  "due_date": "2025/10/20",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 589009.98,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 68966.0,
+   "consumption_kvarh": 38070.7,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 4137.96,
+    "surcharge_tou": 0.0,
+    "off_peak": 53606.5,
+    "off_peak_qty": 31358.0,
+    "peak": 41673.62,
+    "peak_qty": 14108.0,
+    "standard": 52261.65,
+    "standard_qty": 23500.0,
+    "reactive": 7374.72,
+    "reactive_qty": 17380.9,
+    "demand": 88587.52,
+    "demand_qty": 224.0
+   },
+   "excl_vat": 259300.05,
+   "vat": 38895.01,
+   "incl_vat": 298195.06,
+   "reading_period": [
+    "2025/09/02",
+    "2025/09/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1158.0,
+   "reading_period": [
+    "2025/08/24",
+    "2025/09/25"
+   ],
+   "water_excl_vat": 83005.44,
+   "sanitation_excl_vat": 61200.3,
+   "vat": 21630.87,
+   "incl_vat": 165836.61
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 7980.0,
+   "vat": 1197.0,
+   "incl_vat": 9177.0
+  }
+ },
+ {
+  "file": "/tmp/muni/10)_ACCOUNT_559304078_-_Oct_25.txt",
+  "account": "559304078",
+  "statement_for": "November 2025",
+  "statement_date": "2025/11/06",
+  "invoice_number": "600002673947",
+  "due_date": "2025/11/21",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 486622.08,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 49794.0,
+   "consumption_kvarh": 25385.7,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 2987.64,
+    "surcharge_tou": 0.0,
+    "off_peak": 41116.89,
+    "off_peak_qty": 24052.0,
+    "peak": 26286.76,
+    "peak_qty": 8899.0,
+    "standard": 37457.15,
+    "standard_qty": 16843.0,
+    "reactive": 4432.87,
+    "reactive_qty": 10447.5,
+    "demand": 94124.24,
+    "demand_qty": 238.0
+   },
+   "excl_vat": 218063.63,
+   "vat": 32709.54,
+   "incl_vat": 250773.17,
+   "reading_period": [
+    "2025/09/26",
+    "2025/10/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 789.0,
+   "reading_period": [
+    "2025/09/26",
+    "2025/10/23"
+   ],
+   "water_excl_vat": 56433.75,
+   "sanitation_excl_vat": 41698.65,
+   "vat": 14719.86,
+   "incl_vat": 112852.26
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 6256.81,
+   "vat": 938.53,
+   "incl_vat": 7195.34
+  }
+ },
+ {
+  "file": "/tmp/muni/11)_ACCOUNT_559304078_-_Nov_25.txt",
+  "account": "559304078",
+  "statement_for": "December 2025",
+  "statement_date": "2025/12/04",
+  "invoice_number": "600002684295",
+  "due_date": "2025/12/19",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 598833.32,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 71626.0,
+   "consumption_kvarh": 37126.0,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 4297.56,
+    "surcharge_tou": 0.0,
+    "off_peak": 55860.31,
+    "off_peak_qty": 32676.4,
+    "peak": 39114.95,
+    "peak_qty": 13241.8,
+    "standard": 57171.58,
+    "standard_qty": 25707.8,
+    "reactive": 6635.29,
+    "reactive_qty": 15638.2,
+    "demand": 102429.32,
+    "demand_qty": 259.0
+   },
+   "excl_vat": 277167.09,
+   "vat": 41575.06,
+   "incl_vat": 318742.15,
+   "reading_period": [
+    "2025/10/26",
+    "2025/11/27"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1082.0,
+   "reading_period": [
+    "2025/10/24",
+    "2025/11/26"
+   ],
+   "water_excl_vat": 77532.68000000001,
+   "sanitation_excl_vat": 57183.7,
+   "vat": 20207.46,
+   "incl_vat": 154923.84
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 8144.360000000001,
+   "vat": 1221.66,
+   "incl_vat": 9366.02
+  }
+ },
+ {
+  "file": "/tmp/muni/12)_ACCOUNT_559304078_-_Dec_25.txt",
+  "account": "559304078",
+  "statement_for": "January 2026",
+  "statement_date": "2026/01/06",
+  "invoice_number": "600002696951",
+  "due_date": "2026/01/21",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 470163.28,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 51554.0,
+   "consumption_kvarh": 31297.8,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 3093.24,
+    "surcharge_tou": 0.0,
+    "off_peak": 44533.5,
+    "off_peak_qty": 26050.6,
+    "peak": 23785.39,
+    "peak_qty": 8052.2,
+    "standard": 38809.72,
+    "standard_qty": 17451.2,
+    "reactive": 6717.35,
+    "reactive_qty": 15831.6,
+    "demand": 94915.2,
+    "demand_qty": 240.0
+   },
+   "excl_vat": 223512.48,
+   "vat": 33526.87,
+   "incl_vat": 257039.35,
+   "reading_period": [
+    "2025/11/28",
+    "2025/12/25"
+   ]
+  },
+  "water": {
+   "consumption_kl": 633.0,
+   "reading_period": [
+    "2025/11/27",
+    "2025/12/16"
+   ],
+   "water_excl_vat": 45200.19,
+   "sanitation_excl_vat": 33454.05,
+   "vat": 11798.14,
+   "incl_vat": 90452.38
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 5974.120000000001,
+   "vat": 896.12,
+   "incl_vat": 6870.24
+  }
+ },
+ {
+  "file": "/tmp/muni/01)_ACCOUNT_559304078_-_Jan_26.txt",
+  "account": "559304078",
+  "statement_for": "February 2026",
+  "statement_date": "2026/02/06",
+  "invoice_number": "600002708798",
+  "due_date": "2026/02/23",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 345626.75,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 35157.0,
+   "consumption_kvarh": 23065.4,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 2109.42,
+    "surcharge_tou": 0.0,
+    "off_peak": 34348.98,
+    "off_peak_qty": 20093.0,
+    "peak": 16030.82,
+    "peak_qty": 5427.0,
+    "standard": 21431.72,
+    "standard_qty": 9637.0,
+    "reactive": 5311.51,
+    "reactive_qty": 12518.3,
+    "demand": 87401.08,
+    "demand_qty": 221.0
+   },
+   "excl_vat": 178291.61,
+   "vat": 26743.74,
+   "incl_vat": 205035.35,
+   "reading_period": [
+    "2025/12/26",
+    "2026/02/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 143.0,
+   "reading_period": [
+    "2025/12/17",
+    "2026/01/19"
+   ],
+   "water_excl_vat": 10129.04,
+   "sanitation_excl_vat": 7557.55,
+   "vat": 2652.99,
+   "incl_vat": 20339.58
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 3870.0099999999998,
+   "vat": 580.5,
+   "incl_vat": 4450.51
+  }
+ },
+ {
+  "file": "/tmp/muni/02)_MINI_MAR_26_-_Feb_26.txt",
+  "account": "559304078",
+  "statement_for": "March 2026",
+  "statement_date": "2026/03/05",
+  "invoice_number": "600002720655",
+  "due_date": "2026/03/20",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 540150.17,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 60548.0,
+   "consumption_kvarh": 38720.0,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 3632.88,
+    "surcharge_tou": 0.0,
+    "off_peak": 47867.71,
+    "off_peak_qty": 28001.0,
+    "peak": 34929.87,
+    "peak_qty": 11825.0,
+    "standard": 46083.66,
+    "standard_qty": 20722.0,
+    "reactive": 8721.74,
+    "reactive_qty": 20555.6,
+    "demand": 102824.8,
+    "demand_qty": 260.0
+   },
+   "excl_vat": 255718.74,
+   "vat": 38357.81,
+   "incl_vat": 294076.55,
+   "reading_period": [
+    "2026/02/02",
+    "2026/03/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 853.0,
+   "reading_period": [
+    "2026/01/20",
+    "2026/02/13"
+   ],
+   "water_excl_vat": 61042.39,
+   "sanitation_excl_vat": 45081.05,
+   "vat": 15918.52,
+   "incl_vat": 122041.96
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 7156.83,
+   "vat": 1073.52,
+   "incl_vat": 8230.35
+  }
+ },
+ {
+  "file": "/tmp/muni/03)_COJ_2026-04-08_559304078_-_Mar_26.txt",
+  "account": "559304078",
+  "statement_for": "April 2026",
+  "statement_date": "2026/04/08",
+  "invoice_number": "600002733275",
+  "due_date": "2026/04/23",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 685812.13,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 61244.0,
+   "consumption_kvarh": 39957.0,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 3674.64,
+    "surcharge_tou": 0.0,
+    "off_peak": 47889.93,
+    "off_peak_qty": 28014.0,
+    "peak": 35963.73,
+    "peak_qty": 12175.0,
+    "standard": 46824.21,
+    "standard_qty": 21055.0,
+    "reactive": 9158.01,
+    "reactive_qty": 21583.8,
+    "demand": 103615.76,
+    "demand_qty": 262.0
+   },
+   "excl_vat": 258784.36,
+   "vat": 38817.65,
+   "incl_vat": 297602.01,
+   "reading_period": [
+    "2026/03/02",
+    "2026/04/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1823.0,
+   "reading_period": [
+    "2026/02/14",
+    "2026/03/27"
+   ],
+   "water_excl_vat": 130892.09,
+   "sanitation_excl_vat": 96345.55,
+   "vat": 34085.64,
+   "incl_vat": 261323.28
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 9639.59,
+   "vat": 1445.94,
+   "incl_vat": 11085.53
+  }
+ },
+ {
+  "file": "/tmp/muni/04)_COJ_2026-05-06_559304078_-_Apr_26.txt",
+  "account": "559304078",
+  "statement_for": "May 2026",
+  "statement_date": "2026/05/06",
+  "invoice_number": "600002742461",
+  "due_date": "2026/05/21",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 595670.98,
+  "property_rates": {
+   "excl_vat": 114597.26,
+   "vat": 0.0,
+   "incl_vat": 114597.26
+  },
+  "electricity": {
+   "consumption_kwh": 70630.0,
+   "consumption_kvarh": 42403.8,
+   "tariff_type": "TOU",
+   "lines": {
+    "service": 11658.08,
+    "network_surcharge": 4237.8,
+    "surcharge_tou": 0.0,
+    "off_peak": 52389.34,
+    "off_peak_qty": 30646.0,
+    "peak": 39605.89,
+    "peak_qty": 13408.0,
+    "standard": 59102.37,
+    "standard_qty": 26576.0,
+    "reactive": 9001.44,
+    "reactive_qty": 21214.8,
+    "demand": 100847.4,
+    "demand_qty": 255.0
+   },
+   "excl_vat": 276842.32,
+   "vat": 41526.35,
+   "incl_vat": 318368.67,
+   "reading_period": [
+    "2026/04/02",
+    "2026/05/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 1063.0,
+   "reading_period": [
+    "2026/03/28",
+    "2026/04/25"
+   ],
+   "water_excl_vat": 76164.49,
+   "sanitation_excl_vat": 56179.55,
+   "vat": 19851.6,
+   "incl_vat": 152195.64
+  },
+  "refuse": {
+   "excl_vat": 1047.0,
+   "vat": 157.05,
+   "incl_vat": 1204.05
+  },
+  "sundry": {
+   "excl_vat": 8091.610000000001,
+   "vat": 1213.75,
+   "incl_vat": 9305.36
+  }
+ },
+ {
+  "file": "/tmp/muni/09)_ACCOUNT_559304085_-_Sep_2025.txt",
+  "account": "559304085",
+  "statement_for": "October 2025",
+  "statement_date": "2025/10/03",
+  "invoice_number": "600002658348",
+  "due_date": "2025/10/20",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 128549.52,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 8800.832,
+   "consumption_kvarh": 45030.158,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 528.05,
+    "energy": 23269.05,
+    "energy_qty": 8800.832,
+    "reactive": 17986.04,
+    "reactive_qty": 42389.908,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 74941.71,
+   "vat": 11241.26,
+   "incl_vat": 86182.97,
+   "reading_period": [
+    "2025/08/30",
+    "2025/09/28"
+   ]
+  },
+  "water": {
+   "consumption_kl": 78.0,
+   "reading_period": [
+    "2025/08/08",
+    "2025/09/25"
+   ],
+   "water_excl_vat": 6060.0,
+   "sanitation_excl_vat": 4122.3,
+   "vat": 1527.35,
+   "incl_vat": 11709.65
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 1677.21,
+   "vat": 251.59,
+   "incl_vat": 1928.8
+  }
+ },
+ {
+  "file": "/tmp/muni/10)_ACCOUNT_559304085_-_Oct_2025.txt",
+  "account": "559304085",
+  "statement_for": "November 2025",
+  "statement_date": "2025/11/05",
+  "invoice_number": "600002672721",
+  "due_date": "2025/11/20",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 128663.63,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 9698.286,
+   "consumption_kvarh": 49622.049,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 581.9,
+    "energy": 25352.29,
+    "energy_qty": 9698.286,
+    "reactive": 19820.14,
+    "reactive_qty": 46712.563,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 78912.9,
+   "vat": 11836.94,
+   "incl_vat": 90749.84,
+   "reading_period": [
+    "2025/09/29",
+    "2025/10/28"
+   ]
+  },
+  "water": {
+   "consumption_kl": 49.0,
+   "reading_period": [
+    "2025/09/26",
+    "2025/10/23"
+   ],
+   "water_excl_vat": 3712.6,
+   "sanitation_excl_vat": 2589.65,
+   "vat": 945.34,
+   "incl_vat": 7247.59
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 1685.3,
+   "vat": 252.8,
+   "incl_vat": 1938.1
+  }
+ },
+ {
+  "file": "/tmp/muni/10)_ACCOUNT_559304085_-__Oct_2025.txt",
+  "account": "559304085",
+  "statement_for": "November 2025",
+  "statement_date": "2025/12/03",
+  "invoice_number": "600002681869",
+  "due_date": "2025/12/03",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 280195.36,
+  "property_rates": {
+   "excl_vat": 55558.7,
+   "vat": 0.0,
+   "incl_vat": 55558.7
+  },
+  "electricity": {
+   "consumption_kwh": 18499.119,
+   "consumption_kvarh": 94652.207,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 7083.14,
+    "network_surcharge": 1109.9499999999998,
+    "energy": 48621.34,
+    "energy_qty": 18499.118000000002,
+    "reactive": 37806.18,
+    "reactive_qty": 89102.471,
+    "demand": 59234.0,
+    "demand_qty": 140.0
+   },
+   "excl_vat": 153854.61,
+   "vat": 23078.19,
+   "incl_vat": 176932.8,
+   "reading_period": [
+    "2025/08/30",
+    "2025/10/28"
+   ]
+  },
+  "water": {
+   "consumption_kl": 291.0,
+   "reading_period": [
+    "2025/05/30",
+    "2025/10/23"
+   ],
+   "water_excl_vat": 21217.029999999995,
+   "sanitation_excl_vat": 14874.639999999998,
+   "vat": 5413.75,
+   "incl_vat": 41505.42
+  },
+  "refuse": {
+   "excl_vat": 1650.0,
+   "vat": 247.5,
+   "incl_vat": 1897.5
+  },
+  "sundry": {
+   "excl_vat": 3739.94,
+   "vat": 561.0,
+   "incl_vat": 4300.94
+  }
+ },
+ {
+  "file": "/tmp/muni/11)_ACCOUNT_559304085_-_Nov_25.txt",
+  "account": "559304085",
+  "statement_for": "December 2025",
+  "statement_date": "2025/12/04",
+  "invoice_number": "600002684296",
+  "due_date": "2025/12/19",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 147910.91,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 10541.113,
+   "consumption_kvarh": 59546.459,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 632.47,
+    "energy": 27555.53,
+    "energy_qty": 10541.113,
+    "reactive": 23923.78,
+    "reactive_qty": 56384.125,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 85270.35,
+   "vat": 12790.55,
+   "incl_vat": 98060.9,
+   "reading_period": [
+    "2025/10/29",
+    "2025/11/30"
+   ]
+  },
+  "water": {
+   "consumption_kl": 132.0,
+   "reading_period": [
+    "2025/10/24",
+    "2025/11/26"
+   ],
+   "water_excl_vat": 9378.18,
+   "sanitation_excl_vat": 6976.2,
+   "vat": 2453.16,
+   "incl_vat": 18807.54
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 2012.49,
+   "vat": 301.88,
+   "incl_vat": 2314.37
+  }
+ },
+ {
+  "file": "/tmp/muni/12)_ACCOUNT_559304085_-_Dec_25.txt",
+  "account": "559304085",
+  "statement_for": "January 2026",
+  "statement_date": "2026/01/07",
+  "invoice_number": "600002699021",
+  "due_date": "2026/01/22",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 134623.97,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 10021.562,
+   "consumption_kvarh": 49787.613,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 601.29,
+    "energy": 26197.37,
+    "energy_qty": 10021.562,
+    "reactive": 19849.24,
+    "reactive_qty": 46781.144,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 79806.47,
+   "vat": 11970.97,
+   "incl_vat": 91777.44,
+   "reading_period": [
+    "2025/12/01",
+    "2025/12/31"
+   ]
+  },
+  "water": {
+   "consumption_kl": 81.0,
+   "reading_period": [
+    "2025/11/27",
+    "2025/12/16"
+   ],
+   "water_excl_vat": 5896.92,
+   "sanitation_excl_vat": 4280.85,
+   "vat": 1526.67,
+   "incl_vat": 11704.44
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 1780.3,
+   "vat": 314.87,
+   "incl_vat": 2413.99
+  }
+ },
+ {
+  "file": "/tmp/muni/01)_ACCOUNT_559304085_-_Jan_26.txt",
+  "account": "559304085",
+  "statement_for": "February 2026",
+  "statement_date": "2026/02/06",
+  "invoice_number": "600002708515",
+  "due_date": "2026/02/23",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 164472.93,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 15942.203,
+   "consumption_kvarh": 64684.972,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 956.53,
+    "energy": 41674.51,
+    "energy_qty": 15942.203,
+    "reactive": 25416.55,
+    "reactive_qty": 59902.312,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 101206.16,
+   "vat": 15180.92,
+   "incl_vat": 116387.08,
+   "reading_period": [
+    "2026/01/01",
+    "2026/01/31"
+   ]
+  },
+  "water": {
+   "consumption_kl": 117.054,
+   "reading_period": [
+    "2025/12/17",
+    "2026/01/15"
+   ],
+   "water_excl_vat": 8357.98,
+   "sanitation_excl_vat": 6186.32,
+   "vat": 2181.65,
+   "incl_vat": 16725.95
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 2288.52,
+   "vat": 343.28,
+   "incl_vat": 2631.8
+  }
+ },
+ {
+  "file": "/tmp/muni/02)_Account_559304085_-_Feb_26.txt",
+  "account": "559304085",
+  "statement_for": "March 2026",
+  "statement_date": "2026/03/05",
+  "invoice_number": "600002720656",
+  "due_date": "2026/03/20",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 160297.68,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 14759.394,
+   "consumption_kvarh": 59885.765,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 885.56,
+    "energy": 38582.53,
+    "energy_qty": 14759.394,
+    "reactive": 23530.81,
+    "reactive_qty": 55457.946,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 96157.47,
+   "vat": 14423.62,
+   "incl_vat": 110581.09,
+   "reading_period": [
+    "2026/02/01",
+    "2026/02/28"
+   ]
+  },
+  "water": {
+   "consumption_kl": 245.0,
+   "reading_period": [
+    "2025/12/17",
+    "2026/02/24"
+   ],
+   "water_excl_vat": 17260.31,
+   "sanitation_excl_vat": 19134.57,
+   "vat": 2404.82,
+   "incl_vat": 18436.94
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 2785.7900000000004,
+   "vat": 332.82,
+   "incl_vat": 2551.55
+  }
+ },
+ {
+  "file": "/tmp/muni/03)_COJ_2026-04-07_559304085_-_Mar_26.txt",
+  "account": "559304085",
+  "statement_for": "April 2026",
+  "statement_date": "2026/04/07",
+  "invoice_number": "600002731809",
+  "due_date": "2026/04/22",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 174255.01,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 18362.822,
+   "consumption_kvarh": 68119.474,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 1101.77,
+    "energy": 48002.26,
+    "energy_qty": 18362.822,
+    "reactive": 26565.69,
+    "reactive_qty": 62610.627,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 108828.29,
+   "vat": 16324.24,
+   "incl_vat": 125152.53,
+   "reading_period": [
+    "2026/03/01",
+    "2026/03/30"
+   ]
+  },
+  "water": {
+   "consumption_kl": 123.0,
+   "reading_period": [
+    "2026/02/25",
+    "2026/03/27"
+   ],
+   "water_excl_vat": 8763.84,
+   "sanitation_excl_vat": 6500.55,
+   "vat": 2289.66,
+   "incl_vat": 17554.05
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 2452.46,
+   "vat": 367.87,
+   "incl_vat": 2820.33
+  }
+ },
+ {
+  "file": "/tmp/muni/04)_COJ_2026-05-13_559304085_-_Apr_26.txt",
+  "account": "559304085",
+  "statement_for": "May 2026",
+  "statement_date": "2026/05/13",
+  "invoice_number": "600002749466",
+  "due_date": "2026/05/28",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 273818.47,
+  "property_rates": {
+   "excl_vat": 27779.35,
+   "vat": 0.0,
+   "incl_vat": 27779.35
+  },
+  "electricity": {
+   "consumption_kwh": 53339.792,
+   "consumption_kvarh": 82864.322,
+   "tariff_type": "flat",
+   "lines": {
+    "service": 3541.57,
+    "network_surcharge": 3200.39,
+    "energy": 139435.55,
+    "energy_qty": 53339.792,
+    "reactive": 28369.71,
+    "reactive_qty": 66862.385,
+    "demand": 29617.0,
+    "demand_qty": 70.0
+   },
+   "excl_vat": 204164.22,
+   "vat": 30624.63,
+   "incl_vat": 234788.85,
+   "reading_period": [
+    "2026/03/31",
+    "2026/04/30"
+   ]
+  },
+  "water": {
+   "consumption_kl": 37.0,
+   "reading_period": [
+    "2026/03/28",
+    "2026/04/11"
+   ],
+   "water_excl_vat": 2893.48,
+   "sanitation_excl_vat": 1955.45,
+   "vat": 727.34,
+   "incl_vat": 5576.27
+  },
+  "refuse": {
+   "excl_vat": 825.0,
+   "vat": 123.75,
+   "incl_vat": 948.75
+  },
+  "sundry": {
+   "excl_vat": 4108.900000000001,
+   "vat": 616.35,
+   "incl_vat": 4725.25
+  }
+ }
+]

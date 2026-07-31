@@ -1,0 +1,779 @@
+[
+ {
+  "file": "June 25.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 183000000.0,
+  "statement_date": "2025-06-30",
+  "statement_for": "2025-06",
+  "due_date": "2025-07-25",
+  "invoice_number": "2210755502-2025-06-30",
+  "property_rates": {
+   "excl_vat": 351512.5,
+   "vat": 0.0,
+   "incl_vat": 351512.5
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-05-01",
+    "2025-06-01"
+   ],
+   "consumption_kwh": 92557.998,
+   "consumption_kvarh": 362.215,
+   "tariff_type": "TOU",
+   "excl_vat": 281570.25,
+   "vat": 42235.54,
+   "incl_vat": 323805.79,
+   "lines": {
+    "off_peak_qty": 27956.0,
+    "off_peak": 42663.65,
+    "standard_qty": 44793.999,
+    "standard": 91106.51,
+    "peak_qty": 19807.999,
+    "peak": 61361.22,
+    "demand_qty": 362.215,
+    "demand": 47979.0,
+    "service": 5105.36,
+    "network_surcharge": 33354.51
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-05-08",
+    "2025-06-04"
+   ],
+   "consumption_kl": 928.0,
+   "water_excl_vat": 39625.6,
+   "sanitation_excl_vat": 15952.32,
+   "vat": 8336.69
+  },
+  "refuse": {
+   "excl_vat": 7624.36,
+   "vat": 1143.66,
+   "incl_vat": 8768.02
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 748000.92
+ },
+ {
+  "file": "July 25.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2025-07-28",
+  "statement_for": "2025-07",
+  "due_date": "2025-08-25",
+  "invoice_number": "2210755502-2025-07-28",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-06-01",
+    "2025-07-01"
+   ],
+   "consumption_kwh": 102479.999,
+   "consumption_kvarh": 395.251,
+   "tariff_type": "TOU",
+   "excl_vat": 497460.07,
+   "vat": 74619.01,
+   "incl_vat": 572079.08,
+   "lines": {
+    "off_peak_qty": 32750.0,
+    "off_peak": 56169.53,
+    "standard_qty": 49524.0,
+    "standard": 144501.13,
+    "peak_qty": 20205.999,
+    "peak": 205872.86,
+    "demand_qty": 395.251,
+    "demand": 52354.95,
+    "service": 5207.09,
+    "network_surcharge": 33354.51
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-06-04",
+    "2025-07-07"
+   ],
+   "consumption_kl": 1101.0,
+   "water_excl_vat": 48295.76,
+   "sanitation_excl_vat": 18926.19,
+   "vat": 10083.29
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 1028001.54
+ },
+ {
+  "file": "August 25.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2025-08-28",
+  "statement_for": "2025-08",
+  "due_date": "2025-09-25",
+  "invoice_number": "2210755502-2025-08-28",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-07-01",
+    "2025-08-01"
+   ],
+   "consumption_kwh": 111993.998,
+   "consumption_kvarh": 405.265,
+   "tariff_type": "TOU",
+   "excl_vat": 547092.81,
+   "vat": 82063.92,
+   "incl_vat": 629156.73,
+   "lines": {
+    "off_peak_qty": 31137.999,
+    "off_peak": 57944.7,
+    "standard_qty": 62153.999,
+    "standard": 188966.8,
+    "peak_qty": 18702.0,
+    "peak": 196187.72,
+    "demand_qty": 405.265,
+    "demand": 59205.16,
+    "service": 5207.09,
+    "network_surcharge": 39581.34
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-07-07",
+    "2025-08-05"
+   ],
+   "consumption_kl": 1136.0,
+   "water_excl_vat": 55788.96,
+   "sanitation_excl_vat": 19527.84,
+   "vat": 11297.51
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 1094388.26
+ },
+ {
+  "file": "Sep 25.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2025-09-29",
+  "statement_for": "2025-09",
+  "due_date": "2025-10-25",
+  "invoice_number": "2210755502-2025-09-29",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-08-01",
+    "2025-09-01"
+   ],
+   "consumption_kwh": 99577.999,
+   "consumption_kvarh": 400.839,
+   "tariff_type": "TOU",
+   "excl_vat": 486906.83,
+   "vat": 73036.02,
+   "incl_vat": 559942.85,
+   "lines": {
+    "off_peak_qty": 30506.0,
+    "off_peak": 56768.62,
+    "standard_qty": 53337.999,
+    "standard": 162163.52,
+    "peak_qty": 15734.0,
+    "peak": 165052.81,
+    "demand_qty": 400.839,
+    "demand": 58558.57,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-08-05",
+    "2025-09-09"
+   ],
+   "consumption_kl": 1124.0,
+   "water_excl_vat": 55199.64,
+   "sanitation_excl_vat": 19321.56,
+   "vat": 11178.17
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 1024259.44
+ },
+ {
+  "file": "Oct 25.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2025-10-28",
+  "statement_for": "2025-10",
+  "due_date": "2025-11-25",
+  "invoice_number": "2210755502-2025-10-28",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-09-01",
+    "2025-10-01"
+   ],
+   "consumption_kwh": 88915.999,
+   "consumption_kvarh": 345.809,
+   "tariff_type": "TOU",
+   "excl_vat": 297249.1,
+   "vat": 44587.36,
+   "incl_vat": 341836.46,
+   "lines": {
+    "off_peak_qty": 27272.0,
+    "off_peak": 46160.59,
+    "standard_qty": 45883.999,
+    "standard": 102385.56,
+    "peak_qty": 15760.0,
+    "peak": 53820.4,
+    "demand_qty": 345.809,
+    "demand": 50519.24,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-09-09",
+    "2025-10-03"
+   ],
+   "consumption_kl": 810.0,
+   "water_excl_vat": 39779.1,
+   "sanitation_excl_vat": 15317.1,
+   "vat": 8264.44
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 211.74,
+   "vat": 31.76,
+   "incl_vat": 243.5
+  },
+  "grand_total_incl_vat": 784057.82
+ },
+ {
+  "file": "Nov 25.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2025-11-27",
+  "statement_for": "2025-11",
+  "due_date": "2025-12-25",
+  "invoice_number": "2210755502-2025-11-27",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-10-01",
+    "2025-11-01"
+   ],
+   "consumption_kwh": 81093.998,
+   "consumption_kvarh": 367.347,
+   "tariff_type": "TOU",
+   "excl_vat": 285498.32,
+   "vat": 42824.75,
+   "incl_vat": 328323.07,
+   "lines": {
+    "off_peak_qty": 20039.999,
+    "off_peak": 33919.7,
+    "standard_qty": 46425.999,
+    "standard": 103594.97,
+    "peak_qty": 14628.0,
+    "peak": 49954.62,
+    "demand_qty": 367.347,
+    "demand": 53665.72,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-10-03",
+    "2025-11-07"
+   ],
+   "consumption_kl": 1329.0,
+   "water_excl_vat": 65267.19,
+   "sanitation_excl_vat": 25131.39,
+   "vat": 13559.79
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 810898.66
+ },
+ {
+  "file": "Dec 25.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2025-12-29",
+  "statement_for": "2025-12",
+  "due_date": "2026-01-25",
+  "invoice_number": "2210755502-2025-12-29",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-11-01",
+    "2025-12-01"
+   ],
+   "consumption_kwh": 88507.998,
+   "consumption_kvarh": 378.375,
+   "tariff_type": "TOU",
+   "excl_vat": 298671.05,
+   "vat": 44800.65,
+   "incl_vat": 343471.7,
+   "lines": {
+    "off_peak_qty": 27942.0,
+    "off_peak": 47294.63,
+    "standard_qty": 46549.999,
+    "standard": 103871.67,
+    "peak_qty": 14015.999,
+    "peak": 47864.64,
+    "demand_qty": 378.375,
+    "demand": 55276.8,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-11-07",
+    "2025-12-10"
+   ],
+   "consumption_kl": 1180.0,
+   "water_excl_vat": 57949.8,
+   "sanitation_excl_vat": 22313.8,
+   "vat": 12039.54
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 814392.06
+ },
+ {
+  "file": "Jan 26.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-01-28",
+  "statement_for": "2026-01",
+  "due_date": "2026-02-25",
+  "invoice_number": "2210755502-2026-01-28",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2025-12-01",
+    "2026-01-01"
+   ],
+   "consumption_kwh": 79151.999,
+   "consumption_kvarh": 331.058,
+   "tariff_type": "TOU",
+   "excl_vat": 270353.58,
+   "vat": 40553.03,
+   "incl_vat": 310906.61,
+   "lines": {
+    "off_peak_qty": 26936.0,
+    "off_peak": 45591.87,
+    "standard_qty": 39103.999,
+    "standard": 87256.66,
+    "peak_qty": 13112.0,
+    "peak": 44777.48,
+    "demand_qty": 331.058,
+    "demand": 48364.26,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2025-12-10",
+    "2026-01-05"
+   ],
+   "consumption_kl": 880.0,
+   "water_excl_vat": 27501.6,
+   "sanitation_excl_vat": 10589.6,
+   "vat": 5713.68
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 733328.71
+ },
+ {
+  "file": "Feb 26.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-02-27",
+  "statement_for": "2026-02",
+  "due_date": "2026-03-25",
+  "invoice_number": "2210755502-2026-02-27",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-01-01",
+    "2026-02-01"
+   ],
+   "consumption_kwh": 90407.998,
+   "consumption_kvarh": 393.242,
+   "tariff_type": "TOU",
+   "excl_vat": 307002.97,
+   "vat": 46050.44,
+   "incl_vat": 353053.41,
+   "lines": {
+    "off_peak_qty": 27527.999,
+    "off_peak": 46593.89,
+    "standard_qty": 47429.999,
+    "standard": 105835.3,
+    "peak_qty": 15450.0,
+    "peak": 52761.75,
+    "demand_qty": 393.242,
+    "demand": 57448.72,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2026-01-05",
+    "2026-02-04"
+   ],
+   "consumption_kl": 1515.0,
+   "water_excl_vat": 74401.65,
+   "sanitation_excl_vat": 28648.65,
+   "vat": 15457.55
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 850178.48
+ },
+ {
+  "file": "March 26.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-03-27",
+  "statement_for": "2026-03",
+  "due_date": "2026-04-25",
+  "invoice_number": "2210755502-2026-03-27",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-02-01",
+    "2026-03-01"
+   ],
+   "consumption_kwh": 99489.999,
+   "consumption_kvarh": 376.701,
+   "tariff_type": "TOU",
+   "excl_vat": 325148.54,
+   "vat": 48772.28,
+   "incl_vat": 373920.82,
+   "lines": {
+    "off_peak_qty": 30330.0,
+    "off_peak": 51336.56,
+    "standard_qty": 52183.999,
+    "standard": 116443.38,
+    "peak_qty": 16976.0,
+    "peak": 57973.04,
+    "demand_qty": 376.701,
+    "demand": 55032.25,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2026-02-04",
+    "2026-03-10"
+   ],
+   "consumption_kl": 1513.0,
+   "water_excl_vat": 74303.43,
+   "sanitation_excl_vat": 28610.83,
+   "vat": 15437.13
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 870889.43
+ },
+ {
+  "file": "April 26.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-04-29",
+  "statement_for": "2026-04",
+  "due_date": "2026-05-25",
+  "invoice_number": "2210755502-2026-04-29",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-03-01",
+    "2026-04-01"
+   ],
+   "consumption_kwh": 107949.998,
+   "consumption_kvarh": 376.085,
+   "tariff_type": "TOU",
+   "excl_vat": 344537.2,
+   "vat": 51680.57,
+   "incl_vat": 396217.77,
+   "lines": {
+    "off_peak_qty": 33339.999,
+    "off_peak": 56431.28,
+    "standard_qty": 55755.999,
+    "standard": 124413.94,
+    "peak_qty": 18854.0,
+    "peak": 64386.41,
+    "demand_qty": 376.085,
+    "demand": 54942.26,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2026-03-10",
+    "2026-04-09"
+   ],
+   "consumption_kl": 2043.0,
+   "water_excl_vat": 100331.73,
+   "sanitation_excl_vat": 38633.13,
+   "vat": 20844.73
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 934644.58
+ },
+ {
+  "file": "May 26.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-05-31",
+  "statement_for": "2026-05",
+  "due_date": "2026-06-25",
+  "invoice_number": "2210755502-2026-05-31",
+  "property_rates": {
+   "excl_vat": 369088.13,
+   "vat": 0.0,
+   "incl_vat": 369088.13
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-04-01",
+    "2026-05-01"
+   ],
+   "consumption_kwh": 75817.998,
+   "consumption_kvarh": 365.403,
+   "tariff_type": "TOU",
+   "excl_vat": 268216.16,
+   "vat": 40232.41,
+   "incl_vat": 308448.57,
+   "lines": {
+    "off_peak_qty": 24913.999,
+    "off_peak": 42169.43,
+    "standard_qty": 38471.999,
+    "standard": 85846.42,
+    "peak_qty": 12432.0,
+    "peak": 42455.28,
+    "demand_qty": 365.403,
+    "demand": 53381.72,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": [
+    "2026-04-09",
+    "2026-05-13"
+   ],
+   "consumption_kl": 1580.0,
+   "water_excl_vat": 77593.8,
+   "sanitation_excl_vat": 29877.8,
+   "vat": 16120.74
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 810658.13
+ },
+ {
+  "file": "wingfield june ekurhuleni.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-06-30",
+  "statement_for": "2026-06",
+  "due_date": "2026-07-25",
+  "invoice_number": "2210755502-2026-06-30",
+  "property_rates": {
+   "excl_vat": 369088.07,
+   "vat": 0.0,
+   "incl_vat": 369088.07
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-05-01",
+    "2026-06-01"
+   ],
+   "consumption_kwh": 96835.998,
+   "consumption_kvarh": 356.561,
+   "tariff_type": "TOU",
+   "excl_vat": 315803.0,
+   "vat": 47370.45,
+   "incl_vat": 363173.45,
+   "lines": {
+    "off_peak_qty": 29738.0,
+    "off_peak": 50334.54,
+    "standard_qty": 50797.999,
+    "standard": 113350.65,
+    "peak_qty": 16299.999,
+    "peak": 55664.5,
+    "demand_qty": 356.561,
+    "demand": 52090.0,
+    "service": 5207.09,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": null,
+   "consumption_kl": 1571.0,
+   "water_excl_vat": 77151.81,
+   "sanitation_excl_vat": 29707.61,
+   "vat": 16028.91
+  },
+  "refuse": {
+   "excl_vat": 8286.17,
+   "vat": 1242.92,
+   "incl_vat": 9529.09
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 864678.94
+ }
+]

@@ -348,6 +348,7 @@ function readingsCapturePage({ user, period, groups }) {
           <th class="px-4 py-1">Start reading</th><th class="px-4 py-1">End reading</th>
           <th class="px-4 py-1">Multiplier</th>
           <th class="px-4 py-1">kVA (demand)</th><th class="px-4 py-1">kVArh end</th>
+          <th class="px-4 py-1">Photo</th><th class="px-4 py-1"></th>
         </tr></thead>
         <tbody>
         ${g.meters.map(m => `<tr class="border-t">
@@ -358,19 +359,34 @@ function readingsCapturePage({ user, period, groups }) {
           <td class="px-4 py-1">${m.unitScale && m.unitScale !== 1 ? `<span class="badge bg-amber-100 text-amber-700">&times;${m.unitScale}</span>` : '<span class="text-slate-300">&mdash;</span>'}</td>
           <td class="px-4 py-1">${m.showDemand ? `<input name="kva_${m.meter_id}" type="number" step="0.01" class="border rounded px-2 py-1 w-24"/>` : '<span class="text-slate-300">&mdash;</span>'}</td>
           <td class="px-4 py-1">${m.showDemand ? `<input name="kvarh_end_${m.meter_id}" type="number" step="0.01" value="${m.priorEndKvarh ?? ''}" class="border rounded px-2 py-1 w-24"/>` : '<span class="text-slate-300">&mdash;</span>'}</td>
+          <td class="px-4 py-1">
+            ${m.photoPath ? `<a href="${esc(m.photoPath)}" target="_blank"><img src="${esc(m.photoPath)}" class="h-10 w-10 object-cover rounded border mb-1"/></a>` : ''}
+            <input type="file" name="photo_${m.meter_id}" accept="image/*" capture="environment" class="text-xs w-32"/>
+          </td>
+          <td class="px-4 py-1">${m.canDelete ? `<button type="submit" form="delete-${m.meter_id}" class="text-red-600 hover:underline text-xs" onclick="return confirm('Delete this reading${m.photoPath ? ' and its photo' : ''}? This also clears this tenant\\'s bill for this period so it can be regenerated cleanly.')">Delete</button>` : ''}</td>
         </tr>`).join('')}
         </tbody>
       </table>
     </div>`).join('');
 
+  // Each deletable row's "Delete" button submits its own tiny out-of-band form (form="delete-N"
+  // ties a button living inside the main capture <form> to a second, separate <form> elsewhere in
+  // the page) - keeps the delete action a real POST to its own route without nesting a <form>
+  // inside the main readings <form>, which HTML doesn't allow.
+  const deleteFormsHtml = groups.flatMap(g => g.meters)
+    .filter(m => m.canDelete)
+    .map(m => `<form id="delete-${m.meter_id}" method="post" action="/readings/${period.id}/delete/${m.meter_id}" class="hidden"></form>`)
+    .join('');
+
   const body = `
   <a href="/billing-periods" class="text-sm text-blue-600 hover:underline">&larr; Billing periods</a>
   <h1 class="text-2xl font-bold mt-2 mb-1">Capture readings &mdash; ${esc(period.label)}</h1>
-  <p class="text-sm text-slate-500 mb-4">Enter each meter's closing reading exactly as it appears on the meter dial. Start readings are pre-filled from the last recorded reading &mdash; double-check any meter that was replaced. Leave a row blank to skip that meter for now; a tenant's bill won't be (re)generated until every one of their meters has a reading for this period. Meters flagged with a <span class="badge bg-amber-100 text-amber-700">&times;N</span> multiplier read a fraction of true consumption off the dial (CT ratio) &mdash; enter the raw dial numbers as-is, the app applies the multiplier automatically.</p>
-  <form method="post" action="/readings/${period.id}">
+  <p class="text-sm text-slate-500 mb-4">Enter each meter's closing reading exactly as it appears on the meter dial. Start readings are pre-filled from the last recorded reading &mdash; double-check any meter that was replaced. Leave a row blank to skip that meter for now; a tenant's bill won't be (re)generated until every one of their meters has a reading for this period. Meters flagged with a <span class="badge bg-amber-100 text-amber-700">&times;N</span> multiplier read a fraction of true consumption off the dial (CT ratio) &mdash; enter the raw dial numbers as-is, the app applies the multiplier automatically. You can optionally attach a photo of the meter dial alongside each reading (on a phone, tapping the photo field opens the camera directly). Readings you've entered here yourself (not ones from an Excel import) can be deleted with the "Delete" link, which also clears that tenant's bill for this period so it can be regenerated cleanly &mdash; handy while testing.</p>
+  <form method="post" action="/readings/${period.id}" enctype="multipart/form-data">
     ${rowsHtml || '<div class="bg-white border rounded p-6 text-slate-400">No active meter assignments found.</div>'}
     <button class="bg-slate-900 text-white rounded px-6 py-2 font-medium mt-2">Save readings &amp; generate bills</button>
-  </form>`;
+  </form>
+  ${deleteFormsHtml}`;
   return layout({ title: `Capture readings - ${period.label}`, user, active: '/billing-periods', body });
 }
 
