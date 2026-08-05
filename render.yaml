@@ -5,6 +5,13 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: node --experimental-sqlite server.js
+    # Staying on the free plan for now (no persistent disk - Render doesn't offer disks below the
+    # Starter plan). This means data/ is still ephemeral: it resets on every deploy and on every
+    # free-tier spin-down/spin-up. See DEPLOY.md's "Notes on persistence" for the exact 3 lines to
+    # uncomment here (plan: starter + a disk: block) once ready to upgrade and go live for real -
+    # until then, anything typed into the live app beyond what the seed/import scripts cover should
+    # be treated as at-risk, and the import scripts are the safety net (see field-street/
+    # import_history.js for how the client's own manually-entered readings get folded back in).
     envVars:
       - key: SESSION_SECRET
         generateValue: true

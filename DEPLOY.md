@@ -28,16 +28,40 @@ Sign in with `admin` / `admin123` (see README for all 4 demo logins) — **chang
 first thing**, there's no edit-user screen yet so for now that means editing the `seedUsers()`
 list in `seed.js`, committing, and letting Render redeploy.
 
-## Notes on the free plan
+## Notes on persistence (read this if you're relying on the live site day to day)
 
-- Render's free web services **spin down after 15 minutes of no traffic** and take ~30–60
-  seconds to wake back up on the next visit. That's normal, not a bug.
-- Free plan storage is **ephemeral** — if Render restarts the container, both properties' data
-  resets back to the imported 13-month seed on next boot. For anything you actually rely on day to
-  day, upgrade to a paid instance with a persistent disk (a few dollars/month) - then the app
-  remembers new readings and bills you capture between restarts.
-- If you outgrow SQLite (e.g. once several people are using this at once), Render also offers a
-  free PostgreSQL instance you can switch to later — ask me and I'll wire it up.
+`render.yaml` is currently on `plan: free`, which means Render's filesystem - including the SQLite
+files under `data/` - is **ephemeral**: it resets on every deploy, *and* separately whenever a free
+service spins down from 15 minutes of inactivity and wakes back up. So anything typed into the live
+app (readings, edited water/sewer values, new billing slips) beyond what a seed/import script
+reproduces can vanish at any time, not just when I push an update. The seed/import scripts
+(`seed.js`, `import_history.js`, etc.) are the safety net in the meantime - whenever you tell me
+about data you've entered manually, I fold it back into one of those scripts so a filesystem reset
+regenerates it instead of losing it, but that only works for what you've told me about.
+
+**When you're ready to go live for real, switch to a persistent disk:**
+
+1. In `render.yaml`, change `plan: free` to `plan: starter`, and add this block at the same
+   indentation level as `plan:` (right before `envVars:`):
+   ```yaml
+   disk:
+     name: holmstone-data
+     mountPath: /opt/render/project/src/data
+     sizeGB: 1
+   ```
+2. Push to GitHub as usual.
+3. Render usually needs a manual nudge for plan/billing changes on an existing service - open the
+   service in the Render dashboard. If the Starter plan + disk aren't picked up automatically from
+   the Blueprint sync, go to **Settings → Instance Type** and switch to **Starter**, then
+   **Disks → Add Disk** with mount path `/opt/render/project/src/data` and size `1 GB`.
+4. Redeploy. From this point on, the `data/` folder survives deploys and spin-downs - only a full
+   disk delete (not something you'd do by accident) wipes it.
+
+Cost: Starter is ~$7/month, the 1GB disk is ~$0.25/month. Just ask and I'll make this change for
+you when you're ready - it's a 5-minute edit.
+
+If you outgrow SQLite (e.g. once several people are using this at once), Render also offers a
+free PostgreSQL instance you can switch to later — ask me and I'll wire it up.
 
 ## If you'd rather I drive this with you live
 

@@ -498,12 +498,14 @@ function buildMunicipalStatementPdf(data) {
   return doc.build();
 }
 
-// Builds the PDF for one 8 Field Street billing slip (see server.js's /site-billing-pdf/:id and
-// field-street/calc_field_street.js for how `data.calc` is computed). Same visual language as
-// buildBillingSlipPdf/buildMunicipalStatementPdf, but its own 6-column table (Entry/Rate/Unit/
-// Reading/Cost/Comment) since this is the one billing document in the app where the reading
-// itself, the rate, and a free-text comment (the municipality's max-demand timestamp) all need
-// their own column at once - none of the existing table-drawing helpers have room for all four.
+// Builds the PDF for one flat_site billing slip - 8 Field Street, Bob Martin, Loper Road - Sandvic,
+// AutoZone, Cranbrook Flavours, or any future site on this billing model (see server.js's
+// /site-billing-pdf/:id and calc_flat_site.js for how `data.calc` is computed - fully data-driven
+// off whatever line items that site's tariff defines, nothing here is site-specific). Same visual
+// language as buildBillingSlipPdf/buildMunicipalStatementPdf, but its own 6-column table (Entry/
+// Rate/Unit/Reading/Cost/Comment) since this is the one billing document in the app where the
+// reading itself, the rate, and a free-text comment (the max-demand timestamp some rows carry) all
+// need their own column at once - none of the existing table-drawing helpers have room for all four.
 function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
   // The Reading column shows the meter reading after the site-vs-municipal-meter correction
   // factor has already been applied (it.adjustedReading) - i.e. the "actual" consumption the
@@ -549,7 +551,7 @@ function buildSiteBillingSlipPdf(data) {
 
   doc.text(left, y, 'Period:', { bold: true }); doc.text(left + 90, y, data.slip.label);
   doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, `${data.slip.start_date} to ${data.slip.end_date}`); y -= 15;
-  doc.text(left, y, 'Tariff:', { bold: true }); doc.text(left + 90, y, 'Ekurhuleni_Tariff_E_TOU_8 Field Street');
+  doc.text(left, y, 'Tariff:', { bold: true }); doc.text(left + 90, y, (data.tariff && data.tariff.tariff_name) || '-');
   doc.text(right - 180, y, 'Status:', { bold: true }); doc.text(right - 100, y, data.slip.status); y -= 20;
 
   doc.line(left, y, right, y); y -= 18;

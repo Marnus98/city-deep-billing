@@ -14,7 +14,7 @@ const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
 const properties = require('./properties');
 const { seedUsers } = require('./shared_seed_users');
-const calcFieldStreet = require('./field-street/calc_field_street');
+const calcFlatSite = require('./calc_flat_site');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -71,6 +71,15 @@ require('./wingfield/seed_wingfield_municipal').run('wingfield.db');
 // 8 Field Street's historical electricity months (Jul 2025 - Jun 2026) - own de-dup key (label),
 // always safe to re-run; see field-street/import_history.js for why it never touches water/sewer.
 require('./field-street/import_history').run('field-street.db');
+// The 4 "Other Sites" flat_site properties - each script covers that site's full known history
+// (own de-dup key: slip label) and also seeds that site's users on first run, so registering them
+// here (in addition to being each property's seedFile above) is a safety net matching 8 Field
+// Street's pattern: guards against a partially-populated db (not technically "empty") missing
+// some historical months after an ephemeral-disk reset.
+require('./bob-martin/import_history').run('bob-martin.db');
+require('./loper-road/import_history').run('loper-road.db');
+require('./autozone/import_history').run('autozone.db');
+require('./cranbrook-flavours/import_history').run('cranbrook-flavours.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {
@@ -471,60 +480,94 @@ route('POST', '/readings/:periodId/delete/:meterId', async (req, res, params) =>
   redirect(res, `/readings/${period.id}`);
 });
 
-// ---------------- flat_site billing (8 Field Street) ----------------
-// See properties.js's billingModel and db.js's site_tariffs/site_billing_slips for why this is a
-// separate small set of routes rather than reusing the tenant/billing_period machinery above.
+// ---------------- flat_site billing (8 Field Street, Bob Martin, Loper Road - Sandvic, AutoZone,
+// Cranbrook Flavours) ----------------
+// See properties.js's billingModel and db.js's site_tariffs/site_tariff_items/site_billing_slips/
+// site_slip_readings for why this is a separate small set of routes rather than reusing the
+// tenant/billing_period machinery above. Fully data-driven off whatever line items the site's
+// current tariff defines (see calc_flat_site.js) - no site-specific code lives here anymore.
 
-const SITE_TARIFF_FIELDS = [
-  'fixed_charge_rate', 'network_access_rate', 'network_demand_rate',
-  'peak_high_rate', 'peak_low_rate', 'standard_high_rate', 'standard_low_rate',
-  'offpeak_high_rate', 'offpeak_low_rate', 'water_rate', 'sewer_rate',
-  'kva_factor', 'peak_factor', 'standard_factor', 'offpeak_factor',
-];
-const SITE_READING_FIELDS = [
-  'network_access_kva', 'network_demand_kva', 'peak_high_kwh', 'peak_low_kwh',
-  'standard_high_kwh', 'standard_low_kwh', 'offpeak_high_kwh', 'offpeak_low_kwh',
-  'water_kl', 'sewer_kl',
-];
+function getTariffItems(tariffId) {
+  return all('SELECT * FROM site_tariff_items WHERE tariff_id=? ORDER BY sort_order', [tariffId]);
+}
+function getSlipReadings(slipId) {
+  const rows = all('SELECT * FROM site_slip_readings WHERE slip_id=?', [slipId]);
+  const map = {};
+  for (const r of rows) map[r.item_key] = { reading: r.reading, comment: r.comment };
+  return map;
+}
+const FACTOR_COLS = ['kva_factor', 'peak_factor', 'standard_factor', 'offpeak_factor'];
 
-// Reuses an existing site_tariffs row if one already has these exact rates/factors (e.g. saving a
-// slip without touching the tariff section), otherwise inserts a new version - this is what makes
-// "the rate ... should reflect the tariffs as in the image for each new month" work: each month's
-// slip just carries whichever tariff row matches what was typed in, new or old.
-function findOrCreateSiteTariff(fields, effectiveFrom) {
-  const existing = all('SELECT * FROM site_tariffs ORDER BY id DESC');
-  const match = existing.find((t) => SITE_TARIFF_FIELDS.every((c) => Math.abs((t[c] || 0) - (Number(fields[c]) || 0)) < 1e-9));
-  if (match) return match.id;
-  const cols = SITE_TARIFF_FIELDS.join(', ');
-  const placeholders = SITE_TARIFF_FIELDS.map(() => '?').join(',');
-  run(`INSERT INTO site_tariffs (effective_from, ${cols}) VALUES (?, ${placeholders})`,
-    [effectiveFrom, ...SITE_TARIFF_FIELDS.map((c) => Number(fields[c]) || 0)]);
-  return get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
+// Reuses an existing site_tariffs row if one already has these exact rates/factors for this site's
+// exact item set (e.g. saving a slip without touching the tariff section), otherwise inserts a new
+// version - this is what makes "the rate should reflect the tariff for each new month" work: each
+// month's slip just carries whichever tariff row matches what was typed in, new or old. `template`
+// is the ordered site_tariff_items list this site is currently on (label/unit/section/factor_type/
+// fixed_reading/has_comment never change between versions of the same site - only rate/factor
+// values do), `body` is the submitted form fields (rate__<key>, kva_factor, etc).
+function findOrCreateSiteTariff(templateTariff, template, body, effectiveFrom) {
+  const newRates = {};
+  for (const it of template) newRates[it.item_key] = Number(body[`rate__${it.item_key}`]) || 0;
+  const newFactors = {};
+  for (const c of FACTOR_COLS) newFactors[c] = Number(body[c]) || 1;
+
+  const existingTariffs = all('SELECT * FROM site_tariffs ORDER BY id DESC');
+  for (const t of existingTariffs) {
+    if (!FACTOR_COLS.every((c) => Math.abs((t[c] || 1) - newFactors[c]) < 1e-9)) continue;
+    const items = getTariffItems(t.id);
+    if (items.length !== template.length) continue;
+    const ratesMatch = items.every((it) => Math.abs((it.rate || 0) - (newRates[it.item_key] ?? NaN)) < 1e-9);
+    if (ratesMatch) return t.id;
+  }
+
+  // tariff_name is a site-level constant (e.g. "City_Power_Industrial_LV_TOU_Incl_Surcharge") -
+  // there's no form field for it, it just carries forward from whichever tariff this slip started from.
+  run(`INSERT INTO site_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,?,?,?,?)`,
+    [templateTariff.tariff_name || null, effectiveFrom, newFactors.kva_factor, newFactors.peak_factor, newFactors.standard_factor, newFactors.offpeak_factor]);
+  const tariffId = get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
+  template.forEach((it, i) => {
+    run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [tariffId, i, it.section, it.item_key, it.label, it.unit, newRates[it.item_key], it.factor_type, it.fixed_reading, it.has_comment ? 1 : 0]);
+  });
+  return tariffId;
 }
 
 // Trailing-12-month view of this site's own cost + consumption, for the PDF's trend charts (see
 // drawTripleTrendCharts/drawConsumptionTrendCharts in pdf.js, reused as-is from the tenant billing
 // slip - Sewer is passed in the `sanitation` slot since those charts were built around
-// Electricity/Water/Sanitation and the shapes line up one-for-one).
+// Electricity/Water/Sanitation and the shapes line up one-for-one). elecKwh sums every row whose
+// factor_type is peak/standard/offpeak - true across every tariff shape seen so far, and correctly
+// excludes AutoZone's Network Surcharge row (a derived R/kWh figure, not an independent reading).
 function monthlyTrendForSite(asOfStartDate) {
-  const slips = all(`SELECT s.*, t.* FROM site_billing_slips s JOIN site_tariffs t ON t.id=s.tariff_id
+  const slips = all(`SELECT s.* FROM site_billing_slips s
     WHERE s.start_date<=? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate]);
-  return slips.reverse().map((row) => {
-    const { elecTotal, waterTotal, elecItems } = calcFieldStreet.computeSlip(row, row);
-    const elecKwh = elecItems.filter((i) => i.key !== 'fixed_charge' && i.key !== 'network_access' && i.key !== 'network_demand')
+  return slips.reverse().map((slip) => {
+    const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
+    const items = getTariffItems(slip.tariff_id);
+    const readings = getSlipReadings(slip.id);
+    const { elecTotal, elecItems, waterItems } = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
+    const elecKwh = elecItems.filter((i) => ['peak', 'standard', 'offpeak'].includes(i.factor_type))
       .reduce((s, i) => s + i.adjustedReading, 0);
+    const waterItem = waterItems.find((i) => i.key === 'water');
+    const sewerItem = waterItems.find((i) => i.key === 'sewer');
     return {
-      label: row.label,
-      elec: elecTotal, water: row.water_kl * row.water_rate, sanitation: row.sewer_kl * row.sewer_rate,
-      elecKwh, waterM3: row.water_kl,
+      label: slip.label,
+      elec: elecTotal, water: waterItem ? waterItem.cost : 0, sanitation: sewerItem ? sewerItem.cost : 0,
+      elecKwh, waterM3: waterItem ? waterItem.reading : 0,
     };
   });
 }
 
 route('GET', '/site-billing', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
-  const slips = all(`SELECT s.*, t.* , s.id as id FROM site_billing_slips s JOIN site_tariffs t ON t.id=s.tariff_id ORDER BY s.start_date DESC`);
-  const rows = slips.map((row) => ({ row, calc: calcFieldStreet.computeSlip(row, row) }));
+  const slips = all('SELECT * FROM site_billing_slips ORDER BY start_date DESC');
+  const rows = slips.map((slip) => {
+    const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
+    const items = getTariffItems(slip.tariff_id);
+    const readings = getSlipReadings(slip.id);
+    return { row: slip, calc: calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor) };
+  });
   send(res, 200, views.siteBillingListPage({ user, rows }));
 });
 
@@ -532,8 +575,10 @@ route('GET', '/site-billing/new', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
   if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
   const latestTariff = get('SELECT * FROM site_tariffs ORDER BY id DESC LIMIT 1');
+  if (!latestTariff) return send(res, 400, 'This property has no tariff yet - it needs an initial seed/import script before slips can be added.');
   const latestSlip = get('SELECT * FROM site_billing_slips ORDER BY start_date DESC LIMIT 1');
-  send(res, 200, views.siteBillingFormPage({ user, tariff: latestTariff, slip: null, latestSlip }));
+  const items = getTariffItems(latestTariff.id);
+  send(res, 200, views.siteBillingFormPage({ user, tariff: latestTariff, items, readings: {}, slip: null, latestSlip }));
 });
 
 route('GET', '/site-billing/:id/edit', async (req, res, params) => {
@@ -542,7 +587,9 @@ route('GET', '/site-billing/:id/edit', async (req, res, params) => {
   const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
   if (!slip) return send(res, 404, 'Not found');
   const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
-  send(res, 200, views.siteBillingFormPage({ user, tariff, slip, latestSlip: null }));
+  const items = getTariffItems(slip.tariff_id);
+  const readings = getSlipReadings(slip.id);
+  send(res, 200, views.siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip: null }));
 });
 
 async function saveSiteBillingSlip(req, res, existingId) {
@@ -551,37 +598,45 @@ async function saveSiteBillingSlip(req, res, existingId) {
   const body = await readBody(req);
   const label = (body.label || '').trim();
   const startDate = body.start_date, endDate = body.end_date;
+  // Template item list: the tariff this slip is already on (editing), or the site's latest tariff
+  // (new slip) - either way, whichever tariff a sibling slip on this same property most recently
+  // used, since that's the only place the site's line-item shape is known.
+  const templateTariffId = existingId
+    ? get('SELECT tariff_id FROM site_billing_slips WHERE id=?', [existingId]).tariff_id
+    : get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
+  const templateTariff = get('SELECT * FROM site_tariffs WHERE id=?', [templateTariffId]);
+  const template = getTariffItems(templateTariffId);
   if (!label || !startDate || !endDate) {
-    const tariff = { ...body };
-    return send(res, 400, views.siteBillingFormPage({ user, tariff, slip: { ...body, id: existingId }, latestSlip: null, error: 'Label, start date and end date are all required.' }));
+    return send(res, 400, views.siteBillingFormPage({
+      user, tariff: { ...body }, items: template, readings: {}, slip: { ...body, id: existingId }, latestSlip: null,
+      error: 'Label, start date and end date are all required.',
+    }));
   }
-  const tariffId = findOrCreateSiteTariff(body, startDate);
+  const tariffId = findOrCreateSiteTariff(templateTariff, template, body, startDate);
   // Checkboxes only appear in the POST body at all when checked ("apply_correction_factor=1"); an
   // unchecked box simply isn't sent, so its absence here means "off", not "unset".
   const applyCorrectionFactor = body.apply_correction_factor ? 1 : 0;
-  const fields = ['label', 'start_date', 'end_date', 'tariff_id',
-    'network_access_kva', 'network_access_comment', 'network_demand_kva', 'network_demand_comment',
-    'peak_high_kwh', 'peak_low_kwh', 'standard_high_kwh', 'standard_low_kwh',
-    'offpeak_high_kwh', 'offpeak_low_kwh', 'water_kl', 'sewer_kl', 'apply_correction_factor', 'entered_by'];
-  const values = [
-    label, startDate, endDate, tariffId,
-    Number(body.network_access_kva) || 0, body.network_access_comment || null,
-    Number(body.network_demand_kva) || 0, body.network_demand_comment || null,
-    Number(body.peak_high_kwh) || 0, Number(body.peak_low_kwh) || 0,
-    Number(body.standard_high_kwh) || 0, Number(body.standard_low_kwh) || 0,
-    Number(body.offpeak_high_kwh) || 0, Number(body.offpeak_low_kwh) || 0,
-    Number(body.water_kl) || 0, Number(body.sewer_kl) || 0, applyCorrectionFactor, user.userId,
-  ];
+
+  let slipId = existingId;
   if (existingId) {
-    run(`UPDATE site_billing_slips SET ${fields.map((f) => `${f}=?`).join(', ')} WHERE id=?`, [...values, existingId]);
+    run('UPDATE site_billing_slips SET label=?, start_date=?, end_date=?, tariff_id=?, apply_correction_factor=? WHERE id=?',
+      [label, startDate, endDate, tariffId, applyCorrectionFactor, existingId]);
     audit(user.userId, 'update', 'site_billing_slip', existingId, null, null, label, null);
-    redirect(res, `/site-billing/${existingId}`);
   } else {
-    run(`INSERT INTO site_billing_slips (${fields.join(', ')}) VALUES (${fields.map(() => '?').join(',')})`, values);
-    const created = get('SELECT id FROM site_billing_slips WHERE label=?', [label]);
-    audit(user.userId, 'create', 'site_billing_slip', created.id, null, null, label, null);
-    redirect(res, `/site-billing/${created.id}`);
+    run('INSERT INTO site_billing_slips (label, start_date, end_date, tariff_id, apply_correction_factor, entered_by) VALUES (?,?,?,?,?,?)',
+      [label, startDate, endDate, tariffId, applyCorrectionFactor, user.userId]);
+    slipId = get('SELECT id FROM site_billing_slips WHERE label=?', [label]).id;
+    audit(user.userId, 'create', 'site_billing_slip', slipId, null, null, label, null);
   }
+  for (const it of template) {
+    if (it.fixed_reading != null) continue; // nothing to save - always the same fixed value
+    const reading = Number(body[`reading__${it.item_key}`]) || 0;
+    const comment = it.has_comment ? (body[`comment__${it.item_key}`] || null) : null;
+    run(`INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,?)
+      ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading, comment=excluded.comment`,
+      [slipId, it.item_key, reading, comment]);
+  }
+  redirect(res, `/site-billing/${slipId}`);
 }
 
 route('POST', '/site-billing/new', async (req, res) => saveSiteBillingSlip(req, res, null));
@@ -592,8 +647,10 @@ route('GET', '/site-billing/:id', async (req, res, params) => {
   const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
   if (!slip) return send(res, 404, 'Not found');
   const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
-  const calc = calcFieldStreet.computeSlip(slip, tariff);
-  send(res, 200, views.siteBillingDetailPage({ user, slip, tariff, calc }));
+  const items = getTariffItems(slip.tariff_id);
+  const readings = getSlipReadings(slip.id);
+  const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
+  send(res, 200, views.siteBillingDetailPage({ user, slip, tariff, calc, propertyName: currentPropertyName(user) }));
 });
 
 route('POST', '/site-billing/:id/delete', async (req, res, params) => {
@@ -601,6 +658,7 @@ route('POST', '/site-billing/:id/delete', async (req, res, params) => {
   if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
   const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
   if (slip) {
+    run('DELETE FROM site_slip_readings WHERE slip_id=?', [params.id]);
     run('DELETE FROM site_billing_slips WHERE id=?', [params.id]);
     audit(user.userId, 'delete', 'site_billing_slip', slip.id, null, null, null, `Deleted site billing slip ${slip.label}`);
   }
@@ -612,14 +670,18 @@ route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
   const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
   if (!slip) return send(res, 404, 'Not found');
   const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
-  const calc = calcFieldStreet.computeSlip(slip, tariff);
+  const items = getTariffItems(slip.tariff_id);
+  const readings = getSlipReadings(slip.id);
+  const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
   const monthlyTrend = monthlyTrendForSite(slip.start_date);
+  const propertyName = currentPropertyName(user);
   const pdfBuf = buildSiteBillingSlipPdf({
-    propertyName: currentPropertyName(user), slip, tariff, calc, monthlyTrend,
+    propertyName, slip, tariff, calc, monthlyTrend,
     generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
   });
   audit(user.userId, 'pdf_download', 'site_billing_slip', slip.id, null, null, null, slip.label);
-  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="8-field-street-${slip.label}.pdf"` });
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-${slip.label}.pdf"` });
   res.end(pdfBuf);
 });
 

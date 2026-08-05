@@ -845,42 +845,38 @@ function siteBillingListPage({ user, rows }) {
   return layout({ title: 'Billing Slips', user, active: '/site-billing', body });
 }
 
-function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
+function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, error }) {
   const isEdit = !!(slip && slip.id);
   const t = tariff || {};
   const s = slip || {};
+  const r = readings || {};
   const startDateDefault = s.start_date || (latestSlip ? latestSlip.end_date : '');
   const applyFactorOff = s.apply_correction_factor === 0 || s.apply_correction_factor === false;
-  const rate = (name, value, step = '0.01') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
+  const rateInput = (name, value, step = '0.01') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
 
-  const elecRows = [
-    ['Fixed Charge', 'fixed_charge_rate', t.fixed_charge_rate, 'R/c', null, '1 (fixed)', null],
-    ['Network Access', 'network_access_rate', t.network_access_rate, 'R/kVA', 'network_access_kva', s.network_access_kva, 'network_access_comment'],
-    ['Network Demand', 'network_demand_rate', t.network_demand_rate, 'R/kVA', 'network_demand_kva', s.network_demand_kva, 'network_demand_comment'],
-    ['Peak Energy - High Demand', 'peak_high_rate', t.peak_high_rate, 'R/kWh', 'peak_high_kwh', s.peak_high_kwh, null],
-    ['Peak Energy - Low Demand', 'peak_low_rate', t.peak_low_rate, 'R/kWh', 'peak_low_kwh', s.peak_low_kwh, null],
-    ['Standard Energy - High Demand', 'standard_high_rate', t.standard_high_rate, 'R/kWh', 'standard_high_kwh', s.standard_high_kwh, null],
-    ['Standard Energy - Low Demand', 'standard_low_rate', t.standard_low_rate, 'R/kWh', 'standard_low_kwh', s.standard_low_kwh, null],
-    ['Off-Peak Energy - High Demand', 'offpeak_high_rate', t.offpeak_high_rate, 'R/kWh', 'offpeak_high_kwh', s.offpeak_high_kwh, null],
-    ['Off-Peak Energy - Low Demand', 'offpeak_low_rate', t.offpeak_low_rate, 'R/kWh', 'offpeak_low_kwh', s.offpeak_low_kwh, null],
-  ];
-  const waterRows = [
-    ['Water Consumption', 'water_rate', t.water_rate, 'R/kL', 'water_kl', s.water_kl, null],
-    ['Sewer', 'sewer_rate', t.sewer_rate, 'R/kL', 'sewer_kl', s.sewer_kl, null],
-  ];
-  const rowHtml = ([label, rateName, rateVal, unit, readingName, readingVal, commentName]) => `
+  // items (site_tariff_items rows, already sort_order'd) IS the form's line-item list, whatever
+  // shape this site's tariff happens to be on - nothing here is hardcoded to any one site anymore.
+  const rowHtml = (it) => {
+    const reading = r[it.item_key] ? r[it.item_key].reading : (isEdit ? 0 : null);
+    const comment = r[it.item_key] ? r[it.item_key].comment : '';
+    return `
     <tr class="border-t">
-      <td class="px-3 py-1.5 text-sm">${esc(label)}</td>
-      <td class="px-3 py-1.5 w-28">${rate(rateName, rateVal)}</td>
-      <td class="px-3 py-1.5 text-sm text-slate-500">${esc(unit)}</td>
-      <td class="px-3 py-1.5 w-32">${readingName ? `<input name="${readingName}" type="number" step="0.01" value="${readingVal != null ? esc(readingVal) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>` : `<span class="text-slate-400 text-sm">${esc(readingVal)}</span>`}</td>
-      <td class="px-3 py-1.5 w-44">${commentName ? `<input name="${commentName}" placeholder="e.g. 2026/07/15 22:00" value="${esc(s[commentName] || '')}" class="w-full border rounded px-2 py-1.5 text-sm"/>` : ''}</td>
+      <td class="px-3 py-1.5 text-sm">${esc(it.label)}</td>
+      <td class="px-3 py-1.5 w-28">${rateInput(`rate__${it.item_key}`, it.rate)}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${esc(it.unit)}</td>
+      <td class="px-3 py-1.5 w-32">${it.fixed_reading != null
+        ? `<span class="text-slate-400 text-sm">${esc(it.fixed_reading)} (fixed)</span>`
+        : `<input name="reading__${it.item_key}" type="number" step="0.01" value="${reading != null ? esc(reading) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>`}</td>
+      <td class="px-3 py-1.5 w-44">${it.has_comment ? `<input name="comment__${it.item_key}" placeholder="e.g. 2026/07/15 22:00" value="${esc(comment || '')}" class="w-full border rounded px-2 py-1.5 text-sm"/>` : ''}</td>
     </tr>`;
+  };
+  const elecItems = (items || []).filter((it) => it.section !== 'water');
+  const waterItems = (items || []).filter((it) => it.section === 'water');
 
   const body = `
   <a href="/site-billing" class="text-sm text-blue-600 hover:underline">&larr; Billing Slips</a>
   <h1 class="text-2xl font-bold mt-2 mb-1">${isEdit ? `Edit billing slip &mdash; ${esc(s.label)}` : 'New billing slip'}</h1>
-  <p class="text-sm text-slate-500 mb-4">Reading is what was physically read off 8 Field Street's own meter. Cost is calculated automatically - kVA/Peak/Standard/Off-Peak readings are grossed up by this tariff's correction factor first (our meters read lower than the municipality's), then multiplied by the rate. Rates and factors carry over from the last slip by default; only change them for a month where the tariff actually changed - a new tariff version is only created when a rate/factor here differs from every version already on file, so unrelated months keep sharing the one they matched.</p>
+  <p class="text-sm text-slate-500 mb-4">Reading is what was physically read off the site's own meter. Cost is calculated automatically - readings with a correction factor are grossed up first (see below), then multiplied by the rate. Rates and factors carry over from the last slip by default; only change them for a month where the tariff actually changed - a new tariff version is only created when a rate/factor here differs from every version already on file, so unrelated months keep sharing the one they matched.</p>
   ${error ? `<div class="bg-red-50 text-red-700 text-sm rounded p-2 mb-4">${esc(error)}</div>` : ''}
   <form method="post" action="${isEdit ? `/site-billing/${s.id}/edit` : '/site-billing/new'}">
     <div class="bg-white rounded-lg border p-4 mb-4">
@@ -896,16 +892,17 @@ function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
     </div>
 
     <div class="bg-white rounded-lg border mb-4 overflow-hidden">
-      <div class="px-4 py-2 border-b font-semibold">Electrical (Ekurhuleni_Tariff_E_TOU_8 Field Street)</div>
+      <div class="px-4 py-2 border-b font-semibold">Electrical</div>
       <table class="w-full">
         <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
           <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5">Rate</th><th class="px-3 py-1.5">Unit</th>
           <th class="px-3 py-1.5">Reading</th><th class="px-3 py-1.5">Comment</th>
         </tr></thead>
-        <tbody>${elecRows.map(rowHtml).join('')}</tbody>
+        <tbody>${elecItems.map(rowHtml).join('')}</tbody>
       </table>
     </div>
 
+    ${waterItems.length ? `
     <div class="bg-white rounded-lg border mb-4 overflow-hidden">
       <div class="px-4 py-2 border-b font-semibold bg-green-50">Water &amp; Sanitation</div>
       <table class="w-full">
@@ -913,9 +910,9 @@ function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
           <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5">Rate</th><th class="px-3 py-1.5">Unit</th>
           <th class="px-3 py-1.5">Reading</th><th class="px-3 py-1.5"></th>
         </tr></thead>
-        <tbody>${waterRows.map(rowHtml).join('')}</tbody>
+        <tbody>${waterItems.map(rowHtml).join('')}</tbody>
       </table>
-    </div>
+    </div>` : ''}
 
     <details class="bg-white rounded-lg border p-4 mb-4">
       <summary class="font-semibold cursor-pointer">Correction factors (advanced - only touch if the meters are recalibrated)</summary>
@@ -925,10 +922,10 @@ function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
       </label>
       <p class="text-xs text-slate-500 mt-1 mb-3">On by default - our meters read lower than the municipality's. Only switch off for a month where the site meter has been recalibrated, or where the reading entered is already the municipality's own figure (e.g. a historical statement).</p>
       <div class="grid grid-cols-4 gap-3">
-        <div><label class="text-xs text-slate-500">kVA factor</label>${rate('kva_factor', t.kva_factor ?? 1, '0.000000001')}</div>
-        <div><label class="text-xs text-slate-500">Peak factor</label>${rate('peak_factor', t.peak_factor ?? 1, '0.000000001')}</div>
-        <div><label class="text-xs text-slate-500">Standard factor</label>${rate('standard_factor', t.standard_factor ?? 1, '0.000000001')}</div>
-        <div><label class="text-xs text-slate-500">Off-Peak factor</label>${rate('offpeak_factor', t.offpeak_factor ?? 1, '0.000000001')}</div>
+        <div><label class="text-xs text-slate-500">kVA factor</label>${rateInput('kva_factor', t.kva_factor ?? 1, '0.000000001')}</div>
+        <div><label class="text-xs text-slate-500">Peak factor</label>${rateInput('peak_factor', t.peak_factor ?? 1, '0.000000001')}</div>
+        <div><label class="text-xs text-slate-500">Standard factor</label>${rateInput('standard_factor', t.standard_factor ?? 1, '0.000000001')}</div>
+        <div><label class="text-xs text-slate-500">Off-Peak factor</label>${rateInput('offpeak_factor', t.offpeak_factor ?? 1, '0.000000001')}</div>
       </div>
     </details>
 
@@ -962,10 +959,10 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
       </form>
     </div>
   </div>
-  <p class="text-sm text-slate-500 mb-4">Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}.${slip.apply_correction_factor === 0 ? ' <span class="text-amber-600">Correction factor not applied to this month.</span>' : ''}</p>
+  <p class="text-sm text-slate-500 mb-4">${tariff && tariff.tariff_name ? `${esc(tariff.tariff_name)} &middot; ` : ''}Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}.${slip.apply_correction_factor === 0 ? ' <span class="text-amber-600">Correction factor not applied to this month.</span>' : ''}</p>
 
   <div class="bg-white rounded-lg border mb-4 overflow-hidden">
-    <div class="px-4 py-2 border-b font-semibold">Electrical (Ekurhuleni_Tariff_E_TOU_8 Field Street)</div>
+    <div class="px-4 py-2 border-b font-semibold">Electrical</div>
     <table class="w-full">
       <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
         <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Unit</th>
@@ -976,6 +973,7 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
     </table>
   </div>
 
+  ${calc.waterItems.length ? `
   <div class="bg-white rounded-lg border mb-4 overflow-hidden">
     <div class="px-4 py-2 border-b font-semibold bg-green-50">Water &amp; Sanitation</div>
     <table class="w-full">
@@ -986,7 +984,7 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
       <tbody>${calc.waterItems.map((item) => lineRow(item)).join('')}</tbody>
       <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="4">Total (Ex VAT)</td><td class="px-3 py-2 text-right">${money(calc.waterTotal)}</td><td></td></tr></tfoot>
     </table>
-  </div>
+  </div>` : ''}
 
   <div class="bg-white rounded-lg border p-4 max-w-sm ml-auto">
     <div class="flex justify-between text-sm py-1"><span>Sub Total (Excl VAT)</span><span>${money(calc.subtotal)}</span></div>

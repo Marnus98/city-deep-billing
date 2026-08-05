@@ -45,4 +45,32 @@ module.exports = [
     seedFile: './field-street/seed',
     billingModel: 'flat_site',
   },
+  {
+    slug: 'bob-martin',
+    name: 'Bob Martin',
+    dbFile: 'bob-martin.db',
+    seedFile: './bob-martin/import_history',
+    billingModel: 'flat_site',
+  },
+  {
+    slug: 'loper-road',
+    name: 'Loper Road - Sandvic',
+    dbFile: 'loper-road.db',
+    seedFile: './loper-road/import_history',
+    billingModel: 'flat_site',
+  },
+  {
+    slug: 'autozone',
+    name: 'AutoZone',
+    dbFile: 'autozone.db',
+    seedFile: './autozone/import_history',
+    billingModel: 'flat_site',
+  },
+  {
+    slug: 'cranbrook-flavours',
+    name: 'Cranbrook Flavours',
+    dbFile: 'cranbrook-flavours.db',
+    seedFile: './cranbrook-flavours/import_history',
+    billingModel: 'flat_site',
+  },
 ];

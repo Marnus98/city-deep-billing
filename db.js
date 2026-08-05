@@ -256,6 +256,9 @@ function migrate(db) {
   -- the values confirmed for 8 Field Street; editable per version in case they're ever recalibrated.
   CREATE TABLE IF NOT EXISTS site_tariffs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tariff_name TEXT, -- short display label, e.g. "Ekurhuleni_Tariff_E_TOU_8 Field Street" - shown
+      -- on the slip/PDF header. Was hardcoded per-property before a second tariff shape existed;
+      -- now every flat_site property can show its own tariff's real name.
     effective_from TEXT NOT NULL,
     effective_to TEXT,
     fixed_charge_rate REAL NOT NULL DEFAULT 0,
@@ -301,6 +304,53 @@ function migrate(db) {
     entered_by INTEGER REFERENCES users(id),
     created_at TEXT DEFAULT (datetime('now'))
   );
+  -- NOTE: site_tariffs' fixed_charge_rate...sewer_rate columns above and site_billing_slips'
+  -- network_access_kva...sewer_kl columns above are legacy - they were the whole schema when 8
+  -- Field Street was the only flat_site property (one hardcoded shape: Fixed Charge/Network
+  -- Access/Network Demand/Peak/Standard/Off-Peak x High/Low/Water/Sewer). Once a second site
+  -- turned up on a *different* tariff shape (different line items entirely - see
+  -- flat_site_tariff_shapes.js), those fixed columns stopped being able to describe every site, so
+  -- rates/readings moved to the two generic tables below instead. The old columns are kept
+  -- (harmless, DEFAULT 0/NULL, never written by new code) rather than dropped, both because
+  -- node:sqlite's SQLite build makes DROP COLUMN riskier than it's worth here, and so migrate()
+  -- below can still read them once, to carry forward whatever the client already typed into an
+  -- already-deployed 8 Field Street instance before this migration ships.
+
+  -- site_tariff_items: one row per line item *per tariff version* - this is what actually varies
+  -- between tariff shapes (a City Power site has "Excess Reactive"/"Network Surcharge" rows that an
+  -- Ekurhuleni site doesn't, and even two Ekurhuleni tariffs order/name their rows differently).
+  -- item_key is stable across tariff versions of the *same site* (e.g. always 'peak_high') so a
+  -- slip's readings (site_slip_readings, keyed by item_key) keep lining up correctly even after a
+  -- rate change creates a new site_tariffs row. factor_type says which of the tariff's 4 correction
+  -- factors (if any) grosses up this row's reading before the rate is applied - see
+  -- calc_flat_site.js. section splits the slip's PDF/UI into two tables (electricity vs water),
+  -- matching every reference statement seen so far.
+  CREATE TABLE IF NOT EXISTS site_tariff_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tariff_id INTEGER NOT NULL REFERENCES site_tariffs(id),
+    sort_order INTEGER NOT NULL,
+    section TEXT NOT NULL DEFAULT 'electricity' CHECK(section IN ('electricity','water')),
+    item_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    rate REAL NOT NULL DEFAULT 0,
+    factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak') OR factor_type IS NULL),
+    fixed_reading REAL, -- non-NULL for a flat per-slip charge (e.g. 1) that's never typed in
+    has_comment INTEGER NOT NULL DEFAULT 0
+  );
+
+  -- site_slip_readings: one row per line item *per slip* - the actual meter reading (or fixed-row
+  -- placeholder) a slip carries for one of its tariff's item_keys, as read off the site's own
+  -- meter (pre-factor). One UNIQUE(slip_id, item_key) row per line item; a slip's full reading set
+  -- is however many rows its tariff's site_tariff_items defines.
+  CREATE TABLE IF NOT EXISTS site_slip_readings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slip_id INTEGER NOT NULL REFERENCES site_billing_slips(id),
+    item_key TEXT NOT NULL,
+    reading REAL NOT NULL DEFAULT 0,
+    comment TEXT,
+    UNIQUE(slip_id, item_key)
+  );
   `);
 
   // Additive migrations for columns added after the initial schema. node:sqlite's SQLite build
@@ -317,6 +367,62 @@ function migrate(db) {
 
   const sbsCols = db.prepare("PRAGMA table_info(site_billing_slips)").all().map((c) => c.name);
   if (!sbsCols.includes('apply_correction_factor')) db.exec('ALTER TABLE site_billing_slips ADD COLUMN apply_correction_factor INTEGER NOT NULL DEFAULT 1');
+
+  const stCols = db.prepare("PRAGMA table_info(site_tariffs)").all().map((c) => c.name);
+  if (!stCols.includes('tariff_name')) db.exec('ALTER TABLE site_tariffs ADD COLUMN tariff_name TEXT');
+
+  // One-time bridge: any flat_site data written before site_tariff_items/site_slip_readings
+  // existed (8 Field Street was the only flat_site property back then, always on the Ekurhuleni E
+  // TOU shape) lives in site_tariffs'/site_billing_slips' legacy fixed columns. If the new tables
+  // are still empty but there's legacy tariff data sitting there, expand it into the new generic
+  // tables once, so an already-deployed instance doesn't lose readings the client already typed in
+  // (e.g. the water/sewer figures entered by hand) just because this schema shipped. Guarded on
+  // site_tariff_items being empty, so this only ever runs the single time it's needed.
+  const itemsEmpty = db.prepare('SELECT COUNT(*) c FROM site_tariff_items').get().c === 0;
+  if (itemsEmpty) {
+    const legacyTariffs = db.prepare('SELECT * FROM site_tariffs WHERE fixed_charge_rate > 0 OR network_access_rate > 0').all();
+    if (legacyTariffs.length) {
+      const EK_E_ITEMS = [
+        ['fixed_charge', 'Fixed Charge', 'R/c', 'fixed_charge_rate', null, 1, 0, 'electricity'],
+        ['network_access', 'Network Access', 'R/kVA', 'network_access_rate', 'kva', null, 1, 'electricity'],
+        ['network_demand', 'Network Demand', 'R/kVA', 'network_demand_rate', 'kva', null, 1, 'electricity'],
+        ['peak_high', 'Peak Energy - High Demand', 'R/kWh', 'peak_high_rate', 'peak', null, 0, 'electricity'],
+        ['peak_low', 'Peak Energy - Low Demand', 'R/kWh', 'peak_low_rate', 'peak', null, 0, 'electricity'],
+        ['standard_high', 'Standard Energy - High Demand', 'R/kWh', 'standard_high_rate', 'standard', null, 0, 'electricity'],
+        ['standard_low', 'Standard Energy - Low Demand', 'R/kWh', 'standard_low_rate', 'standard', null, 0, 'electricity'],
+        ['offpeak_high', 'Off-Peak Energy - High Demand', 'R/kWh', 'offpeak_high_rate', 'offpeak', null, 0, 'electricity'],
+        ['offpeak_low', 'Off-Peak Energy - Low Demand', 'R/kWh', 'offpeak_low_rate', 'offpeak', null, 0, 'electricity'],
+        ['water', 'Water Consumption', 'R/kL', 'water_rate', null, null, 0, 'water'],
+        ['sewer', 'Sewer', 'R/kL', 'sewer_rate', null, null, 0, 'water'],
+      ];
+      const readingColByKey = {
+        network_access: ['network_access_kva', 'network_access_comment'],
+        network_demand: ['network_demand_kva', 'network_demand_comment'],
+        peak_high: ['peak_high_kwh', null], peak_low: ['peak_low_kwh', null],
+        standard_high: ['standard_high_kwh', null], standard_low: ['standard_low_kwh', null],
+        offpeak_high: ['offpeak_high_kwh', null], offpeak_low: ['offpeak_low_kwh', null],
+        water: ['water_kl', null], sewer: ['sewer_kl', null],
+      };
+      for (const t of legacyTariffs) {
+        db.prepare('UPDATE site_tariffs SET tariff_name=? WHERE id=? AND (tariff_name IS NULL OR tariff_name=\'\')')
+          .run('Ekurhuleni_Tariff_E_TOU_8 Field Street', t.id);
+        EK_E_ITEMS.forEach(([key, label, unit, rateCol, factorType, fixedReading, hasComment, section], i) => {
+          db.prepare(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment)
+            VALUES (?,?,?,?,?,?,?,?,?,?)`).run(t.id, i, section, key, label, unit, t[rateCol] || 0, factorType, fixedReading, hasComment);
+        });
+        const slips = db.prepare('SELECT * FROM site_billing_slips WHERE tariff_id=?').all(t.id);
+        for (const slip of slips) {
+          for (const [key, [readingCol, commentCol]] of Object.entries(readingColByKey)) {
+            const reading = slip[readingCol] || 0;
+            const comment = commentCol ? (slip[commentCol] || null) : null;
+            db.prepare('INSERT OR IGNORE INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,?)')
+              .run(slip.id, key, reading, comment);
+          }
+        }
+      }
+      console.log(`Flat-site legacy migration: expanded ${legacyTariffs.length} tariff version(s) into the new line-item schema.`);
+    }
+  }
 
   const msCols = db.prepare("PRAGMA table_info(municipal_statements)").all().map((c) => c.name);
   const newMsCols = [
