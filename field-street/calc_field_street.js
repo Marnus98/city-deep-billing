@@ -47,10 +47,14 @@ const WATER_ROWS = [
 // vatAmount, total } - each item carries both the raw reading (as entered) and the cost (reading
 // x factor x rate), so the slip can show its full derivation.
 function computeSlip(slip, tariff) {
+  // apply_correction_factor is stored as 0/1 (SQLite has no real boolean); undefined/missing
+  // (e.g. a plain object built from a form that hasn't posted the checkbox yet) defaults to "on",
+  // matching the column's own DB default - the factor is the normal case, not the exception.
+  const applyFactor = !(slip.apply_correction_factor === 0 || slip.apply_correction_factor === false);
   const buildItems = (rows) => rows.map((r) => {
     const reading = r.fixedReading != null ? r.fixedReading : Number(slip[r.readingField] || 0);
     const rate = Number(tariff[r.rateField] || 0);
-    const factor = r.factorKey ? Number(tariff[r.factorKey] || 1) : 1;
+    const factor = (applyFactor && r.factorKey) ? Number(tariff[r.factorKey] || 1) : 1;
     const adjustedReading = reading * factor;
     const cost = round2(adjustedReading * rate);
     return {

@@ -850,6 +850,7 @@ function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
   const t = tariff || {};
   const s = slip || {};
   const startDateDefault = s.start_date || (latestSlip ? latestSlip.end_date : '');
+  const applyFactorOff = s.apply_correction_factor === 0 || s.apply_correction_factor === false;
   const rate = (name, value, step = '0.01') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
 
   const elecRows = [
@@ -918,7 +919,12 @@ function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
 
     <details class="bg-white rounded-lg border p-4 mb-4">
       <summary class="font-semibold cursor-pointer">Correction factors (advanced - only touch if the meters are recalibrated)</summary>
-      <div class="grid grid-cols-4 gap-3 mt-3">
+      <label class="flex items-center gap-2 text-sm mt-3">
+        <input type="checkbox" name="apply_correction_factor" value="1" ${applyFactorOff ? '' : 'checked'}/>
+        Apply these factors to this month's readings
+      </label>
+      <p class="text-xs text-slate-500 mt-1 mb-3">On by default - our meters read lower than the municipality's. Only switch off for a month where the site meter has been recalibrated, or where the reading entered is already the municipality's own figure (e.g. a historical statement).</p>
+      <div class="grid grid-cols-4 gap-3">
         <div><label class="text-xs text-slate-500">kVA factor</label>${rate('kva_factor', t.kva_factor ?? 1, '0.000000001')}</div>
         <div><label class="text-xs text-slate-500">Peak factor</label>${rate('peak_factor', t.peak_factor ?? 1, '0.000000001')}</div>
         <div><label class="text-xs text-slate-500">Standard factor</label>${rate('standard_factor', t.standard_factor ?? 1, '0.000000001')}</div>
@@ -956,7 +962,7 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
       </form>
     </div>
   </div>
-  <p class="text-sm text-slate-500 mb-4">Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}.</p>
+  <p class="text-sm text-slate-500 mb-4">Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}.${slip.apply_correction_factor === 0 ? ' <span class="text-amber-600">Correction factor not applied to this month.</span>' : ''}</p>
 
   <div class="bg-white rounded-lg border mb-4 overflow-hidden">
     <div class="px-4 py-2 border-b font-semibold">Electrical (Ekurhuleni_Tariff_E_TOU_8 Field Street)</div>

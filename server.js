@@ -68,6 +68,9 @@ for (const prop of properties) {
 // seed_wingfield_municipal.js).
 require('./city-deep/seed_municipal').run('city-deep.db');
 require('./wingfield/seed_wingfield_municipal').run('wingfield.db');
+// 8 Field Street's historical electricity months (Jul 2025 - Jun 2026) - own de-dup key (label),
+// always safe to re-run; see field-street/import_history.js for why it never touches water/sewer.
+require('./field-street/import_history').run('field-street.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {
@@ -553,10 +556,13 @@ async function saveSiteBillingSlip(req, res, existingId) {
     return send(res, 400, views.siteBillingFormPage({ user, tariff, slip: { ...body, id: existingId }, latestSlip: null, error: 'Label, start date and end date are all required.' }));
   }
   const tariffId = findOrCreateSiteTariff(body, startDate);
+  // Checkboxes only appear in the POST body at all when checked ("apply_correction_factor=1"); an
+  // unchecked box simply isn't sent, so its absence here means "off", not "unset".
+  const applyCorrectionFactor = body.apply_correction_factor ? 1 : 0;
   const fields = ['label', 'start_date', 'end_date', 'tariff_id',
     'network_access_kva', 'network_access_comment', 'network_demand_kva', 'network_demand_comment',
     'peak_high_kwh', 'peak_low_kwh', 'standard_high_kwh', 'standard_low_kwh',
-    'offpeak_high_kwh', 'offpeak_low_kwh', 'water_kl', 'sewer_kl', 'entered_by'];
+    'offpeak_high_kwh', 'offpeak_low_kwh', 'water_kl', 'sewer_kl', 'apply_correction_factor', 'entered_by'];
   const values = [
     label, startDate, endDate, tariffId,
     Number(body.network_access_kva) || 0, body.network_access_comment || null,
@@ -564,7 +570,7 @@ async function saveSiteBillingSlip(req, res, existingId) {
     Number(body.peak_high_kwh) || 0, Number(body.peak_low_kwh) || 0,
     Number(body.standard_high_kwh) || 0, Number(body.standard_low_kwh) || 0,
     Number(body.offpeak_high_kwh) || 0, Number(body.offpeak_low_kwh) || 0,
-    Number(body.water_kl) || 0, Number(body.sewer_kl) || 0, user.userId,
+    Number(body.water_kl) || 0, Number(body.sewer_kl) || 0, applyCorrectionFactor, user.userId,
   ];
   if (existingId) {
     run(`UPDATE site_billing_slips SET ${fields.map((f) => `${f}=?`).join(', ')} WHERE id=?`, [...values, existingId]);

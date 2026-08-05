@@ -292,6 +292,11 @@ function migrate(db) {
     offpeak_high_kwh REAL DEFAULT 0, offpeak_low_kwh REAL DEFAULT 0,
     water_kl REAL DEFAULT 0,
     sewer_kl REAL DEFAULT 0,
+    apply_correction_factor INTEGER NOT NULL DEFAULT 1, -- advanced/rarely-touched: whether this
+      -- month's readings get grossed up by the tariff's kva/peak/standard/offpeak_factor at all.
+      -- Stays on (1) for normal months read off the site's own meter; turn off only for a month
+      -- where the site meter was recalibrated to match the municipal meter (or for historical
+      -- months where the "reading" entered is already the municipal statement's own figure).
     status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','finalised')),
     entered_by INTEGER REFERENCES users(id),
     created_at TEXT DEFAULT (datetime('now'))
@@ -309,6 +314,9 @@ function migrate(db) {
 
   const mrCols = db.prepare("PRAGMA table_info(meter_readings)").all().map((c) => c.name);
   if (!mrCols.includes('photo_path')) db.exec('ALTER TABLE meter_readings ADD COLUMN photo_path TEXT');
+
+  const sbsCols = db.prepare("PRAGMA table_info(site_billing_slips)").all().map((c) => c.name);
+  if (!sbsCols.includes('apply_correction_factor')) db.exec('ALTER TABLE site_billing_slips ADD COLUMN apply_correction_factor INTEGER NOT NULL DEFAULT 1');
 
   const msCols = db.prepare("PRAGMA table_info(municipal_statements)").all().map((c) => c.name);
   const newMsCols = [
