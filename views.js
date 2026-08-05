@@ -932,11 +932,12 @@ function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
 }
 
 function siteBillingDetailPage({ user, slip, tariff, calc }) {
-  const lineRow = (item) => `<tr class="border-t">
+  const lineRow = (item, showActual) => `<tr class="border-t">
     <td class="px-3 py-1.5 text-sm">${esc(item.label)}</td>
     <td class="px-3 py-1.5 text-sm text-right">${money(item.rate)}</td>
     <td class="px-3 py-1.5 text-sm text-slate-500">${esc(item.unit)}</td>
     <td class="px-3 py-1.5 text-sm text-right">${fmtNum(item.reading, 2)}</td>
+    ${showActual ? `<td class="px-3 py-1.5 text-sm text-right text-slate-600">${fmtNum(item.adjustedReading, 2)}</td>` : ''}
     <td class="px-3 py-1.5 text-sm text-right font-medium">${money(item.cost)}</td>
     <td class="px-3 py-1.5 text-sm text-slate-500">${esc(item.comment || '')}</td>
   </tr>`;
@@ -960,10 +961,10 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
     <table class="w-full">
       <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
         <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Unit</th>
-        <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5">Comment</th>
+        <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Actual&nbsp;(&times;factor)</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5">Comment</th>
       </tr></thead>
-      <tbody>${calc.elecItems.map(lineRow).join('')}</tbody>
-      <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="4">Total (Excl VAT)</td><td class="px-3 py-2 text-right">${money(calc.elecTotal)}</td><td></td></tr></tfoot>
+      <tbody>${calc.elecItems.map((item) => lineRow(item, true)).join('')}</tbody>
+      <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="5">Total (Excl VAT)</td><td class="px-3 py-2 text-right">${money(calc.elecTotal)}</td><td></td></tr></tfoot>
     </table>
   </div>
 
@@ -974,7 +975,7 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
         <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Unit</th>
         <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5"></th>
       </tr></thead>
-      <tbody>${calc.waterItems.map(lineRow).join('')}</tbody>
+      <tbody>${calc.waterItems.map((item) => lineRow(item, false)).join('')}</tbody>
       <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="4">Total (Ex VAT)</td><td class="px-3 py-2 text-right">${money(calc.waterTotal)}</td><td></td></tr></tfoot>
     </table>
   </div>

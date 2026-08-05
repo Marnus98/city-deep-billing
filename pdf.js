@@ -505,11 +505,21 @@ function buildMunicipalStatementPdf(data) {
 // itself, the rate, and a free-text comment (the municipality's max-demand timestamp) all need
 // their own column at once - none of the existing table-drawing helpers have room for all four.
 function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
-  const xRate = left + 208, xUnit = left + 216, xReading = left + 323, xCost = left + 408, xComment = left + 416;
+  // showActual adds a 4th numeric column (the reading after the site-vs-municipal-meter
+  // correction factor is applied) between Reading and Cost, so the factor math is visible
+  // instead of only being silently folded into Cost. Only used for the electricity table -
+  // water/sewer has no correction factor, so its layout stays at the original wider spacing.
+  const showActual = !!opts.showActual;
+  const xRate = left + 208, xUnit = left + 216;
+  const xReading = showActual ? left + 308 : left + 323;
+  const xActual = left + 363;
+  const xCost = showActual ? left + 423 : left + 408;
+  const xComment = showActual ? left + 431 : left + 416;
   doc.text(left, y, 'Entry', { bold: true, size: 8.5 });
   doc.text(xRate - textWidth('Rate', { bold: true, size: 8.5 }), y, 'Rate', { bold: true, size: 8.5 });
   doc.text(xUnit, y, 'Unit', { bold: true, size: 8.5 });
   doc.text(xReading - textWidth('Reading', { bold: true, size: 8.5 }), y, 'Reading', { bold: true, size: 8.5 });
+  if (showActual) doc.text(xActual - textWidth('Actual', { bold: true, size: 8.5 }), y, 'Actual', { bold: true, size: 8.5 });
   doc.text(xCost - textWidth('Cost', { bold: true, size: 8.5 }), y, 'Cost', { bold: true, size: 8.5 });
   if (!opts.noComment) doc.text(xComment, y, 'Comment', { bold: true, size: 8.5 });
   y -= 4; doc.line(left, y, right, y); y -= 12;
@@ -520,6 +530,10 @@ function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
     doc.text(xUnit, y, it.unit, { size: 8 });
     const readingStr = it.reading.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     doc.text(xReading - textWidth(readingStr, { size: 8.5 }), y, readingStr, { size: 8.5 });
+    if (showActual) {
+      const actualStr = it.adjustedReading.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      doc.text(xActual - textWidth(actualStr, { size: 8.5 }), y, actualStr, { size: 8.5 });
+    }
     const costStr = money(it.cost);
     doc.text(xCost - textWidth(costStr, { size: 8.5, bold: true }), y, costStr, { size: 8.5, bold: true });
     if (it.comment) doc.text(xComment, y, it.comment, { size: 7.5 });
@@ -551,15 +565,15 @@ function buildSiteBillingSlipPdf(data) {
   doc.line(left, y, right, y); y -= 18;
 
   doc.text(left, y, 'ELECTRICAL', { size: 12, bold: true }); y -= 16;
-  ({ y } = drawSiteLineItemsTable(doc, data.calc.elecItems, left, right, y));
-  y -= 4; doc.line(left, y, right, y); y -= 4;
+  ({ y } = drawSiteLineItemsTable(doc, data.calc.elecItems, left, right, y, { showActual: true }));
+  y -= 4; doc.line(left, y, right, y); y -= 16;
   const elecTotalStr = money(data.calc.elecTotal);
   doc.text(left, y, 'Total (Excl VAT)', { bold: true, size: 9.5 });
   doc.text(right - textWidth(elecTotalStr, { size: 9.5, bold: true }), y, elecTotalStr, { bold: true, size: 9.5 }); y -= 22;
 
   doc.text(left, y, 'WATER & SANITATION', { size: 12, bold: true }); y -= 16;
   ({ y } = drawSiteLineItemsTable(doc, data.calc.waterItems, left, right, y, { noComment: true }));
-  y -= 4; doc.line(left, y, right, y); y -= 4;
+  y -= 4; doc.line(left, y, right, y); y -= 16;
   const waterTotalStr = money(data.calc.waterTotal);
   doc.text(left, y, 'Total (Ex VAT)', { bold: true, size: 9.5 });
   doc.text(right - textWidth(waterTotalStr, { size: 9.5, bold: true }), y, waterTotalStr, { bold: true, size: 9.5 }); y -= 24;
