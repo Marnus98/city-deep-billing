@@ -932,12 +932,14 @@ function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
 }
 
 function siteBillingDetailPage({ user, slip, tariff, calc }) {
-  const lineRow = (item, showActual) => `<tr class="border-t">
+  // Reading column shows the meter reading after the site-vs-municipal correction factor is
+  // applied (item.adjustedReading) - the "actual" consumption the tariff is billed against - not
+  // the raw as-entered reading. Raw readings stay in the DB/audit trail, just not shown here.
+  const lineRow = (item) => `<tr class="border-t">
     <td class="px-3 py-1.5 text-sm">${esc(item.label)}</td>
     <td class="px-3 py-1.5 text-sm text-right">${money(item.rate)}</td>
     <td class="px-3 py-1.5 text-sm text-slate-500">${esc(item.unit)}</td>
-    <td class="px-3 py-1.5 text-sm text-right">${fmtNum(item.reading, 2)}</td>
-    ${showActual ? `<td class="px-3 py-1.5 text-sm text-right text-slate-600">${fmtNum(item.adjustedReading, 2)}</td>` : ''}
+    <td class="px-3 py-1.5 text-sm text-right">${fmtNum(item.adjustedReading, 2)}</td>
     <td class="px-3 py-1.5 text-sm text-right font-medium">${money(item.cost)}</td>
     <td class="px-3 py-1.5 text-sm text-slate-500">${esc(item.comment || '')}</td>
   </tr>`;
@@ -954,17 +956,17 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
       </form>
     </div>
   </div>
-  <p class="text-sm text-slate-500 mb-4">Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}. Readings are as read off 8 Field Street's own meter; Cost already includes this tariff's correction factor (kVA &times;${fmtNum(tariff.kva_factor, 9)}, Peak &times;${fmtNum(tariff.peak_factor, 9)}, Standard &times;${fmtNum(tariff.standard_factor, 9)}, Off-Peak &times;${fmtNum(tariff.offpeak_factor, 9)}).</p>
+  <p class="text-sm text-slate-500 mb-4">Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}.</p>
 
   <div class="bg-white rounded-lg border mb-4 overflow-hidden">
     <div class="px-4 py-2 border-b font-semibold">Electrical (Ekurhuleni_Tariff_E_TOU_8 Field Street)</div>
     <table class="w-full">
       <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
         <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Unit</th>
-        <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Actual&nbsp;(&times;factor)</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5">Comment</th>
+        <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5">Comment</th>
       </tr></thead>
-      <tbody>${calc.elecItems.map((item) => lineRow(item, true)).join('')}</tbody>
-      <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="5">Total (Excl VAT)</td><td class="px-3 py-2 text-right">${money(calc.elecTotal)}</td><td></td></tr></tfoot>
+      <tbody>${calc.elecItems.map((item) => lineRow(item)).join('')}</tbody>
+      <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="4">Total (Excl VAT)</td><td class="px-3 py-2 text-right">${money(calc.elecTotal)}</td><td></td></tr></tfoot>
     </table>
   </div>
 
@@ -975,7 +977,7 @@ function siteBillingDetailPage({ user, slip, tariff, calc }) {
         <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Unit</th>
         <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5"></th>
       </tr></thead>
-      <tbody>${calc.waterItems.map((item) => lineRow(item, false)).join('')}</tbody>
+      <tbody>${calc.waterItems.map((item) => lineRow(item)).join('')}</tbody>
       <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="4">Total (Ex VAT)</td><td class="px-3 py-2 text-right">${money(calc.waterTotal)}</td><td></td></tr></tfoot>
     </table>
   </div>

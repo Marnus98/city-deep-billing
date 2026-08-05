@@ -505,21 +505,15 @@ function buildMunicipalStatementPdf(data) {
 // itself, the rate, and a free-text comment (the municipality's max-demand timestamp) all need
 // their own column at once - none of the existing table-drawing helpers have room for all four.
 function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
-  // showActual adds a 4th numeric column (the reading after the site-vs-municipal-meter
-  // correction factor is applied) between Reading and Cost, so the factor math is visible
-  // instead of only being silently folded into Cost. Only used for the electricity table -
-  // water/sewer has no correction factor, so its layout stays at the original wider spacing.
-  const showActual = !!opts.showActual;
-  const xRate = left + 208, xUnit = left + 216;
-  const xReading = showActual ? left + 308 : left + 323;
-  const xActual = left + 363;
-  const xCost = showActual ? left + 423 : left + 408;
-  const xComment = showActual ? left + 431 : left + 416;
+  // The Reading column shows the meter reading after the site-vs-municipal-meter correction
+  // factor has already been applied (it.adjustedReading) - i.e. the "actual" consumption the
+  // tariff rate is billed against - not the raw as-entered meter reading. Raw readings still
+  // live in the DB/audit trail, just not shown as a separate column here per the client's request.
+  const xRate = left + 208, xUnit = left + 216, xReading = left + 323, xCost = left + 408, xComment = left + 416;
   doc.text(left, y, 'Entry', { bold: true, size: 8.5 });
   doc.text(xRate - textWidth('Rate', { bold: true, size: 8.5 }), y, 'Rate', { bold: true, size: 8.5 });
   doc.text(xUnit, y, 'Unit', { bold: true, size: 8.5 });
   doc.text(xReading - textWidth('Reading', { bold: true, size: 8.5 }), y, 'Reading', { bold: true, size: 8.5 });
-  if (showActual) doc.text(xActual - textWidth('Actual', { bold: true, size: 8.5 }), y, 'Actual', { bold: true, size: 8.5 });
   doc.text(xCost - textWidth('Cost', { bold: true, size: 8.5 }), y, 'Cost', { bold: true, size: 8.5 });
   if (!opts.noComment) doc.text(xComment, y, 'Comment', { bold: true, size: 8.5 });
   y -= 4; doc.line(left, y, right, y); y -= 12;
@@ -528,12 +522,8 @@ function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
     const rateStr = money(it.rate);
     doc.text(xRate - textWidth(rateStr, { size: 8.5 }), y, rateStr, { size: 8.5 });
     doc.text(xUnit, y, it.unit, { size: 8 });
-    const readingStr = it.reading.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const readingStr = it.adjustedReading.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     doc.text(xReading - textWidth(readingStr, { size: 8.5 }), y, readingStr, { size: 8.5 });
-    if (showActual) {
-      const actualStr = it.adjustedReading.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      doc.text(xActual - textWidth(actualStr, { size: 8.5 }), y, actualStr, { size: 8.5 });
-    }
     const costStr = money(it.cost);
     doc.text(xCost - textWidth(costStr, { size: 8.5, bold: true }), y, costStr, { size: 8.5, bold: true });
     if (it.comment) doc.text(xComment, y, it.comment, { size: 7.5 });
@@ -565,7 +555,7 @@ function buildSiteBillingSlipPdf(data) {
   doc.line(left, y, right, y); y -= 18;
 
   doc.text(left, y, 'ELECTRICAL', { size: 12, bold: true }); y -= 16;
-  ({ y } = drawSiteLineItemsTable(doc, data.calc.elecItems, left, right, y, { showActual: true }));
+  ({ y } = drawSiteLineItemsTable(doc, data.calc.elecItems, left, right, y));
   y -= 4; doc.line(left, y, right, y); y -= 16;
   const elecTotalStr = money(data.calc.elecTotal);
   doc.text(left, y, 'Total (Excl VAT)', { bold: true, size: 9.5 });
@@ -589,10 +579,6 @@ function buildSiteBillingSlipPdf(data) {
   const totalStr = money(data.calc.total);
   doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 });
   doc.text(right - textWidth(totalStr, { size: 12, bold: true }), y, totalStr, { bold: true, size: 12 }); y -= 20;
-
-  doc.text(left, 30, `Generated: ${data.generatedAt}. Readings are as read off 8 Field Street's own meters; Cost includes this tariff's ` +
-    `correction factor (kVA ×${data.tariff.kva_factor.toFixed(6)}, Peak ×${data.tariff.peak_factor.toFixed(6)}, ` +
-    `Standard ×${data.tariff.standard_factor.toFixed(6)}, Off-Peak ×${data.tariff.offpeak_factor.toFixed(6)}).`, { size: 6.5 });
 
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
     doc.newPage();
