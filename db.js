@@ -237,6 +237,65 @@ function migrate(db) {
     source_file TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  -- "Flat single-site" billing (first user: 8 Field Street, see field-street/). Unlike City Deep/
+  -- Wingfield's tenant-per-meter model, a flat_site property (see properties.js's billingModel)
+  -- has exactly one set of fixed line items every month - Fixed Charge, Network Access, Network
+  -- Demand, Peak/Standard/Off-Peak Energy (each split High/Low demand season), Water, Sewer - so
+  -- a small fixed schema fits better than reusing tenants/meters/bills. Both tables are created in
+  -- every property's database (same pattern as municipal_statements) but only populated for
+  -- properties that actually use this billing model; harmless and empty otherwise.
+  --
+  -- site_tariffs: one row per rate change. Kept as its own versioned table (rather than just
+  -- columns on site_billing_slips) so a slip can be re-priced if a rate turns out wrong without
+  -- retyping every reading, and so the "reflects the tariff for that month" requirement has a real
+  -- history instead of only ever showing the latest rate. kva/peak/standard/offpeak_factor exist
+  -- because the site's own installed meters read measurably lower than the municipality's check
+  -- meter - readings are entered as read off our own meter dial, and these factors gross them up
+  -- to real consumption before the tariff rate is applied (see calc_field_street.js). Defaults are
+  -- the values confirmed for 8 Field Street; editable per version in case they're ever recalibrated.
+  CREATE TABLE IF NOT EXISTS site_tariffs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    effective_from TEXT NOT NULL,
+    effective_to TEXT,
+    fixed_charge_rate REAL NOT NULL DEFAULT 0,
+    network_access_rate REAL NOT NULL DEFAULT 0,
+    network_demand_rate REAL NOT NULL DEFAULT 0,
+    peak_high_rate REAL NOT NULL DEFAULT 0, peak_low_rate REAL NOT NULL DEFAULT 0,
+    standard_high_rate REAL NOT NULL DEFAULT 0, standard_low_rate REAL NOT NULL DEFAULT 0,
+    offpeak_high_rate REAL NOT NULL DEFAULT 0, offpeak_low_rate REAL NOT NULL DEFAULT 0,
+    water_rate REAL NOT NULL DEFAULT 0,
+    sewer_rate REAL NOT NULL DEFAULT 0,
+    kva_factor REAL NOT NULL DEFAULT 1,
+    peak_factor REAL NOT NULL DEFAULT 1,
+    standard_factor REAL NOT NULL DEFAULT 1,
+    offpeak_factor REAL NOT NULL DEFAULT 1,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  -- site_billing_slips: one row per billing period. Readings are stored exactly as read off the
+  -- site's own meter (pre-factor) - the factor lives on the tariff row so cost can always be
+  -- recomputed the same way the slip originally was. network_access_comment/network_demand_comment
+  -- hold the municipality's max-demand timestamp note (see the reference statement's "Comment"
+  -- column - only those two rows ever carry one).
+  CREATE TABLE IF NOT EXISTS site_billing_slips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT UNIQUE NOT NULL, -- e.g. '2026-07'
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    tariff_id INTEGER NOT NULL REFERENCES site_tariffs(id),
+    network_access_kva REAL DEFAULT 0, network_access_comment TEXT,
+    network_demand_kva REAL DEFAULT 0, network_demand_comment TEXT,
+    peak_high_kwh REAL DEFAULT 0, peak_low_kwh REAL DEFAULT 0,
+    standard_high_kwh REAL DEFAULT 0, standard_low_kwh REAL DEFAULT 0,
+    offpeak_high_kwh REAL DEFAULT 0, offpeak_low_kwh REAL DEFAULT 0,
+    water_kl REAL DEFAULT 0,
+    sewer_kl REAL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','finalised')),
+    entered_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
   `);
 
   // Additive migrations for columns added after the initial schema. node:sqlite's SQLite build

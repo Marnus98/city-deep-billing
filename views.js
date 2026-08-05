@@ -15,12 +15,22 @@ function money(n) {
 function fmtNum(n, dp = 2) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }); }
 
 function layout({ title, user, active, body }) {
-  const nav = [
-    ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
-    ['/billing-periods', 'Billing Periods'], ['/billing', 'Billing'], ['/solar-billing-slips', 'Solar Billing Slips'],
-    ['/municipal-accounts', 'Municipality'],
-    ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
-  ];
+  // Nav tabs depend on the active property's billingModel (see properties.js): the City Deep/
+  // Wingfield tenant-per-meter tabs make no sense for a flat_site property like 8 Field Street
+  // (no tenants, no meters, no per-tenant billing runs, no solar), and it has its own "Billing
+  // Slips" tab instead. Audit Log is common to both, since every property writes to its own copy.
+  const currentProp = properties.find((p) => p.slug === (user && user.currentProperty));
+  const isFlatSite = currentProp && currentProp.billingModel === 'flat_site';
+  const nav = isFlatSite
+    ? [
+      ['/dashboard', 'Dashboard'], ['/site-billing', 'Billing Slips'], ['/audit-log', 'Audit Log'],
+    ]
+    : [
+      ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
+      ['/billing-periods', 'Billing Periods'], ['/billing', 'Billing'], ['/solar-billing-slips', 'Solar Billing Slips'],
+      ['/municipal-accounts', 'Municipality'],
+      ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
+    ];
   // Property switcher - auto-submits on change (same pattern as the Municipality Accounts page's
   // account selector). POSTs to /switch-property, which updates the session's currentProperty
   // (see auth.js/server.js) so every subsequent request resolves to that property's own database.
@@ -801,10 +811,187 @@ function auditLogPage({ user, entries }) {
   return layout({ title: 'Audit Log', user, active: '/audit-log', body });
 }
 
+// ---------------- flat_site billing (8 Field Street) ----------------
+// See properties.js's billingModel and server.js's /site-billing routes. The line-items table
+// layout below deliberately mirrors the client's reference statement column-for-column (Entry /
+// Rate / Unit / Reading / Cost / Comment) since that's the format they're used to reading.
+
+function siteBillingListPage({ user, rows }) {
+  const body = `
+  <div class="flex justify-between items-baseline mb-4">
+    <h1 class="text-2xl font-bold">Billing Slips</h1>
+    <a href="/site-billing/new" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">+ New billing slip</a>
+  </div>
+  <div class="bg-white rounded-lg border overflow-hidden">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b bg-slate-50">
+        <th class="px-4 py-2">Period</th><th class="px-4 py-2">Reading dates</th>
+        <th class="px-4 py-2 text-right">Electricity</th><th class="px-4 py-2 text-right">Water &amp; Sewer</th>
+        <th class="px-4 py-2 text-right">Total (incl. VAT)</th><th class="px-4 py-2">Status</th><th class="px-4 py-2"></th>
+      </tr></thead>
+      <tbody>
+      ${rows.map(({ row, calc }) => `<tr class="border-b last:border-0">
+        <td class="px-4 py-2 font-medium">${esc(row.label)}</td>
+        <td class="px-4 py-2 text-slate-500">${esc(row.start_date)} to ${esc(row.end_date)}</td>
+        <td class="px-4 py-2 text-right">${money(calc.elecTotal)}</td>
+        <td class="px-4 py-2 text-right">${money(calc.waterTotal)}</td>
+        <td class="px-4 py-2 text-right font-medium">${money(calc.total)}</td>
+        <td class="px-4 py-2"><span class="badge ${statusColor(row.status)}">${esc(row.status)}</span></td>
+        <td class="px-4 py-2 text-right"><a class="text-blue-600 hover:underline" href="/site-billing/${row.id}">View</a></td>
+      </tr>`).join('') || '<tr><td class="px-4 py-6 text-slate-400" colspan="7">No billing slips yet - click "+ New billing slip" to add the first one.</td></tr>'}
+      </tbody>
+    </table>
+  </div>`;
+  return layout({ title: 'Billing Slips', user, active: '/site-billing', body });
+}
+
+function siteBillingFormPage({ user, tariff, slip, latestSlip, error }) {
+  const isEdit = !!(slip && slip.id);
+  const t = tariff || {};
+  const s = slip || {};
+  const startDateDefault = s.start_date || (latestSlip ? latestSlip.end_date : '');
+  const rate = (name, value, step = '0.01') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
+
+  const elecRows = [
+    ['Fixed Charge', 'fixed_charge_rate', t.fixed_charge_rate, 'R/c', null, '1 (fixed)', null],
+    ['Network Access', 'network_access_rate', t.network_access_rate, 'R/kVA', 'network_access_kva', s.network_access_kva, 'network_access_comment'],
+    ['Network Demand', 'network_demand_rate', t.network_demand_rate, 'R/kVA', 'network_demand_kva', s.network_demand_kva, 'network_demand_comment'],
+    ['Peak Energy - High Demand', 'peak_high_rate', t.peak_high_rate, 'R/kWh', 'peak_high_kwh', s.peak_high_kwh, null],
+    ['Peak Energy - Low Demand', 'peak_low_rate', t.peak_low_rate, 'R/kWh', 'peak_low_kwh', s.peak_low_kwh, null],
+    ['Standard Energy - High Demand', 'standard_high_rate', t.standard_high_rate, 'R/kWh', 'standard_high_kwh', s.standard_high_kwh, null],
+    ['Standard Energy - Low Demand', 'standard_low_rate', t.standard_low_rate, 'R/kWh', 'standard_low_kwh', s.standard_low_kwh, null],
+    ['Off-Peak Energy - High Demand', 'offpeak_high_rate', t.offpeak_high_rate, 'R/kWh', 'offpeak_high_kwh', s.offpeak_high_kwh, null],
+    ['Off-Peak Energy - Low Demand', 'offpeak_low_rate', t.offpeak_low_rate, 'R/kWh', 'offpeak_low_kwh', s.offpeak_low_kwh, null],
+  ];
+  const waterRows = [
+    ['Water Consumption', 'water_rate', t.water_rate, 'R/kL', 'water_kl', s.water_kl, null],
+    ['Sewer', 'sewer_rate', t.sewer_rate, 'R/kL', 'sewer_kl', s.sewer_kl, null],
+  ];
+  const rowHtml = ([label, rateName, rateVal, unit, readingName, readingVal, commentName]) => `
+    <tr class="border-t">
+      <td class="px-3 py-1.5 text-sm">${esc(label)}</td>
+      <td class="px-3 py-1.5 w-28">${rate(rateName, rateVal)}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${esc(unit)}</td>
+      <td class="px-3 py-1.5 w-32">${readingName ? `<input name="${readingName}" type="number" step="0.01" value="${readingVal != null ? esc(readingVal) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>` : `<span class="text-slate-400 text-sm">${esc(readingVal)}</span>`}</td>
+      <td class="px-3 py-1.5 w-44">${commentName ? `<input name="${commentName}" placeholder="e.g. 2026/07/15 22:00" value="${esc(s[commentName] || '')}" class="w-full border rounded px-2 py-1.5 text-sm"/>` : ''}</td>
+    </tr>`;
+
+  const body = `
+  <a href="/site-billing" class="text-sm text-blue-600 hover:underline">&larr; Billing Slips</a>
+  <h1 class="text-2xl font-bold mt-2 mb-1">${isEdit ? `Edit billing slip &mdash; ${esc(s.label)}` : 'New billing slip'}</h1>
+  <p class="text-sm text-slate-500 mb-4">Reading is what was physically read off 8 Field Street's own meter. Cost is calculated automatically - kVA/Peak/Standard/Off-Peak readings are grossed up by this tariff's correction factor first (our meters read lower than the municipality's), then multiplied by the rate. Rates and factors carry over from the last slip by default; only change them for a month where the tariff actually changed - a new tariff version is only created when a rate/factor here differs from every version already on file, so unrelated months keep sharing the one they matched.</p>
+  ${error ? `<div class="bg-red-50 text-red-700 text-sm rounded p-2 mb-4">${esc(error)}</div>` : ''}
+  <form method="post" action="${isEdit ? `/site-billing/${s.id}/edit` : '/site-billing/new'}">
+    <div class="bg-white rounded-lg border p-4 mb-4">
+      <div class="font-semibold mb-3">Period</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="text-xs text-slate-500">Label</label>
+          <input name="label" placeholder="2026-07" value="${esc(s.label || '')}" class="w-full border rounded px-2 py-1.5 text-sm mt-1" required/></div>
+        <div><label class="text-xs text-slate-500">Start date</label>
+          <input name="start_date" type="date" value="${esc(startDateDefault)}" class="w-full border rounded px-2 py-1.5 text-sm mt-1" required/></div>
+        <div><label class="text-xs text-slate-500">End date</label>
+          <input name="end_date" type="date" value="${esc(s.end_date || '')}" class="w-full border rounded px-2 py-1.5 text-sm mt-1" required/></div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+      <div class="px-4 py-2 border-b font-semibold">Electrical (Ekurhuleni_Tariff_E_TOU_8 Field Street)</div>
+      <table class="w-full">
+        <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+          <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5">Rate</th><th class="px-3 py-1.5">Unit</th>
+          <th class="px-3 py-1.5">Reading</th><th class="px-3 py-1.5">Comment</th>
+        </tr></thead>
+        <tbody>${elecRows.map(rowHtml).join('')}</tbody>
+      </table>
+    </div>
+
+    <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+      <div class="px-4 py-2 border-b font-semibold bg-green-50">Water &amp; Sanitation</div>
+      <table class="w-full">
+        <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+          <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5">Rate</th><th class="px-3 py-1.5">Unit</th>
+          <th class="px-3 py-1.5">Reading</th><th class="px-3 py-1.5"></th>
+        </tr></thead>
+        <tbody>${waterRows.map(rowHtml).join('')}</tbody>
+      </table>
+    </div>
+
+    <details class="bg-white rounded-lg border p-4 mb-4">
+      <summary class="font-semibold cursor-pointer">Correction factors (advanced - only touch if the meters are recalibrated)</summary>
+      <div class="grid grid-cols-4 gap-3 mt-3">
+        <div><label class="text-xs text-slate-500">kVA factor</label>${rate('kva_factor', t.kva_factor ?? 1, '0.000000001')}</div>
+        <div><label class="text-xs text-slate-500">Peak factor</label>${rate('peak_factor', t.peak_factor ?? 1, '0.000000001')}</div>
+        <div><label class="text-xs text-slate-500">Standard factor</label>${rate('standard_factor', t.standard_factor ?? 1, '0.000000001')}</div>
+        <div><label class="text-xs text-slate-500">Off-Peak factor</label>${rate('offpeak_factor', t.offpeak_factor ?? 1, '0.000000001')}</div>
+      </div>
+    </details>
+
+    <button class="bg-slate-900 text-white rounded px-6 py-2 font-medium">Save billing slip</button>
+  </form>`;
+  return layout({ title: isEdit ? `Edit ${s.label}` : 'New billing slip', user, active: '/site-billing', body });
+}
+
+function siteBillingDetailPage({ user, slip, tariff, calc }) {
+  const lineRow = (item) => `<tr class="border-t">
+    <td class="px-3 py-1.5 text-sm">${esc(item.label)}</td>
+    <td class="px-3 py-1.5 text-sm text-right">${money(item.rate)}</td>
+    <td class="px-3 py-1.5 text-sm text-slate-500">${esc(item.unit)}</td>
+    <td class="px-3 py-1.5 text-sm text-right">${fmtNum(item.reading, 2)}</td>
+    <td class="px-3 py-1.5 text-sm text-right font-medium">${money(item.cost)}</td>
+    <td class="px-3 py-1.5 text-sm text-slate-500">${esc(item.comment || '')}</td>
+  </tr>`;
+
+  const body = `
+  <a href="/site-billing" class="text-sm text-blue-600 hover:underline">&larr; Billing Slips</a>
+  <div class="flex justify-between items-baseline mt-2 mb-4 flex-wrap gap-2">
+    <h1 class="text-2xl font-bold">Billing slip &mdash; ${esc(slip.label)}</h1>
+    <div class="flex gap-2">
+      <a href="/site-billing-pdf/${slip.id}" class="bg-slate-900 text-white rounded px-3 py-1.5 text-sm font-medium">Download PDF</a>
+      <a href="/site-billing/${slip.id}/edit" class="border rounded px-3 py-1.5 text-sm font-medium">Edit</a>
+      <form method="post" action="/site-billing/${slip.id}/delete" onsubmit="return confirm('Delete this billing slip? This cannot be undone.')">
+        <button class="border border-red-300 text-red-600 rounded px-3 py-1.5 text-sm font-medium">Delete</button>
+      </form>
+    </div>
+  </div>
+  <p class="text-sm text-slate-500 mb-4">Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}. Readings are as read off 8 Field Street's own meter; Cost already includes this tariff's correction factor (kVA &times;${fmtNum(tariff.kva_factor, 9)}, Peak &times;${fmtNum(tariff.peak_factor, 9)}, Standard &times;${fmtNum(tariff.standard_factor, 9)}, Off-Peak &times;${fmtNum(tariff.offpeak_factor, 9)}).</p>
+
+  <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold">Electrical (Ekurhuleni_Tariff_E_TOU_8 Field Street)</div>
+    <table class="w-full">
+      <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+        <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Unit</th>
+        <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5">Comment</th>
+      </tr></thead>
+      <tbody>${calc.elecItems.map(lineRow).join('')}</tbody>
+      <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="4">Total (Excl VAT)</td><td class="px-3 py-2 text-right">${money(calc.elecTotal)}</td><td></td></tr></tfoot>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold bg-green-50">Water &amp; Sanitation</div>
+    <table class="w-full">
+      <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+        <th class="px-3 py-1.5">Entry</th><th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Unit</th>
+        <th class="px-3 py-1.5 text-right">Reading</th><th class="px-3 py-1.5 text-right">Cost</th><th class="px-3 py-1.5"></th>
+      </tr></thead>
+      <tbody>${calc.waterItems.map(lineRow).join('')}</tbody>
+      <tfoot><tr class="border-t bg-slate-50 font-semibold"><td class="px-3 py-2" colspan="4">Total (Ex VAT)</td><td class="px-3 py-2 text-right">${money(calc.waterTotal)}</td><td></td></tr></tfoot>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-lg border p-4 max-w-sm ml-auto">
+    <div class="flex justify-between text-sm py-1"><span>Sub Total (Excl VAT)</span><span>${money(calc.subtotal)}</span></div>
+    <div class="flex justify-between text-sm py-1"><span>VAT (${(calc.vatRate * 100).toFixed(0)}%)</span><span>${money(calc.vatAmount)}</span></div>
+    <div class="flex justify-between font-semibold text-lg py-1 border-t mt-1 pt-2"><span>Total (Incl VAT)</span><span>${money(calc.total)}</span></div>
+  </div>`;
+  return layout({ title: `Billing slip - ${slip.label}`, user, active: '/site-billing', body });
+}
+
 module.exports = {
   esc, money, fmtNum, layout, loginPage, dashboardPage, tenantsPage, tenantDetailPage,
   metersPage, tariffsPage, billingPeriodsPage, newBillingPeriodPage, readingsCapturePage,
   readingsResultPage, billingSelectorPage, billDetailPage,
   solarBillingSlipsPage, municipalAccountsPage,
   reconciliationPage, auditLogPage, statusColor,
+  siteBillingListPage, siteBillingFormPage, siteBillingDetailPage,
 };

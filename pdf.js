@@ -498,4 +498,105 @@ function buildMunicipalStatementPdf(data) {
   return doc.build();
 }
 
-module.exports = { PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, money };
+// Builds the PDF for one 8 Field Street billing slip (see server.js's /site-billing-pdf/:id and
+// field-street/calc_field_street.js for how `data.calc` is computed). Same visual language as
+// buildBillingSlipPdf/buildMunicipalStatementPdf, but its own 6-column table (Entry/Rate/Unit/
+// Reading/Cost/Comment) since this is the one billing document in the app where the reading
+// itself, the rate, and a free-text comment (the municipality's max-demand timestamp) all need
+// their own column at once - none of the existing table-drawing helpers have room for all four.
+function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
+  const xRate = left + 208, xUnit = left + 216, xReading = left + 323, xCost = left + 408, xComment = left + 416;
+  doc.text(left, y, 'Entry', { bold: true, size: 8.5 });
+  doc.text(xRate - textWidth('Rate', { bold: true, size: 8.5 }), y, 'Rate', { bold: true, size: 8.5 });
+  doc.text(xUnit, y, 'Unit', { bold: true, size: 8.5 });
+  doc.text(xReading - textWidth('Reading', { bold: true, size: 8.5 }), y, 'Reading', { bold: true, size: 8.5 });
+  doc.text(xCost - textWidth('Cost', { bold: true, size: 8.5 }), y, 'Cost', { bold: true, size: 8.5 });
+  if (!opts.noComment) doc.text(xComment, y, 'Comment', { bold: true, size: 8.5 });
+  y -= 4; doc.line(left, y, right, y); y -= 12;
+  for (const it of items) {
+    doc.text(left, y, it.label, { size: 8.5 });
+    const rateStr = money(it.rate);
+    doc.text(xRate - textWidth(rateStr, { size: 8.5 }), y, rateStr, { size: 8.5 });
+    doc.text(xUnit, y, it.unit, { size: 8 });
+    const readingStr = it.reading.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    doc.text(xReading - textWidth(readingStr, { size: 8.5 }), y, readingStr, { size: 8.5 });
+    const costStr = money(it.cost);
+    doc.text(xCost - textWidth(costStr, { size: 8.5, bold: true }), y, costStr, { size: 8.5, bold: true });
+    if (it.comment) doc.text(xComment, y, it.comment, { size: 7.5 });
+    y -= 13;
+  }
+  return { y, xCost };
+}
+
+function buildSiteBillingSlipPdf(data) {
+  const doc = new PDFDoc();
+  const left = 42, right = PAGE_W - 42;
+  let y = PAGE_H - 50;
+  const propertyName = (data.propertyName || '8 FIELD STREET').toUpperCase();
+
+  doc.registerImage('Logo', LOGO);
+  const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
+  doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
+
+  doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
+  doc.text(left, y, 'Utility Billing Slip', { size: 10 });
+  y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
+  doc.line(left, y, right, y); y -= 18;
+
+  doc.text(left, y, 'Period:', { bold: true }); doc.text(left + 90, y, data.slip.label);
+  doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, `${data.slip.start_date} to ${data.slip.end_date}`); y -= 15;
+  doc.text(left, y, 'Tariff:', { bold: true }); doc.text(left + 90, y, 'Ekurhuleni_Tariff_E_TOU_8 Field Street');
+  doc.text(right - 180, y, 'Status:', { bold: true }); doc.text(right - 100, y, data.slip.status); y -= 20;
+
+  doc.line(left, y, right, y); y -= 18;
+
+  doc.text(left, y, 'ELECTRICAL', { size: 12, bold: true }); y -= 16;
+  ({ y } = drawSiteLineItemsTable(doc, data.calc.elecItems, left, right, y));
+  y -= 4; doc.line(left, y, right, y); y -= 4;
+  const elecTotalStr = money(data.calc.elecTotal);
+  doc.text(left, y, 'Total (Excl VAT)', { bold: true, size: 9.5 });
+  doc.text(right - textWidth(elecTotalStr, { size: 9.5, bold: true }), y, elecTotalStr, { bold: true, size: 9.5 }); y -= 22;
+
+  doc.text(left, y, 'WATER & SANITATION', { size: 12, bold: true }); y -= 16;
+  ({ y } = drawSiteLineItemsTable(doc, data.calc.waterItems, left, right, y, { noComment: true }));
+  y -= 4; doc.line(left, y, right, y); y -= 4;
+  const waterTotalStr = money(data.calc.waterTotal);
+  doc.text(left, y, 'Total (Ex VAT)', { bold: true, size: 9.5 });
+  doc.text(right - textWidth(waterTotalStr, { size: 9.5, bold: true }), y, waterTotalStr, { bold: true, size: 9.5 }); y -= 24;
+
+  doc.line(left, y, right, y); y -= 16;
+  const subtotalStr = money(data.calc.subtotal);
+  doc.text(right - 220, y, 'Sub Total (Excl VAT)', {});
+  doc.text(right - textWidth(subtotalStr, { size: 10 }), y, subtotalStr); y -= 14;
+  const vatStr = money(data.calc.vatAmount);
+  doc.text(right - 220, y, `VAT (${(data.calc.vatRate * 100).toFixed(0)}%)`, {});
+  doc.text(right - textWidth(vatStr, { size: 10 }), y, vatStr); y -= 14;
+  doc.line(right - 220, y + 8, right, y + 8);
+  const totalStr = money(data.calc.total);
+  doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 });
+  doc.text(right - textWidth(totalStr, { size: 12, bold: true }), y, totalStr, { bold: true, size: 12 }); y -= 20;
+
+  doc.text(left, 30, `Generated: ${data.generatedAt}. Readings are as read off 8 Field Street's own meters; Cost includes this tariff's ` +
+    `correction factor (kVA ×${data.tariff.kva_factor.toFixed(6)}, Peak ×${data.tariff.peak_factor.toFixed(6)}, ` +
+    `Standard ×${data.tariff.standard_factor.toFixed(6)}, Off-Peak ×${data.tariff.offpeak_factor.toFixed(6)}).`, { size: 6.5 });
+
+  if (data.monthlyTrend && data.monthlyTrend.length > 1) {
+    doc.newPage();
+    let ty = PAGE_H - 50;
+    doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
+    doc.text(left, ty, 'Utility Cost Excluding VAT', { size: 11, bold: true }); ty -= 8;
+    doc.line(left, ty, right, ty); ty -= 30;
+    drawTripleTrendCharts(doc, { x: left + 46, y: ty, width: right - left - 46, series: data.monthlyTrend });
+
+    doc.newPage();
+    let cy = PAGE_H - 50;
+    doc.text(left, cy, propertyName, { size: 16, bold: true }); cy -= 14;
+    doc.text(left, cy, 'Consumption Trend', { size: 11, bold: true }); cy -= 8;
+    doc.line(left, cy, right, cy); cy -= 30;
+    drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend });
+  }
+
+  return doc.build();
+}
+
+module.exports = { PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, money };

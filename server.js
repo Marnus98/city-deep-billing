@@ -8,12 +8,13 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
-const { buildBillingSlipPdf, buildMunicipalStatementPdf } = require('./pdf');
+const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
 const properties = require('./properties');
 const { seedUsers } = require('./shared_seed_users');
+const calcFieldStreet = require('./field-street/calc_field_street');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -36,7 +37,13 @@ const propertyDbs = new Map(); // slug -> DatabaseSync
 for (const prop of properties) {
   let propDb = open(prop.dbFile);
   migrate(propDb);
-  const isEmpty = propDb.prepare('SELECT COUNT(*) c FROM tenants').get().c === 0;
+  // "Empty" means different things per billingModel: a tenant-billed property (City Deep,
+  // Wingfield) is empty when it has no tenants; a flat_site property (8 Field Street) never has
+  // tenants at all, so it's empty when it has no billing slips yet instead - checking `tenants`
+  // for a flat_site property would (harmlessly, but pointlessly) re-run its seed on every single
+  // boot forever, since that table is always 0 for it.
+  const emptyCheckTable = prop.billingModel === 'flat_site' ? 'site_billing_slips' : 'tenants';
+  const isEmpty = propDb.prepare(`SELECT COUNT(*) c FROM ${emptyCheckTable}`).get().c === 0;
   if (isEmpty) {
     propDb.close();
     let seedModule = null;
@@ -286,6 +293,11 @@ route('POST', '/switch-property', async (req, res) => {
 
 route('GET', '/dashboard', async (req, res, params, query) => {
   const user = requireLogin(req, res); if (!user) return;
+  // The tenant/bills-oriented dashboard below doesn't mean anything for a flat_site property (see
+  // properties.js) - there are no tenants or per-tenant bills to summarise, just a list of monthly
+  // billing slips - so /site-billing (its own list page) stands in as this property's "dashboard".
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  if (currentProp && currentProp.billingModel === 'flat_site') return redirect(res, '/site-billing');
   const data = dashboardData(query.periodId);
   send(res, 200, views.dashboardPage({ user, ...data }));
 });
@@ -454,6 +466,155 @@ route('POST', '/readings/:periodId/delete/:meterId', async (req, res, params) =>
     audit(user.userId, 'delete_reading', 'meter_reading', meterId, null, null, null, `Deleted manual reading for meter ${meterId}, period ${period.label}`);
   }
   redirect(res, `/readings/${period.id}`);
+});
+
+// ---------------- flat_site billing (8 Field Street) ----------------
+// See properties.js's billingModel and db.js's site_tariffs/site_billing_slips for why this is a
+// separate small set of routes rather than reusing the tenant/billing_period machinery above.
+
+const SITE_TARIFF_FIELDS = [
+  'fixed_charge_rate', 'network_access_rate', 'network_demand_rate',
+  'peak_high_rate', 'peak_low_rate', 'standard_high_rate', 'standard_low_rate',
+  'offpeak_high_rate', 'offpeak_low_rate', 'water_rate', 'sewer_rate',
+  'kva_factor', 'peak_factor', 'standard_factor', 'offpeak_factor',
+];
+const SITE_READING_FIELDS = [
+  'network_access_kva', 'network_demand_kva', 'peak_high_kwh', 'peak_low_kwh',
+  'standard_high_kwh', 'standard_low_kwh', 'offpeak_high_kwh', 'offpeak_low_kwh',
+  'water_kl', 'sewer_kl',
+];
+
+// Reuses an existing site_tariffs row if one already has these exact rates/factors (e.g. saving a
+// slip without touching the tariff section), otherwise inserts a new version - this is what makes
+// "the rate ... should reflect the tariffs as in the image for each new month" work: each month's
+// slip just carries whichever tariff row matches what was typed in, new or old.
+function findOrCreateSiteTariff(fields, effectiveFrom) {
+  const existing = all('SELECT * FROM site_tariffs ORDER BY id DESC');
+  const match = existing.find((t) => SITE_TARIFF_FIELDS.every((c) => Math.abs((t[c] || 0) - (Number(fields[c]) || 0)) < 1e-9));
+  if (match) return match.id;
+  const cols = SITE_TARIFF_FIELDS.join(', ');
+  const placeholders = SITE_TARIFF_FIELDS.map(() => '?').join(',');
+  run(`INSERT INTO site_tariffs (effective_from, ${cols}) VALUES (?, ${placeholders})`,
+    [effectiveFrom, ...SITE_TARIFF_FIELDS.map((c) => Number(fields[c]) || 0)]);
+  return get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
+}
+
+// Trailing-12-month view of this site's own cost + consumption, for the PDF's trend charts (see
+// drawTripleTrendCharts/drawConsumptionTrendCharts in pdf.js, reused as-is from the tenant billing
+// slip - Sewer is passed in the `sanitation` slot since those charts were built around
+// Electricity/Water/Sanitation and the shapes line up one-for-one).
+function monthlyTrendForSite(asOfStartDate) {
+  const slips = all(`SELECT s.*, t.* FROM site_billing_slips s JOIN site_tariffs t ON t.id=s.tariff_id
+    WHERE s.start_date<=? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate]);
+  return slips.reverse().map((row) => {
+    const { elecTotal, waterTotal, elecItems } = calcFieldStreet.computeSlip(row, row);
+    const elecKwh = elecItems.filter((i) => i.key !== 'fixed_charge' && i.key !== 'network_access' && i.key !== 'network_demand')
+      .reduce((s, i) => s + i.adjustedReading, 0);
+    return {
+      label: row.label,
+      elec: elecTotal, water: row.water_kl * row.water_rate, sanitation: row.sewer_kl * row.sewer_rate,
+      elecKwh, waterM3: row.water_kl,
+    };
+  });
+}
+
+route('GET', '/site-billing', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slips = all(`SELECT s.*, t.* , s.id as id FROM site_billing_slips s JOIN site_tariffs t ON t.id=s.tariff_id ORDER BY s.start_date DESC`);
+  const rows = slips.map((row) => ({ row, calc: calcFieldStreet.computeSlip(row, row) }));
+  send(res, 200, views.siteBillingListPage({ user, rows }));
+});
+
+route('GET', '/site-billing/new', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const latestTariff = get('SELECT * FROM site_tariffs ORDER BY id DESC LIMIT 1');
+  const latestSlip = get('SELECT * FROM site_billing_slips ORDER BY start_date DESC LIMIT 1');
+  send(res, 200, views.siteBillingFormPage({ user, tariff: latestTariff, slip: null, latestSlip }));
+});
+
+route('GET', '/site-billing/:id/edit', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
+  if (!slip) return send(res, 404, 'Not found');
+  const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
+  send(res, 200, views.siteBillingFormPage({ user, tariff, slip, latestSlip: null }));
+});
+
+async function saveSiteBillingSlip(req, res, existingId) {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const body = await readBody(req);
+  const label = (body.label || '').trim();
+  const startDate = body.start_date, endDate = body.end_date;
+  if (!label || !startDate || !endDate) {
+    const tariff = { ...body };
+    return send(res, 400, views.siteBillingFormPage({ user, tariff, slip: { ...body, id: existingId }, latestSlip: null, error: 'Label, start date and end date are all required.' }));
+  }
+  const tariffId = findOrCreateSiteTariff(body, startDate);
+  const fields = ['label', 'start_date', 'end_date', 'tariff_id',
+    'network_access_kva', 'network_access_comment', 'network_demand_kva', 'network_demand_comment',
+    'peak_high_kwh', 'peak_low_kwh', 'standard_high_kwh', 'standard_low_kwh',
+    'offpeak_high_kwh', 'offpeak_low_kwh', 'water_kl', 'sewer_kl', 'entered_by'];
+  const values = [
+    label, startDate, endDate, tariffId,
+    Number(body.network_access_kva) || 0, body.network_access_comment || null,
+    Number(body.network_demand_kva) || 0, body.network_demand_comment || null,
+    Number(body.peak_high_kwh) || 0, Number(body.peak_low_kwh) || 0,
+    Number(body.standard_high_kwh) || 0, Number(body.standard_low_kwh) || 0,
+    Number(body.offpeak_high_kwh) || 0, Number(body.offpeak_low_kwh) || 0,
+    Number(body.water_kl) || 0, Number(body.sewer_kl) || 0, user.userId,
+  ];
+  if (existingId) {
+    run(`UPDATE site_billing_slips SET ${fields.map((f) => `${f}=?`).join(', ')} WHERE id=?`, [...values, existingId]);
+    audit(user.userId, 'update', 'site_billing_slip', existingId, null, null, label, null);
+    redirect(res, `/site-billing/${existingId}`);
+  } else {
+    run(`INSERT INTO site_billing_slips (${fields.join(', ')}) VALUES (${fields.map(() => '?').join(',')})`, values);
+    const created = get('SELECT id FROM site_billing_slips WHERE label=?', [label]);
+    audit(user.userId, 'create', 'site_billing_slip', created.id, null, null, label, null);
+    redirect(res, `/site-billing/${created.id}`);
+  }
+}
+
+route('POST', '/site-billing/new', async (req, res) => saveSiteBillingSlip(req, res, null));
+route('POST', '/site-billing/:id/edit', async (req, res, params) => saveSiteBillingSlip(req, res, Number(params.id)));
+
+route('GET', '/site-billing/:id', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
+  if (!slip) return send(res, 404, 'Not found');
+  const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
+  const calc = calcFieldStreet.computeSlip(slip, tariff);
+  send(res, 200, views.siteBillingDetailPage({ user, slip, tariff, calc }));
+});
+
+route('POST', '/site-billing/:id/delete', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
+  if (slip) {
+    run('DELETE FROM site_billing_slips WHERE id=?', [params.id]);
+    audit(user.userId, 'delete', 'site_billing_slip', slip.id, null, null, null, `Deleted site billing slip ${slip.label}`);
+  }
+  redirect(res, '/site-billing');
+});
+
+route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slip = get('SELECT * FROM site_billing_slips WHERE id=?', [params.id]);
+  if (!slip) return send(res, 404, 'Not found');
+  const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
+  const calc = calcFieldStreet.computeSlip(slip, tariff);
+  const monthlyTrend = monthlyTrendForSite(slip.start_date);
+  const pdfBuf = buildSiteBillingSlipPdf({
+    propertyName: currentPropertyName(user), slip, tariff, calc, monthlyTrend,
+    generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+  });
+  audit(user.userId, 'pdf_download', 'site_billing_slip', slip.id, null, null, null, slip.label);
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="8-field-street-${slip.label}.pdf"` });
+  res.end(pdfBuf);
 });
 
 route('GET', '/billing', async (req, res) => {
