@@ -77,6 +77,13 @@ function main(dbFile = 'loper-road.db') {
     if (slipId) created++;
   }
   if (created) console.log(`Loper Road - Sandvic history import: ${created} month(s) added (Jul 2025 - Jun 2026).`);
+
+  // The client doesn't want the site-meter correction factor applied to any historical import -
+  // it should only ever be ticked deliberately, per month, on new slips added going forward via
+  // the live "Add Billing Slip" form (default unticked there too - see views.js). Runs
+  // unconditionally every boot; a no-op once every slip is already off.
+  db.prepare('UPDATE site_billing_slips SET apply_correction_factor=0').run();
+
   return db;
 }
 

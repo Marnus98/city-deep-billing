@@ -851,7 +851,11 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
   const s = slip || {};
   const r = readings || {};
   const startDateDefault = s.start_date || (latestSlip ? latestSlip.end_date : '');
-  const applyFactorOff = s.apply_correction_factor === 0 || s.apply_correction_factor === false;
+  // Default is UNTICKED - for a brand-new slip (s.apply_correction_factor is undefined) and for
+  // every historical slip (all forced to 0 by each site's import_history.js), the box starts
+  // unchecked. It only starts checked when a slip was explicitly saved with the factor on
+  // (apply_correction_factor === 1) - i.e. the client ticked it themselves for that one month.
+  const applyFactorOn = s.apply_correction_factor === 1 || s.apply_correction_factor === true;
   const rateInput = (name, value, step = '0.01') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
 
   // items (site_tariff_items/municipal_tariff_items rows, already sort_order'd) IS the form's
@@ -930,7 +934,7 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
     <details class="bg-white rounded-lg border p-4 mb-4">
       <summary class="font-semibold cursor-pointer">Correction factors (advanced - only touch if the meters are recalibrated)</summary>
       <label class="flex items-center gap-2 text-sm mt-3">
-        <input type="checkbox" name="apply_correction_factor" value="1" ${applyFactorOff ? '' : 'checked'}/>
+        <input type="checkbox" name="apply_correction_factor" value="1" ${applyFactorOn ? 'checked' : ''}/>
         Apply these factors to this month's readings
       </label>
       <p class="text-xs text-slate-500 mt-1 mb-3">Our meters read lower than the municipality's - only relevant to the client-facing billing slip. A municipal account statement's readings are already the municipality's own figures, so this is off by default there.</p>

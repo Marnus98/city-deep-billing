@@ -85,6 +85,10 @@ require('./bob-martin/import_history').run('bob-martin.db');
 require('./loper-road/import_history').run('loper-road.db');
 require('./autozone/import_history').run('autozone.db');
 require('./cranbrook-flavours/import_history').run('cranbrook-flavours.db');
+// Bob Martin's actual municipal account statements (Dec 2025, Jan/Feb/Mar/May 2026 - Apr 2026
+// missing, no statement provided for it) - own de-dup key (label), separate tables from the above
+// (see db.js), always safe to re-run; see bob-martin/municipal_import.js for extraction notes.
+require('./bob-martin/municipal_import').run('bob-martin.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {

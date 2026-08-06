@@ -100,4 +100,29 @@ const EKURHULENI_MUNICIPAL_E_TOU_8FS = [
   ...WATER_SEWER_ITEMS,
 ];
 
-module.exports = { EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, CITY_POWER_LV_TOU, EKURHULENI_MUNICIPAL_E_TOU_8FS };
+// Ekurhuleni municipal account statement shape for Bob Martin (see bob-martin/municipal_import.js) -
+// structurally close to EKURHULENI_MUNICIPAL_E_TOU_8FS above but two genuine differences on this
+// site's actual statements: "Network Access Charge" is a flat monthly fee here (identical every
+// month regardless of the kVA reading - not a per-kVA rate at all, unlike Network Demand which
+// does scale with kVA), and Refuse Removal is billed as two separate line items ("Business" bin
+// collection and area-wide "Litter-picking"), not one combined figure.
+const EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN = [
+  { key: 'property_rates', label: 'Property Rates (Industrial)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal', vatExempt: true },
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'network_demand', label: 'Network Demand', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'peak_high', label: 'Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'peak_low', label: 'Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_high', label: 'Standard Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_low', label: 'Standard Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_high', label: 'Off-Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'refuse_business', label: 'Refuse Removal - Business', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  { key: 'refuse_litter', label: 'Refuse Removal - Litter-picking', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  ...WATER_SEWER_ITEMS,
+];
+
+module.exports = {
+  EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, CITY_POWER_LV_TOU, EKURHULENI_MUNICIPAL_E_TOU_8FS,
+  EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN,
+};

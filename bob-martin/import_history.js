@@ -77,6 +77,76 @@ function main(dbFile = 'bob-martin.db') {
     if (slipId) created++;
   }
   if (created) console.log(`Bob Martin history import: ${created} month(s) added (Jul 2025 - Jul 2026).`);
+
+  // ---------------------------------------------------------------------------------------------
+  // Corrections below: the client's "Bob Martin - past billing V2.xlsx" (uploaded 2026-08-06) is a
+  // literal export of the real "Bob Martins Main Incomer" statement for every month Jul 2025-Jul
+  // 2026 except Sep 2025 (missing from the workbook, left as this script's original estimate).
+  // Cross-checking every row's rate*reading against the sheet's own printed Cost and Total (Ex
+  // VAT) figures (all reconcile to the cent) confirmed: every month's rates already matched
+  // exactly, and 9 of the 11 months' readings already matched exactly too (Jul-Dec 2025, Jan-Apr
+  // 2026, Jun 2026) - only May and July 2026 had different (corrected) readings, and only those
+  // two months carry a Water & Sanitation section at all (every other month has none in the source
+  // workbook, so stays unbilled at R0 here, same as before). Runs unconditionally every boot, like
+  // every other correction block in this project - idempotent (UPDATEs are no-ops once correct).
+  // May 2026 shares its tariff (RATES_B, effective 2026-02-01) with Feb/Mar/Apr/Jun, none of which
+  // have any water/sewer data of their own in the source workbook - updating water/sewer directly
+  // on that shared tariff row would incorrectly put a nonzero rate against those months' still-R0
+  // water section too. So May gets its own tariff version instead (identical electrical rates,
+  // only water/sewer set), same pattern used for 8 Field Street's per-month tariff corrections.
+  const RATES_MAY26 = {
+    fixed_charge: 3069.24, network_access: 105.9466, network_demand: 158.13,
+    peak_high: 10.8065, peak_low: 3.561, standard_high: 3.1578, standard_low: 2.343,
+    offpeak_high: 1.9508, offpeak_low: 1.788, water: 49.11, sewer: 18.91,
+  };
+  const may26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-05-01', shape: EKURHULENI_E_TOU, rates: RATES_MAY26, factors: FACTORS,
+    notes: 'Water/sewer confirmed via "Bob Martin - past billing V2.xlsx" for May 2026 only - '
+      + 'electrical rates unchanged from RATES_B, just given its own tariff version so April/June '
+      + "(still R0/unbilled water) aren't affected.",
+  });
+  const maySlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-05'").get();
+  if (maySlip) {
+    db.prepare('UPDATE site_billing_slips SET tariff_id=? WHERE id=?').run(may26TariffId, maySlip.id);
+    const maySet = db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key=?");
+    maySet.run(499.39500000000004, maySlip.id, 'network_access');
+    maySet.run(499.39500000000004, maySlip.id, 'network_demand');
+    maySet.run(20999.075558334094, maySlip.id, 'peak_low');
+    maySet.run(49083.28964358961, maySlip.id, 'standard_low');
+    maySet.run(33330.46900673987, maySlip.id, 'offpeak_low');
+    const hasWater = db.prepare("SELECT 1 FROM site_slip_readings WHERE slip_id=? AND item_key='water'").get(maySlip.id);
+    if (hasWater) {
+      db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(107, maySlip.id);
+    } else {
+      db.prepare("INSERT INTO site_slip_readings (slip_id, item_key, reading) VALUES (?,?,?)").run(maySlip.id, 'water', 107);
+      db.prepare("INSERT INTO site_slip_readings (slip_id, item_key, reading) VALUES (?,?,?)").run(maySlip.id, 'sewer', 107);
+    }
+  }
+  const julSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-07'").get();
+  if (julSlip) {
+    const julSet = db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key=?");
+    julSet.run(494.6710841773542, julSlip.id, 'network_access');
+    julSet.run(494.6710841773542, julSlip.id, 'network_demand');
+    julSet.run(21130.999414734284, julSlip.id, 'peak_high');
+    julSet.run(50108.47706122777, julSlip.id, 'standard_high');
+    julSet.run(37241.9490158341, julSlip.id, 'offpeak_high');
+    db.prepare("UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key='water'").run(54.51, julSlip.tariff_id);
+    db.prepare("UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key='sewer'").run(22.07, julSlip.tariff_id);
+    const hasWater = db.prepare("SELECT 1 FROM site_slip_readings WHERE slip_id=? AND item_key='water'").get(julSlip.id);
+    if (hasWater) {
+      db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(114, julSlip.id);
+    } else {
+      db.prepare("INSERT INTO site_slip_readings (slip_id, item_key, reading) VALUES (?,?,?)").run(julSlip.id, 'water', 114);
+      db.prepare("INSERT INTO site_slip_readings (slip_id, item_key, reading) VALUES (?,?,?)").run(julSlip.id, 'sewer', 114);
+    }
+  }
+
+  // The client doesn't want the site-meter correction factor applied to any historical import -
+  // it should only ever be ticked deliberately, per month, on new slips added going forward via
+  // the live "Add Billing Slip" form (default unticked there too - see views.js). Runs
+  // unconditionally every boot; a no-op once every slip is already off.
+  db.prepare('UPDATE site_billing_slips SET apply_correction_factor=0').run();
+
   return db;
 }
 

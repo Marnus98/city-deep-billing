@@ -83,20 +83,126 @@ function main(dbFile = 'field-street.db') {
   }
   if (created) console.log(`8 Field Street history import: ${created} month(s) added (Jul 2025 - Jun 2026).`);
 
-  // One-off correction for the July 2026 slip: the client corrected the water/sewer tariff to
-  // R49.11/kL water, R18.91/kL sewer (the reference statement's R54.51/R22.07 was wrong) and asked
-  // for the meter reading to be adjusted rather than the bill total - so 222.48 kL is back-solved
-  // to keep the Water & Sanitation section at the same R15,132.97 total the client had already
-  // seen, under the corrected rates. seed.js already plants these correct values on a brand-new
-  // database, but a database seeded before this correction (i.e. the live site) never re-runs
-  // seed.js - so this UPDATE runs unconditionally every boot (like the rest of this script) to
-  // reach it too. Idempotent: setting fixed values is a no-op once already correct.
+  // ---------------------------------------------------------------------------------------------
+  // Corrections below: the client's "8 field test - past billing V2.xlsx" (uploaded 2026-08-06)
+  // is a literal export of the real "8 Field Street Main Electrical" statement for March, April,
+  // May, June and July 2026, in the exact Entry/Rate/Unit/Reading/Cost/Comment shape our own PDF
+  // uses. Cross-checking every row's rate*reading against the sheet's own printed Cost and Total
+  // (Excl VAT)/Sub Total figures (all reconcile to the cent) revealed the sheet's "Reading" column
+  // is the *unadjusted* figure - i.e. for these 5 months apply_correction_factor must be OFF, not
+  // the seedSlip default of ON, or the app was silently grossing up an already-correct reading by
+  // the ~1.7-3.9% kva/peak/standard/offpeak factors and overstating the bill. (The correction
+  // factor concept still applies as originally intended to every *other* month - Jul 2025-Feb 2026
+  // - where we only ever had the site's own submeter estimate, not the real statement.)
+  //
+  // Each block below is idempotent and runs unconditionally every boot, like the rest of this
+  // script (UPDATEs are no-ops once already correct; seedTariff dedupes by
+  // tariff_name+effective_from) - necessary because seed.js/the MONTHS loop above only ever insert
+  // once and a live (already-seeded) database never re-runs them.
+
+  // March / April / May 2026: same electrical rates as RATES_B (fixed_charge, network_access,
+  // network_demand, and every peak/standard/off-peak rate all match RATES_B exactly) - only
+  // water/sewer differs (R49.11/R18.91, not RATES_B's R49.15/R18.93 historic back-solved guess) -
+  // so these three months share one new tariff version rather than RATES_B itself, to avoid
+  // touching February (still an unconfirmed estimate). March and April's electrical readings
+  // already matched the real statement exactly (no factor needed); May's raw kVA/peak/standard/
+  // off-peak readings were themselves off (a bad historic estimate) and are corrected below too.
+  const RATES_MAR_APR_MAY26 = {
+    fixed_charge: 5207.09, network_access: 105.9466, network_demand: 146.09,
+    peak_high: 10.486, peak_low: 3.415, standard_high: 3.036, standard_low: 2.231,
+    offpeak_high: 1.848, offpeak_low: 1.693, water: 49.11, sewer: 18.91,
+  };
+  const marAprMayTariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-03-01', shape: EKURHULENI_E_TOU, rates: RATES_MAR_APR_MAY26, factors: FACTORS,
+    notes: 'Actual water/sewer rate (R49.11/R18.91) confirmed via the client\'s "8 field test - past '
+      + 'billing V2.xlsx" for March-May 2026, replacing the RATES_B back-solved historic guess '
+      + '(R49.15/R18.93) for these 3 months. Electrical rates unchanged from RATES_B.',
+  });
+  const marSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-03'").get();
+  if (marSlip) {
+    db.prepare('UPDATE site_billing_slips SET tariff_id=?, apply_correction_factor=0 WHERE id=?').run(marAprMayTariffId, marSlip.id);
+    db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(190.685, marSlip.id);
+  }
+  const aprSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-04'").get();
+  if (aprSlip) {
+    db.prepare('UPDATE site_billing_slips SET tariff_id=?, apply_correction_factor=0 WHERE id=?').run(marAprMayTariffId, aprSlip.id);
+    db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(217.735, aprSlip.id);
+  }
+  const maySlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-05'").get();
+  if (maySlip) {
+    db.prepare('UPDATE site_billing_slips SET tariff_id=?, apply_correction_factor=0 WHERE id=?').run(marAprMayTariffId, maySlip.id);
+    db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(214.36, maySlip.id);
+    const maySet = db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key=?");
+    maySet.run(617.0271947049999, maySlip.id, 'network_access');
+    maySet.run(617.0271947049999, maySlip.id, 'network_demand');
+    maySet.run(46446.34727079082, maySlip.id, 'peak_low');
+    maySet.run(105661.43837171832, maySlip.id, 'standard_low');
+    maySet.run(142429.55555733255, maySlip.id, 'offpeak_low');
+  }
+
+  // June 2026: same fix as March/April/May (turn correction factor OFF), plus June already needed
+  // its own genuinely different tariff (see RATES_JUN26 below, set in an earlier pass) - the
+  // reading values here replace the raw-pre-factor figures previously stored (580.191224 etc,
+  // which only worked because they were deliberately back-computed as reading/factor - simpler and
+  // less fragile to just store the real reading directly and turn the factor off, matching every
+  // other corrected month).
+  const RATES_JUN26 = {
+    fixed_charge: 6195.35, network_access: 101.1166, network_demand: 146.09,
+    peak_high: 10.4902, peak_low: 3.4150, standard_high: 3.0403, standard_low: 2.2310,
+    offpeak_high: 1.8609, offpeak_low: 1.6930, water: 49.65, sewer: 19.226,
+  };
+  const jun26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-06-01', shape: EKURHULENI_E_TOU, rates: RATES_JUN26, factors: FACTORS,
+    notes: 'Actual rates from the client-provided "8 Field Street Main Electrical" statement for the '
+      + 'period 2026-06-01 to 2026-07-01, replacing the earlier RATES_B estimate for this one month.',
+  });
+  const junSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-06'").get();
+  if (junSlip) {
+    db.prepare('UPDATE site_billing_slips SET tariff_id=?, apply_correction_factor=0 WHERE id=?').run(jun26TariffId, junSlip.id);
+    const junSet = db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key=?");
+    junSet.run(602.634, junSlip.id, 'network_access');
+    junSet.run(602.634, junSlip.id, 'network_demand');
+    junSet.run(41880, junSlip.id, 'peak_high');
+    junSet.run(95230.8, junSlip.id, 'standard_high');
+    junSet.run(116686.8, junSlip.id, 'offpeak_high');
+    db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(193, junSlip.id);
+  }
+
+  // July 2026: seed.js planted this slip with rates/readings rounded to 2 decimal places (taken
+  // from the original reference image) and the seedSlip default of apply_correction_factor ON,
+  // which was silently grossing up an already-correct reading - same bug as March/April/June
+  // above. Full-precision rates/readings below come straight from the V2 workbook. Water/sewer are
+  // deliberately NOT reset to the V2 sheet's R54.51/R22.07/197.61kL here - the client explicitly
+  // corrected those to R49.11/R18.91 with a 222.48kL reading earlier in this project (see the
+  // water/sewer note at the top of this file), and that correction stands.
   const julSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-07'").get();
   if (julSlip) {
-    db.prepare("UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key='water'").run(49.11, julSlip.tariff_id);
-    db.prepare("UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key='sewer'").run(18.91, julSlip.tariff_id);
+    const julRate = db.prepare("UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key=?");
+    julRate.run(11.4354, julSlip.tariff_id, 'peak_high');
+    julRate.run(3.7227, julSlip.tariff_id, 'peak_low');
+    julRate.run(3.3142, julSlip.tariff_id, 'standard_high');
+    julRate.run(2.4324, julSlip.tariff_id, 'standard_low');
+    julRate.run(2.0286, julSlip.tariff_id, 'offpeak_high');
+    julRate.run(1.8451, julSlip.tariff_id, 'offpeak_low');
+    julRate.run(49.11, julSlip.tariff_id, 'water');
+    julRate.run(18.91, julSlip.tariff_id, 'sewer');
+    db.prepare('UPDATE site_billing_slips SET apply_correction_factor=0 WHERE id=?').run(julSlip.id);
+    const julSet = db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key=?");
+    julSet.run(628.48638795, julSlip.id, 'network_access');
+    julSet.run(628.48638795, julSlip.id, 'network_demand');
+    julSet.run(54891.82308157098, julSlip.id, 'peak_high');
+    julSet.run(117534.54287771918, julSlip.id, 'standard_high');
+    julSet.run(140252.84279365416, julSlip.id, 'offpeak_high');
     db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(222.48, julSlip.id);
   }
+
+  // The client doesn't want the site-meter correction factor applied to any historical import -
+  // it should only ever be ticked deliberately, per month, on new slips added going forward via
+  // the live "Add Billing Slip" form (default unticked there too - see views.js). The blocks above
+  // already turn it off month-by-month for Mar-Jul 2026; this blanket UPDATE catches every other
+  // month too (Jul 2025 - Feb 2026, still on the seedSlip default of ON until now). Runs
+  // unconditionally every boot; a no-op once every slip is already off.
+  db.prepare('UPDATE site_billing_slips SET apply_correction_factor=0').run();
 
   return db;
 }
