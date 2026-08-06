@@ -538,28 +538,59 @@ function findOrCreateSiteTariff(templateTariff, template, body, effectiveFrom) {
   return tariffId;
 }
 
-// Trailing-12-month view of this site's own cost + consumption, for the PDF's trend charts (see
-// drawTripleTrendCharts/drawConsumptionTrendCharts in pdf.js, reused as-is from the tenant billing
-// slip - Sewer is passed in the `sanitation` slot since those charts were built around
-// Electricity/Water/Sanitation and the shapes line up one-for-one). elecKwh sums every row whose
-// factor_type is peak/standard/offpeak - true across every tariff shape seen so far, and correctly
-// excludes AutoZone's Network Surcharge row (a derived R/kWh figure, not an independent reading).
+// Generates every 'YYYY-MM' label from startLabel to endLabel inclusive - used to fill trend-chart
+// series with an explicit blank entry for a calendar month that has no slip at all (e.g. 8 Field
+// Street's municipal account is missing an April 2026 statement - see field-street/
+// municipal_import.js), so the PDF chart shows a genuine gap there instead of silently closing the
+// gap by butting March straight up against May.
+function monthLabelRange(startLabel, endLabel) {
+  const labels = [];
+  let [y, m] = startLabel.split('-').map(Number);
+  const [endY, endM] = endLabel.split('-').map(Number);
+  while (y < endY || (y === endY && m <= endM)) {
+    labels.push(`${y}-${String(m).padStart(2, '0')}`);
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return labels;
+}
+
+// elecKwh sums every row whose item_key starts with peak_/standard_/offpeak_ (matches by key, not
+// factor_type - a municipal statement's items never carry a factor_type at all, since there's
+// nothing to gross up on the municipality's own meter reading, so filtering on factor_type would
+// silently zero out every municipal consumption figure). Correctly excludes AutoZone's Network
+// Surcharge row (key 'network_surcharge' - a derived R/kWh figure, not an independent reading) and
+// every municipal-only row (property_rates, refuse - key doesn't match the prefixes either).
+function sumElecKwh(elecItems) {
+  return elecItems.filter((i) => i.key.startsWith('peak_') || i.key.startsWith('standard_') || i.key.startsWith('offpeak_'))
+    .reduce((s, i) => s + i.adjustedReading, 0);
+}
+
+// Trailing-12-actual-statement view of this site's own cost + consumption, for the PDF's trend
+// charts (see drawTripleTrendCharts/drawConsumptionTrendCharts in pdf.js, reused as-is from the
+// tenant billing slip - Sewer is passed in the `sanitation` slot since those charts were built
+// around Electricity/Water/Sanitation and the shapes line up one-for-one). Fills any calendar-month
+// gap between the earliest and latest of those 12 with a blank ({elec: null, ...}) entry rather
+// than skipping it, so pdf.js's chart drawing can render an empty column instead of closing the gap.
 function monthlyTrendForSite(asOfStartDate) {
   const slips = all(`SELECT s.* FROM site_billing_slips s
     WHERE s.start_date<=? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate]);
-  return slips.reverse().map((slip) => {
+  const ordered = slips.reverse();
+  if (!ordered.length) return [];
+  const byLabel = new Map(ordered.map((s) => [s.label, s]));
+  return monthLabelRange(ordered[0].label, ordered[ordered.length - 1].label).map((label) => {
+    const slip = byLabel.get(label);
+    if (!slip) return { label, elec: null, water: null, sanitation: null, elecKwh: null, waterM3: null };
     const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
     const items = getTariffItems(slip.tariff_id);
     const readings = getSlipReadings(slip.id);
     const { elecTotal, elecItems, waterItems } = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
-    const elecKwh = elecItems.filter((i) => ['peak', 'standard', 'offpeak'].includes(i.factor_type))
-      .reduce((s, i) => s + i.adjustedReading, 0);
     const waterItem = waterItems.find((i) => i.key === 'water');
     const sewerItem = waterItems.find((i) => i.key === 'sewer');
     return {
-      label: slip.label,
+      label,
       elec: elecTotal, water: waterItem ? waterItem.cost : 0, sanitation: sewerItem ? sewerItem.cost : 0,
-      elecKwh, waterM3: waterItem ? waterItem.reading : 0,
+      elecKwh: sumElecKwh(elecItems), waterM3: waterItem ? waterItem.reading : 0,
     };
   });
 }
@@ -734,22 +765,29 @@ function findOrCreateMunicipalTariff(templateTariff, template, body, effectiveFr
   return tariffId;
 }
 
+// Same trailing-view + gap-filling as monthlyTrendForSite (see monthLabelRange/sumElecKwh above) -
+// 8 Field Street's municipal account is missing an April 2026 statement (no PDF was provided for
+// it), so this is exactly the case that needed a real blank column instead of March butting
+// straight up against May.
 function monthlyTrendForMunicipal(asOfStartDate) {
   const slips = all(`SELECT s.* FROM municipal_statement_slips s
     WHERE s.start_date<=? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate]);
-  return slips.reverse().map((slip) => {
+  const ordered = slips.reverse();
+  if (!ordered.length) return [];
+  const byLabel = new Map(ordered.map((s) => [s.label, s]));
+  return monthLabelRange(ordered[0].label, ordered[ordered.length - 1].label).map((label) => {
+    const slip = byLabel.get(label);
+    if (!slip) return { label, elec: null, water: null, sanitation: null, elecKwh: null, waterM3: null };
     const tariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [slip.tariff_id]);
     const items = getMunicipalTariffItems(slip.tariff_id);
     const readings = getMunicipalStatementReadings(slip.id);
     const { elecTotal, elecItems, waterItems } = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
-    const elecKwh = elecItems.filter((i) => ['peak', 'standard', 'offpeak'].includes(i.factor_type))
-      .reduce((s, i) => s + i.adjustedReading, 0);
     const waterItem = waterItems.find((i) => i.key === 'water');
     const sewerItem = waterItems.find((i) => i.key === 'sewer');
     return {
-      label: slip.label,
+      label,
       elec: elecTotal, water: waterItem ? waterItem.cost : 0, sanitation: sewerItem ? sewerItem.cost : 0,
-      elecKwh, waterM3: waterItem ? waterItem.reading : 0,
+      elecKwh: sumElecKwh(elecItems), waterM3: waterItem ? waterItem.reading : 0,
     };
   });
 }

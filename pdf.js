@@ -186,8 +186,12 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
   const COLOR_WATER = [0.13, 0.62, 0.35];
   const COLOR_SAN = [0.93, 0.55, 0.09];
 
-  const totals = series.map((s) => (s.elec || 0) + (s.water || 0) + (s.sanitation || 0));
-  const maxVal = Math.max(1, ...totals);
+  // A month with no statement at all has elec/water/sanitation all null (see monthLabelRange/
+  // monthlyTrendForSite/monthlyTrendForMunicipal in server.js) - excluded from both the max-value
+  // scale and the totals-label, and its column is left blank below, rather than plotting it as a
+  // genuine R0 month (which would misleadingly look identical to a month that really billed R0).
+  const totals = series.map((s) => (s.elec == null ? null : (s.elec || 0) + (s.water || 0) + (s.sanitation || 0)));
+  const maxVal = Math.max(1, ...totals.filter((t) => t != null));
   const chartBottom = y - height;
   const n = series.length || 1;
   const colWidth = width / n;
@@ -217,17 +221,23 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
 
   series.forEach((s, i) => {
     const colX = x + i * colWidth + (colWidth - barWidth) / 2;
-    const elecH = ((s.elec || 0) / maxVal) * height;
-    const waterH = ((s.water || 0) / maxVal) * height;
-    const sanH = ((s.sanitation || 0) / maxVal) * height;
-    let by = chartBottom;
-    doc.rect(colX, by, barWidth, elecH, { fill: COLOR_ELEC }); by += elecH;
-    doc.rect(colX, by, barWidth, waterH, { fill: COLOR_WATER }); by += waterH;
-    doc.rect(colX, by, barWidth, sanH, { fill: COLOR_SAN }); by += sanH;
-    const total = totals[i];
-    if (total > 0) {
-      const label = moneyShort(total);
-      doc.text(colX + barWidth / 2 - textWidth(label, { size: 6, bold: true }) / 2, by + 4, label, { size: 6, bold: true });
+    // No statement this month at all - leave the column blank (no bars, no total label) but still
+    // print the month tick below, so the gap reads as "no data" rather than "nothing happened".
+    if (s.elec != null) {
+      const elecH = ((s.elec || 0) / maxVal) * height;
+      const waterH = ((s.water || 0) / maxVal) * height;
+      const sanH = ((s.sanitation || 0) / maxVal) * height;
+      let by = chartBottom;
+      doc.rect(colX, by, barWidth, elecH, { fill: COLOR_ELEC }); by += elecH;
+      doc.rect(colX, by, barWidth, waterH, { fill: COLOR_WATER }); by += waterH;
+      doc.rect(colX, by, barWidth, sanH, { fill: COLOR_SAN }); by += sanH;
+      const total = totals[i];
+      if (total > 0) {
+        const label = moneyShort(total);
+        doc.text(colX + barWidth / 2 - textWidth(label, { size: 6, bold: true }) / 2, by + 4, label, { size: 6, bold: true });
+      }
+    } else {
+      doc.text(colX + barWidth / 2 - textWidth('no data', { size: 6 }) / 2, chartBottom + 4, 'no data', { size: 6 });
     }
     doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
   });
@@ -241,7 +251,10 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
 // or kL next to kWh) isn't squashed flat at the bottom of the chart. `formatValue` defaults to the
 // Rand formatter but can be swapped for qtyShort() to reuse this same chart for consumption trends.
 function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, color, formatValue = moneyShort }) {
-  const values = series.map((s) => s[seriesKey] || 0);
+  // null (see monthLabelRange/monthlyTrendForSite/monthlyTrendForMunicipal in server.js) means no
+  // statement at all that month - excluded from the max-value scale, and its column is left blank
+  // below instead of plotted as a genuine 0.
+  const values = series.map((s) => s[seriesKey]).filter((v) => v != null);
   const maxVal = Math.max(1, ...values);
   const chartBottom = y - height;
   const n = series.length || 1;
@@ -259,7 +272,12 @@ function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, co
 
   series.forEach((s, i) => {
     const colX = x + i * colWidth + (colWidth - barWidth) / 2;
-    const val = s[seriesKey] || 0;
+    const val = s[seriesKey];
+    if (val == null) {
+      doc.text(colX + barWidth / 2 - textWidth('no data', { size: 6 }) / 2, chartBottom + 4, 'no data', { size: 6 });
+      doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 12, shortMonthLabel(s.label), { size: 6 });
+      return;
+    }
     const h = (val / maxVal) * height;
     doc.rect(colX, chartBottom, barWidth, h, { fill: color });
     if (val > 0) {
