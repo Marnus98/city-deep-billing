@@ -34,16 +34,26 @@ function computeSlip(tariffItems, readingsByKey, tariff, applyCorrectionFactor) 
     return {
       key: it.item_key, label: it.label, unit: it.unit, rate, reading, factor, adjustedReading, cost,
       comment: it.has_comment ? ((r && r.comment) || null) : null, section: it.section, factor_type: it.factor_type,
+      vatExempt: !!it.vat_exempt,
     };
   });
-  const elecItems = items.filter((i) => i.section !== 'water');
+  // 'municipal' is a third bucket only municipal account statements use (Property Rates, Refuse -
+  // see municipal_seed_helpers.js/db.js) - every existing flat_site property's items are always
+  // 'electricity' or 'water', so municipalItems is always [] for them and this is a no-op there.
+  const elecItems = items.filter((i) => i.section !== 'water' && i.section !== 'municipal');
   const waterItems = items.filter((i) => i.section === 'water');
+  const municipalItems = items.filter((i) => i.section === 'municipal');
   const elecTotal = round2(elecItems.reduce((s, i) => s + i.cost, 0));
   const waterTotal = round2(waterItems.reduce((s, i) => s + i.cost, 0));
-  const subtotal = round2(elecTotal + waterTotal);
-  const vatAmount = round2(subtotal * VAT_RATE);
+  const municipalTotal = round2(municipalItems.reduce((s, i) => s + i.cost, 0));
+  const subtotal = round2(elecTotal + waterTotal + municipalTotal);
+  // Property Rates is VAT-exempt on the real municipal statement (see db.js's vat_exempt column) -
+  // everything else in every flat_site shape has vatExempt false/undefined, so this is a no-op for
+  // the client-facing site billing slips and every non-municipal item on the municipal one too.
+  const vatableBase = round2(items.reduce((s, i) => s + (i.vatExempt ? 0 : i.cost), 0));
+  const vatAmount = round2(vatableBase * VAT_RATE);
   const total = round2(subtotal + vatAmount);
-  return { elecItems, waterItems, elecTotal, waterTotal, subtotal, vatRate: VAT_RATE, vatAmount, total };
+  return { elecItems, waterItems, municipalItems, elecTotal, waterTotal, municipalTotal, subtotal, vatRate: VAT_RATE, vatAmount, total };
 }
 
 module.exports = { computeSlip, round2 };

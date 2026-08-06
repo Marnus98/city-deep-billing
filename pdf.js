@@ -373,7 +373,7 @@ function buildBillingSlipPdf(data) {
   const vatStr = money(data.vatAmount);
   doc.text(right - 220, y, `VAT (${(data.vatRate * 100).toFixed(0)}%)`, {});
   doc.text(right - textWidth(vatStr, { size: 10 }), y, vatStr); y -= 14;
-  doc.line(right - 220, y + 8, right, y + 8);
+  doc.line(right - 220, y + 11, right, y + 11);
   const totalStr = money(data.total);
   doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 });
   doc.text(right - textWidth(totalStr, { size: 12, bold: true }), y, totalStr, { bold: true, size: 12 }); y -= 26;
@@ -545,7 +545,7 @@ function buildSiteBillingSlipPdf(data) {
   doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
 
   doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
-  doc.text(left, y, 'Utility Billing Slip', { size: 10 });
+  doc.text(left, y, data.subtitle || 'Utility Billing Slip', { size: 10 });
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 18;
 
@@ -555,6 +555,19 @@ function buildSiteBillingSlipPdf(data) {
   doc.text(right - 180, y, 'Status:', { bold: true }); doc.text(right - 100, y, data.slip.status); y -= 20;
 
   doc.line(left, y, right, y); y -= 18;
+
+  // Municipal-only bucket (Property Rates, Refuse) - see calc_flat_site.js's computeSlip(). Empty
+  // for every existing flat_site property's own client-facing slip, so this section simply never
+  // renders there; only a municipal account statement (see field-street/municipal_import.js) has
+  // items here.
+  if (data.calc.municipalItems && data.calc.municipalItems.length) {
+    doc.text(left, y, 'MUNICIPAL CHARGES', { size: 12, bold: true }); y -= 16;
+    ({ y } = drawSiteLineItemsTable(doc, data.calc.municipalItems, left, right, y, { noComment: true }));
+    y -= 4; doc.line(left, y, right, y); y -= 16;
+    const municipalTotalStr = money(data.calc.municipalTotal);
+    doc.text(left, y, 'Total (Excl VAT)', { bold: true, size: 9.5 });
+    doc.text(right - textWidth(municipalTotalStr, { size: 9.5, bold: true }), y, municipalTotalStr, { bold: true, size: 9.5 }); y -= 22;
+  }
 
   doc.text(left, y, 'ELECTRICAL', { size: 12, bold: true }); y -= 16;
   ({ y } = drawSiteLineItemsTable(doc, data.calc.elecItems, left, right, y));
@@ -577,7 +590,7 @@ function buildSiteBillingSlipPdf(data) {
   const vatStr = money(data.calc.vatAmount);
   doc.text(right - 220, y, `VAT (${(data.calc.vatRate * 100).toFixed(0)}%)`, {});
   doc.text(right - textWidth(vatStr, { size: 10 }), y, vatStr); y -= 14;
-  doc.line(right - 220, y + 8, right, y + 8);
+  doc.line(right - 220, y + 11, right, y + 11);
   const totalStr = money(data.calc.total);
   doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 });
   doc.text(right - textWidth(totalStr, { size: 12, bold: true }), y, totalStr, { bold: true, size: 12 }); y -= 20;

@@ -351,6 +351,73 @@ function migrate(db) {
     comment TEXT,
     UNIQUE(slip_id, item_key)
   );
+
+  -- municipal_tariffs / municipal_tariff_items / municipal_statement_slips /
+  -- municipal_statement_readings: the actual municipality (e.g. Ekurhuleni) account statement for a
+  -- flat_site property, as opposed to site_tariffs/site_billing_slips above (what HolmStone bills
+  -- the client). Deliberately a full parallel set of tables rather than a 'kind' column on the
+  -- site_* tables - the two are genuinely different documents (different line items even: Property
+  -- Rates and Refuse only ever appear on the municipal statement, never on the client-facing slip)
+  -- billed by different parties, and keeping them physically separate means nothing about the
+  -- already-working site billing engine had to change or risk regressing to add this. The row
+  -- shapes are identical on purpose so calc_flat_site.js's computeSlip() and pdf.js's
+  -- drawSiteLineItemsTable() work unmodified on either - see municipal_seed_helpers.js.
+  CREATE TABLE IF NOT EXISTS municipal_tariffs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tariff_name TEXT,
+    effective_from TEXT NOT NULL,
+    kva_factor REAL NOT NULL DEFAULT 1,
+    peak_factor REAL NOT NULL DEFAULT 1,
+    standard_factor REAL NOT NULL DEFAULT 1,
+    offpeak_factor REAL NOT NULL DEFAULT 1,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  -- section adds 'municipal' (Property Rates, Refuse - charges that are neither electricity nor
+  -- water) alongside the two sections site_tariff_items supports - see calc_flat_site.js's
+  -- computeSlip() for how the third bucket is folded into the total. vat_exempt exists because
+  -- Property Rates specifically is VAT-exempt on the real Ekurhuleni statement (Refuse and every
+  -- electricity/water line still attract the normal 15% - confirmed by back-checking each source
+  -- statement's own printed VAT figure) - see calc_flat_site.js for how this is excluded from the
+  -- VATable base without excluding it from the line-item subtotal itself.
+  CREATE TABLE IF NOT EXISTS municipal_tariff_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tariff_id INTEGER NOT NULL REFERENCES municipal_tariffs(id),
+    sort_order INTEGER NOT NULL,
+    section TEXT NOT NULL DEFAULT 'electricity' CHECK(section IN ('electricity','water','municipal')),
+    item_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    rate REAL NOT NULL DEFAULT 0,
+    factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak') OR factor_type IS NULL),
+    fixed_reading REAL,
+    has_comment INTEGER NOT NULL DEFAULT 0,
+    vat_exempt INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS municipal_statement_slips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT UNIQUE NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    tariff_id INTEGER NOT NULL REFERENCES municipal_tariffs(id),
+    apply_correction_factor INTEGER NOT NULL DEFAULT 0, -- off by default: a municipal statement's
+      -- readings are the municipality's own meter figures already, not the site's own under-reading
+      -- meter, so there's normally nothing to gross up (unlike site_billing_slips, which defaults on).
+    status TEXT NOT NULL DEFAULT 'finalised' CHECK(status IN ('draft','finalised')),
+    entered_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS municipal_statement_readings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slip_id INTEGER NOT NULL REFERENCES municipal_statement_slips(id),
+    item_key TEXT NOT NULL,
+    reading REAL NOT NULL DEFAULT 0,
+    comment TEXT,
+    UNIQUE(slip_id, item_key)
+  );
   `);
 
   // Additive migrations for columns added after the initial schema. node:sqlite's SQLite build

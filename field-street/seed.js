@@ -4,6 +4,14 @@
 // months before July 2026 come from import_history.js instead - this script only plants that first
 // known-good month as a working example. Safe to re-run: both inserts are idempotent (see
 // flat_site_seed_helpers.js).
+//
+// Water/Sewer for July 2026: the client corrected the tariff to R49.11/kL water, R18.91/kL sewer
+// (the reference statement's R54.51/R22.07 was wrong) and asked for the meter reading to be
+// adjusted rather than the bill total - so 222.48 kL here is back-solved to keep the Water &
+// Sanitation section at the same R15,132.97 total the client had already seen, under the
+// corrected rates. Since a live (already-seeded) instance never re-runs this script, the same
+// correction is also applied as an idempotent UPDATE in import_history.js so it reaches an
+// existing database on redeploy, not just a fresh one.
 const { open, migrate } = require('../db');
 const { seedUsers: seedUsersShared } = require('../shared_seed_users');
 const { EKURHULENI_E_TOU } = require('../flat_site_tariff_shapes');
@@ -23,7 +31,7 @@ function main(dbFile = 'field-street.db') {
     rates: {
       fixed_charge: 5676.25, network_access: 112.25, network_demand: 159.25,
       peak_high: 11.44, peak_low: 3.72, standard_high: 3.31, standard_low: 2.43,
-      offpeak_high: 2.03, offpeak_low: 1.85, water: 54.51, sewer: 22.07,
+      offpeak_high: 2.03, offpeak_low: 1.85, water: 49.11, sewer: 18.91,
     },
     factors: FACTORS,
     notes: 'Initial tariff, taken from the client-provided "8 Field Street Main Electrical" statement '
@@ -37,7 +45,7 @@ function main(dbFile = 'field-street.db') {
       network_access: { reading: 628.49, comment: '2026/07/15 22:00' },
       network_demand: { reading: 628.49, comment: '2026/07/15 22:00' },
       peak_high: 54891.82, peak_low: 0, standard_high: 117534.54, standard_low: 0,
-      offpeak_high: 140252.84, offpeak_low: 0, water: 197.61, sewer: 197.61,
+      offpeak_high: 140252.84, offpeak_low: 0, water: 222.48, sewer: 222.48,
     },
   });
 

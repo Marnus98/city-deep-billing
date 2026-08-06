@@ -71,6 +71,11 @@ require('./wingfield/seed_wingfield_municipal').run('wingfield.db');
 // 8 Field Street's historical electricity months (Jul 2025 - Jun 2026) - own de-dup key (label),
 // always safe to re-run; see field-street/import_history.js for why it never touches water/sewer.
 require('./field-street/import_history').run('field-street.db');
+// 8 Field Street's actual municipal account statements (Sep 2025 - Jun 2026, Apr 2026 missing - no
+// statement was provided for it) - own de-dup key (label), separate tables from the above (see
+// db.js), always safe to re-run; see field-street/municipal_import.js for the tariff-change/
+// anomaly notes flagged during extraction.
+require('./field-street/municipal_import').run('field-street.db');
 // The 4 "Other Sites" flat_site properties - each script covers that site's full known history
 // (own de-dup key: slip label) and also seeds that site's users on first run, so registering them
 // here (in addition to being each property's seedFile above) is a safety net matching 8 Field
@@ -682,6 +687,205 @@ route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
   audit(user.userId, 'pdf_download', 'site_billing_slip', slip.id, null, null, null, slip.label);
   const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-${slip.label}.pdf"` });
+  res.end(pdfBuf);
+});
+
+// ---------------- municipal account statements (flat_site properties) ----------------
+// The actual municipality invoice (e.g. Ekurhuleni), as opposed to /site-billing above (what
+// HolmStone bills the client). See db.js's municipal_tariffs/municipal_tariff_items/
+// municipal_statement_slips/municipal_statement_readings for why this is a fully separate set of
+// tables - mirrors the /site-billing routes above almost exactly, reusing the same
+// calcFlatSite.computeSlip() and buildSiteBillingSlipPdf() since the row shapes are identical by
+// design (see municipal_seed_helpers.js).
+
+function getMunicipalTariffItems(tariffId) {
+  return all('SELECT * FROM municipal_tariff_items WHERE tariff_id=? ORDER BY sort_order', [tariffId]);
+}
+function getMunicipalStatementReadings(slipId) {
+  const rows = all('SELECT * FROM municipal_statement_readings WHERE slip_id=?', [slipId]);
+  const map = {};
+  for (const r of rows) map[r.item_key] = { reading: r.reading, comment: r.comment };
+  return map;
+}
+
+function findOrCreateMunicipalTariff(templateTariff, template, body, effectiveFrom) {
+  const newRates = {};
+  for (const it of template) newRates[it.item_key] = Number(body[`rate__${it.item_key}`]) || 0;
+  const newFactors = {};
+  for (const c of FACTOR_COLS) newFactors[c] = Number(body[c]) || 1;
+
+  const existingTariffs = all('SELECT * FROM municipal_tariffs ORDER BY id DESC');
+  for (const t of existingTariffs) {
+    if (!FACTOR_COLS.every((c) => Math.abs((t[c] || 1) - newFactors[c]) < 1e-9)) continue;
+    const items = getMunicipalTariffItems(t.id);
+    if (items.length !== template.length) continue;
+    const ratesMatch = items.every((it) => Math.abs((it.rate || 0) - (newRates[it.item_key] ?? NaN)) < 1e-9);
+    if (ratesMatch) return t.id;
+  }
+
+  run(`INSERT INTO municipal_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,?,?,?,?)`,
+    [templateTariff.tariff_name || null, effectiveFrom, newFactors.kva_factor, newFactors.peak_factor, newFactors.standard_factor, newFactors.offpeak_factor]);
+  const tariffId = get('SELECT id FROM municipal_tariffs ORDER BY id DESC LIMIT 1').id;
+  template.forEach((it, i) => {
+    run(`INSERT INTO municipal_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, vat_exempt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [tariffId, i, it.section, it.item_key, it.label, it.unit, newRates[it.item_key], it.factor_type, it.fixed_reading, it.has_comment ? 1 : 0, it.vat_exempt ? 1 : 0]);
+  });
+  return tariffId;
+}
+
+function monthlyTrendForMunicipal(asOfStartDate) {
+  const slips = all(`SELECT s.* FROM municipal_statement_slips s
+    WHERE s.start_date<=? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate]);
+  return slips.reverse().map((slip) => {
+    const tariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [slip.tariff_id]);
+    const items = getMunicipalTariffItems(slip.tariff_id);
+    const readings = getMunicipalStatementReadings(slip.id);
+    const { elecTotal, elecItems, waterItems } = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
+    const elecKwh = elecItems.filter((i) => ['peak', 'standard', 'offpeak'].includes(i.factor_type))
+      .reduce((s, i) => s + i.adjustedReading, 0);
+    const waterItem = waterItems.find((i) => i.key === 'water');
+    const sewerItem = waterItems.find((i) => i.key === 'sewer');
+    return {
+      label: slip.label,
+      elec: elecTotal, water: waterItem ? waterItem.cost : 0, sanitation: sewerItem ? sewerItem.cost : 0,
+      elecKwh, waterM3: waterItem ? waterItem.reading : 0,
+    };
+  });
+}
+
+route('GET', '/municipal-billing', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slips = all('SELECT * FROM municipal_statement_slips ORDER BY start_date DESC');
+  const rows = slips.map((slip) => {
+    const tariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [slip.tariff_id]);
+    const items = getMunicipalTariffItems(slip.tariff_id);
+    const readings = getMunicipalStatementReadings(slip.id);
+    return { row: slip, calc: calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor) };
+  });
+  send(res, 200, views.siteBillingListPage({
+    user, rows, basePath: '/municipal-billing', pageTitle: 'Municipal Account Statements',
+    newLabel: '+ New statement', emptyLabel: '"+ New statement"',
+  }));
+});
+
+route('GET', '/municipal-billing/new', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const latestTariff = get('SELECT * FROM municipal_tariffs ORDER BY id DESC LIMIT 1');
+  if (!latestTariff) return send(res, 400, 'This property has no municipal tariff yet - it needs an initial import script before statements can be added.');
+  const latestSlip = get('SELECT * FROM municipal_statement_slips ORDER BY start_date DESC LIMIT 1');
+  const items = getMunicipalTariffItems(latestTariff.id);
+  send(res, 200, views.siteBillingFormPage({
+    user, tariff: latestTariff, items, readings: {}, slip: null, latestSlip,
+    basePath: '/municipal-billing', pageTitle: 'municipal account statement', backLabel: 'Municipal Account Statements',
+    helpText: 'Enter the figures exactly as printed on the municipality\'s statement. Cost is calculated automatically from Rate \xd7 Reading. Rates carry over from the last statement by default; only change them for a month where the municipal tariff actually changed - a new tariff version is only created when a rate here differs from every version already on file.',
+  }));
+});
+
+route('GET', '/municipal-billing/:id/edit', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const slip = get('SELECT * FROM municipal_statement_slips WHERE id=?', [params.id]);
+  if (!slip) return send(res, 404, 'Not found');
+  const tariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [slip.tariff_id]);
+  const items = getMunicipalTariffItems(slip.tariff_id);
+  const readings = getMunicipalStatementReadings(slip.id);
+  send(res, 200, views.siteBillingFormPage({
+    user, tariff, items, readings, slip, latestSlip: null,
+    basePath: '/municipal-billing', pageTitle: 'municipal account statement', backLabel: 'Municipal Account Statements',
+  }));
+});
+
+async function saveMunicipalStatement(req, res, existingId) {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const body = await readBody(req);
+  const label = (body.label || '').trim();
+  const startDate = body.start_date, endDate = body.end_date;
+  const templateTariffId = existingId
+    ? get('SELECT tariff_id FROM municipal_statement_slips WHERE id=?', [existingId]).tariff_id
+    : get('SELECT id FROM municipal_tariffs ORDER BY id DESC LIMIT 1').id;
+  const templateTariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [templateTariffId]);
+  const template = getMunicipalTariffItems(templateTariffId);
+  if (!label || !startDate || !endDate) {
+    return send(res, 400, views.siteBillingFormPage({
+      user, tariff: { ...body }, items: template, readings: {}, slip: { ...body, id: existingId }, latestSlip: null,
+      basePath: '/municipal-billing', pageTitle: 'municipal account statement', backLabel: 'Municipal Account Statements',
+      error: 'Label, start date and end date are all required.',
+    }));
+  }
+  const tariffId = findOrCreateMunicipalTariff(templateTariff, template, body, startDate);
+  const applyCorrectionFactor = body.apply_correction_factor ? 1 : 0;
+
+  let slipId = existingId;
+  if (existingId) {
+    run('UPDATE municipal_statement_slips SET label=?, start_date=?, end_date=?, tariff_id=?, apply_correction_factor=? WHERE id=?',
+      [label, startDate, endDate, tariffId, applyCorrectionFactor, existingId]);
+    audit(user.userId, 'update', 'municipal_statement_slip', existingId, null, null, label, null);
+  } else {
+    run('INSERT INTO municipal_statement_slips (label, start_date, end_date, tariff_id, apply_correction_factor, entered_by) VALUES (?,?,?,?,?,?)',
+      [label, startDate, endDate, tariffId, applyCorrectionFactor, user.userId]);
+    slipId = get('SELECT id FROM municipal_statement_slips WHERE label=?', [label]).id;
+    audit(user.userId, 'create', 'municipal_statement_slip', slipId, null, null, label, null);
+  }
+  for (const it of template) {
+    if (it.fixed_reading != null) continue;
+    const reading = Number(body[`reading__${it.item_key}`]) || 0;
+    const comment = it.has_comment ? (body[`comment__${it.item_key}`] || null) : null;
+    run(`INSERT INTO municipal_statement_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,?)
+      ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading, comment=excluded.comment`,
+      [slipId, it.item_key, reading, comment]);
+  }
+  redirect(res, `/municipal-billing/${slipId}`);
+}
+
+route('POST', '/municipal-billing/new', async (req, res) => saveMunicipalStatement(req, res, null));
+route('POST', '/municipal-billing/:id/edit', async (req, res, params) => saveMunicipalStatement(req, res, Number(params.id)));
+
+route('GET', '/municipal-billing/:id', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slip = get('SELECT * FROM municipal_statement_slips WHERE id=?', [params.id]);
+  if (!slip) return send(res, 404, 'Not found');
+  const tariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [slip.tariff_id]);
+  const items = getMunicipalTariffItems(slip.tariff_id);
+  const readings = getMunicipalStatementReadings(slip.id);
+  const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
+  send(res, 200, views.siteBillingDetailPage({
+    user, slip, tariff, calc, basePath: '/municipal-billing', pdfBasePath: '/municipal-billing-pdf',
+    pageTitle: 'Municipal statement', backLabel: 'Municipal Account Statements', hideCorrectionNote: true,
+  }));
+});
+
+route('POST', '/municipal-billing/:id/delete', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const slip = get('SELECT * FROM municipal_statement_slips WHERE id=?', [params.id]);
+  if (slip) {
+    run('DELETE FROM municipal_statement_readings WHERE slip_id=?', [params.id]);
+    run('DELETE FROM municipal_statement_slips WHERE id=?', [params.id]);
+    audit(user.userId, 'delete', 'municipal_statement_slip', slip.id, null, null, null, `Deleted municipal statement ${slip.label}`);
+  }
+  redirect(res, '/municipal-billing');
+});
+
+route('GET', '/municipal-billing-pdf/:id', async (req, res, params) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slip = get('SELECT * FROM municipal_statement_slips WHERE id=?', [params.id]);
+  if (!slip) return send(res, 404, 'Not found');
+  const tariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [slip.tariff_id]);
+  const items = getMunicipalTariffItems(slip.tariff_id);
+  const readings = getMunicipalStatementReadings(slip.id);
+  const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
+  const monthlyTrend = monthlyTrendForMunicipal(slip.start_date);
+  const propertyName = currentPropertyName(user);
+  const pdfBuf = buildSiteBillingSlipPdf({
+    propertyName, slip, tariff, calc, monthlyTrend, subtitle: 'Municipal Account Statement',
+    generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+  });
+  audit(user.userId, 'pdf_download', 'municipal_statement_slip', slip.id, null, null, null, slip.label);
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-municipal-${slip.label}.pdf"` });
   res.end(pdfBuf);
 });
 

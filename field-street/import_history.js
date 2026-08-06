@@ -82,6 +82,22 @@ function main(dbFile = 'field-street.db') {
     if (slipId) created++;
   }
   if (created) console.log(`8 Field Street history import: ${created} month(s) added (Jul 2025 - Jun 2026).`);
+
+  // One-off correction for the July 2026 slip: the client corrected the water/sewer tariff to
+  // R49.11/kL water, R18.91/kL sewer (the reference statement's R54.51/R22.07 was wrong) and asked
+  // for the meter reading to be adjusted rather than the bill total - so 222.48 kL is back-solved
+  // to keep the Water & Sanitation section at the same R15,132.97 total the client had already
+  // seen, under the corrected rates. seed.js already plants these correct values on a brand-new
+  // database, but a database seeded before this correction (i.e. the live site) never re-runs
+  // seed.js - so this UPDATE runs unconditionally every boot (like the rest of this script) to
+  // reach it too. Idempotent: setting fixed values is a no-op once already correct.
+  const julSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-07'").get();
+  if (julSlip) {
+    db.prepare("UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key='water'").run(49.11, julSlip.tariff_id);
+    db.prepare("UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key='sewer'").run(18.91, julSlip.tariff_id);
+    db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(222.48, julSlip.id);
+  }
+
   return db;
 }
 

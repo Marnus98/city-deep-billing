@@ -78,4 +78,26 @@ const CITY_POWER_LV_TOU = [
   ...WATER_SEWER_ITEMS,
 ];
 
-module.exports = { EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, CITY_POWER_LV_TOU };
+// Ekurhuleni municipal account statement shape for 8 Field Street - the actual invoice the
+// municipality sends (see field-street/municipal_import.js), as opposed to EKURHULENI_E_TOU above
+// (what HolmStone bills the client off the site's own meters). Same electricity line items as
+// EKURHULENI_E_TOU, plus Property Rates and Refuse Removal, which only ever appear on the
+// municipal side - never billed through to the client this way. factorType is null throughout:
+// these are the municipality's own meter readings already, nothing to gross up (see
+// municipal_statement_slips.apply_correction_factor, off by default).
+const EKURHULENI_MUNICIPAL_E_TOU_8FS = [
+  { key: 'property_rates', label: 'Property Rates (Industrial)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal', vatExempt: true },
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'network_demand', label: 'Network Demand', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'peak_high', label: 'Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'peak_low', label: 'Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_high', label: 'Standard Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_low', label: 'Standard Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_high', label: 'Off-Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'refuse', label: 'Refuse Removal', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  ...WATER_SEWER_ITEMS,
+];
+
+module.exports = { EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, CITY_POWER_LV_TOU, EKURHULENI_MUNICIPAL_E_TOU_8FS };
