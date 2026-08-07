@@ -4,7 +4,7 @@ SRC_DIR = "/sessions/beautiful-stoic-allen/mnt/uploads"
 FILES = [
     "June 25.pdf", "July 25.pdf", "August 25.pdf", "Sep 25.pdf", "Oct 25.pdf", "Nov 25.pdf",
     "Dec 25.pdf", "Jan 26.pdf", "Feb 26.pdf", "March 26.pdf", "April 26.pdf", "May 26.pdf",
-    "wingfield june ekurhuleni.pdf",
+    "wingfield june ekurhuleni.pdf", "wingfield july account.pdf",
 ]
 
 # A "charge row" is any line ending in 3 whitespace-separated decimal numbers (excl VAT, VAT,

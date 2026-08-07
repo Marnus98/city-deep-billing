@@ -645,8 +645,23 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
       ? `<div class="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b">No "${esc(s.statement_for)}" statement found yet for: ${combinedInfo.missingAccounts.map(esc).join(', ')} &mdash; combined totals below exclude ${combinedInfo.missingAccounts.length === 1 ? 'it' : 'them'}.</div>`
       : '';
 
-    breakdownHtml = `
-    <div class="bg-white rounded-lg border mb-6">
+    // Split into separate boxed tables - Municipal Charges (Refuse/Sundry) / Electrical / Water &
+    // Sanitation - same visual convention as the flat_site properties' own Municipal Account pages
+    // (see siteBillingDetailPage above: amber "Municipal Charges" box, plain "Electrical" box, green
+    // "Water & Sanitation" box, then a Sub Total/VAT/Total summary card) rather than one long
+    // combined table. Each box gets its own Total (Excl VAT)/VAT/Total footer row, computed from
+    // that box's own category figures - the main Electricity/Water/Sanitation rows already ARE each
+    // category's authoritative total (elecSubRowsClean below them is just an informational
+    // breakdown of the SAME total, not an addition to it - see that const's own comment).
+    const muniExcl = s.refuse_excl_vat + s.sundry_excl_vat;
+    const muniVat = s.refuse_vat + s.sundry_vat;
+    const muniIncl = s.refuse_incl_vat + s.sundry_incl_vat;
+    const waterSanExcl = s.water_excl_vat + s.sanitation_excl_vat;
+    const waterSanVat = s.water_vat + s.sanitation_vat;
+    const waterSanIncl = s.water_incl_vat + s.sanitation_incl_vat;
+
+    const headerHtml = `
+    <div class="bg-white rounded-lg border mb-4">
       <div class="px-4 py-3 border-b font-semibold flex justify-between items-baseline flex-wrap gap-2">
         <span>Statement for ${esc(s.statement_for)}${s.invoice_number ? ` <span class="text-slate-400 font-normal text-sm">(invoice ${esc(s.invoice_number)}, issued ${esc(s.statement_date)})</span>` : ` <span class="text-slate-400 font-normal text-sm">(combining ${combinedInfo.matchedAccounts.length} account${combinedInfo.matchedAccounts.length === 1 ? '' : 's'}: ${combinedInfo.matchedAccounts.map(esc).join(', ')})</span>`}</span>
         <div class="flex items-center gap-2">
@@ -655,24 +670,66 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
         </div>
       </div>
       ${missingNote}
+    </div>`;
+
+    const catTableHead = `<thead><tr class="text-left text-slate-500 border-b">
+        <th class="py-1 pl-2">Category</th><th class="py-1 text-right">Consumption</th>
+        <th class="py-1 text-right">Excl. VAT</th><th class="py-1 text-right">VAT</th><th class="py-1 text-right">Total</th>
+      </tr></thead>`;
+
+    const muniBoxHtml = (muniExcl > 0.005 || muniVat > 0.005) ? `
+    <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+      <div class="px-4 py-2 border-b font-semibold bg-amber-50">Municipal Charges</div>
       <div class="px-4 py-3">
         <table class="w-full text-sm">
-          <thead><tr class="text-left text-slate-500 border-b">
-            <th class="py-1 pl-2">Category</th><th class="py-1 text-right">Consumption</th>
-            <th class="py-1 text-right">Excl. VAT</th><th class="py-1 text-right">VAT</th><th class="py-1 text-right">Total</th>
-          </tr></thead>
+          ${catTableHead}
+          <tbody>
+            ${catRow('Refuse', null, null, s.refuse_excl_vat, s.refuse_vat, s.refuse_incl_vat)}
+            ${catRow('Sundry', null, null, s.sundry_excl_vat, s.sundry_vat, s.sundry_incl_vat)}
+            ${catRow('Total (Excl VAT)', null, null, muniExcl, muniVat, muniIncl, { total: true })}
+          </tbody>
+        </table>
+      </div>
+    </div>` : '';
+
+    const elecBoxHtml = `
+    <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+      <div class="px-4 py-2 border-b font-semibold">Electrical</div>
+      <div class="px-4 py-3">
+        <table class="w-full text-sm">
+          ${catTableHead}
           <tbody>
             ${catRowHtml('Electricity' + (s.elec_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.elec_reading_start)} to ${esc(s.elec_reading_end)})</span>` : ''), s.elec_consumption_kwh, 'kWh', s.elec_excl_vat, s.elec_vat, s.elec_incl_vat)}
             ${elecSubRowsClean}
-            ${catRowHtml('Water' + (s.water_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.water_reading_start)} to ${esc(s.water_reading_end)})</span>` : ''), s.water_consumption_kl, 'KL', s.water_excl_vat, s.water_vat, s.water_incl_vat)}
-            ${catRowHtml('Sanitation <span class="text-slate-400 text-xs">(billed on water consumption)</span>', s.water_consumption_kl, 'KL', s.sanitation_excl_vat, s.sanitation_vat, s.sanitation_incl_vat)}
-            ${catRow('Refuse', null, null, s.refuse_excl_vat, s.refuse_vat, s.refuse_incl_vat)}
-            ${catRow('Sundry', null, null, s.sundry_excl_vat, s.sundry_vat, s.sundry_incl_vat)}
-            ${catRow('Total Charges', null, null, totalExcl, totalVat, totalInclVat, { total: true })}
+            ${catRow('Total (Excl VAT)', null, null, s.elec_excl_vat, s.elec_vat, s.elec_incl_vat, { total: true })}
           </tbody>
         </table>
       </div>
     </div>`;
+
+    const waterBoxHtml = `
+    <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+      <div class="px-4 py-2 border-b font-semibold bg-green-50">Water &amp; Sanitation</div>
+      <div class="px-4 py-3">
+        <table class="w-full text-sm">
+          ${catTableHead}
+          <tbody>
+            ${catRowHtml('Water' + (s.water_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.water_reading_start)} to ${esc(s.water_reading_end)})</span>` : ''), s.water_consumption_kl, 'KL', s.water_excl_vat, s.water_vat, s.water_incl_vat)}
+            ${catRowHtml('Sanitation <span class="text-slate-400 text-xs">(billed on water consumption)</span>', s.water_consumption_kl, 'KL', s.sanitation_excl_vat, s.sanitation_vat, s.sanitation_incl_vat)}
+            ${catRow('Total (Excl VAT)', null, null, waterSanExcl, waterSanVat, waterSanIncl, { total: true })}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+    const summaryCardHtml = `
+    <div class="bg-white rounded-lg border p-4 max-w-sm ml-auto mb-6">
+      <div class="flex justify-between text-sm py-1"><span>Sub Total (Excl VAT)</span><span>${money(totalExcl)}</span></div>
+      <div class="flex justify-between text-sm py-1"><span>VAT</span><span>${money(totalVat)}</span></div>
+      <div class="flex justify-between font-semibold text-lg py-1 border-t mt-1 pt-2"><span>Total (Incl VAT)</span><span>${money(totalInclVat)}</span></div>
+    </div>`;
+
+    breakdownHtml = headerHtml + muniBoxHtml + elecBoxHtml + waterBoxHtml + summaryCardHtml;
   }
 
   let comparisonHtml = '';

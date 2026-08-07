@@ -775,5 +775,62 @@
    "incl_vat": 0.0
   },
   "grand_total_incl_vat": 864678.94
+ },
+ {
+  "file": "wingfield july account.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-07-28",
+  "statement_for": "2026-07",
+  "due_date": "2026-08-25",
+  "invoice_number": "2210755502-2026-07-28",
+  "property_rates": {
+   "excl_vat": 374692.5,
+   "vat": 0.0,
+   "incl_vat": 374692.5
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-06-01",
+    "2026-07-01"
+   ],
+   "consumption_kwh": 119239.992,
+   "consumption_kvarh": 376.617,
+   "tariff_type": "TOU",
+   "excl_vat": 559623.27,
+   "vat": 83943.49,
+   "incl_vat": 643566.76,
+   "lines": {
+    "off_peak_qty": 38003.84,
+    "off_peak": 70721.35,
+    "standard_qty": 62236.152,
+    "standard": 189216.57,
+    "peak_qty": 19000.0,
+    "peak": 199313.8,
+    "demand_qty": 376.617,
+    "demand": 55019.98,
+    "service": 6195.35,
+    "network_surcharge": 39156.22
+   }
+  },
+  "water": {
+   "reading_period": null,
+   "consumption_kl": 1571.0,
+   "water_excl_vat": 78000.15,
+   "sanitation_excl_vat": 30204.04,
+   "vat": 16230.62
+  },
+  "refuse": {
+   "excl_vat": 8356.57,
+   "vat": 1253.49,
+   "incl_vat": 9610.06
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 1152304.13
  }
 ]

@@ -1,26 +1,35 @@
 // seed_wingfield_municipal.js - imports wingfield_municipal_statements.json (produced by
-// extract_wingfield_municipal.py against the 13 City of Ekurhuleni PDF invoices you uploaded)
-// into Wingfield's own municipal_accounts/municipal_statements tables. Mirrors seed_municipal.js's
-// structure and insertion pattern exactly - same schema, same "invoice_number is the de-dup key so
-// re-running is always safe" approach - but is its own file because Ekurhuleni's statement layout
-// (single combined account, a flat property-rates line, no separate account-per-precinct) is
-// different enough from City of Johannesburg's that sharing one parser would mean threading two
-// municipalities' quirks through one function.
+// extract_wingfield_municipal.py against the 14 City of Ekurhuleni PDF invoices you uploaded, Jun
+// 2025 - Jul 2026) into Wingfield's own municipal_accounts/municipal_statements tables. Mirrors
+// seed_municipal.js's structure and insertion pattern exactly - same schema, same "invoice_number
+// is the de-dup key so re-running is always safe" approach - but is its own file because
+// Ekurhuleni's statement layout (single combined account, a flat property-rates line, no separate
+// account-per-precinct) is different enough from City of Johannesburg's that sharing one parser
+// would mean threading two municipalities' quirks through one function.
 //
 // Electricity IS Time-of-Use here (Peak/Standard/Off-peak, not flat) - corrected after the client
 // caught that an earlier pass of this pipeline had wrongly lumped all 3 registers into one "flat
 // energy" total. See extract_wingfield_municipal.py for how each kWh line is classified by its own
-// rate (unambiguous - Peak/Standard/Off-peak rates never overlap across any of the 13 months),
+// rate (unambiguous - Peak/Standard/Off-peak rates never overlap across any of the 14 months),
 // verified against a reference table the client independently rebuilt from these same invoices.
 //
-// Ekurhuleni quirk worth knowing: three of the thirteen statements (Nov 2025, Dec 2025, Jan 2026)
+// Ekurhuleni quirk worth knowing: three of the fourteen statements (Nov 2025, Dec 2025, Jan 2026)
 // carry one-off "INTERIM"/"INTERIM REVERSAL" water & sewer adjustment lines instead of the usual
 // "WATER n kl"/"SEWER-BUSINESS n kl" lines (an estimated-reading correction, not a mistake), and
-// Oct 2025 carries a one-off "FINAL NOTICE" fee. extract_wingfield_municipal.py handles both by
-// summing whatever charge-shaped rows fall within each utility's section of the statement rather
-// than only matching specific labels - every one of the 13 months reconciles to the cent against
-// that statement's own "TOTAL CURRENT LEVY" figure (the current month's own new charges, separate
-// from any arrears/balance-brought-forward also shown on the same statement - see README).
+// Oct 2025 carries a one-off "FINAL NOTICE" fee. Jul 2026's statement carries its own one-off
+// quirk: its own header prints "2027/07/27" for Statement Date/Payments Included Until/Invoice
+// Number - a genuine EMM system typo (one year ahead) - while every itemised charge line on that
+// same statement is dated "07/28", the electricity reading period ends 2026-07-01, and the Due
+// Date (a separate field, unaffected by the typo) is 2026-08-25, only ~4 weeks after a 2026-07-28
+// invoice date, matching every other month's ~1-month invoice-to-due-date gap. Corrected by hand to
+// statement_date "2026-07-28" / statement_for "2026-07" / invoice_number
+// "2210755502-2026-07-28" in wingfield_municipal_statements.json rather than trusting the script's
+// naive first-date-match (which would have picked up the typo'd year). extract_wingfield_municipal.py
+// handles the INTERIM/FINAL NOTICE quirks by summing whatever charge-shaped rows fall within each
+// utility's section of the statement rather than only matching specific labels - every one of the
+// 14 months reconciles to the cent against that statement's own "TOTAL CURRENT LEVY" figure (the
+// current month's own new charges, separate from any arrears/balance-brought-forward also shown on
+// the same statement - see README).
 const fs = require('fs');
 const path = require('path');
 const { open, migrate } = require('../db');
