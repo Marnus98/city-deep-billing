@@ -18,7 +18,10 @@
 // factor (factorType: null in the shape) - reactive power and the flat total-energy surcharge
 // aren't quantities that factor was calibrated against.
 //
-// Water/Sewer: not billed through this app for this site yet (rate 0, unused).
+// Water/Sewer: Jul-Dec 2025 has no source for these yet (rate 0, unused). Jan-Jul 2026 now bills
+// real water/sewer figures, added via the correction blocks below the MONTHS loop, taken from the
+// client's 7 "AutoZone Slips <Month> 2026.xlsx" workbooks - see those blocks' comments for the
+// sliding-scale/blended-rate details.
 //
 // Safe to re-run on every boot - see flat_site_seed_helpers.js.
 const { open, migrate } = require('../db');
@@ -40,8 +43,11 @@ const RATES_B = { // Jan 2026 - Jun 2026: Service + Capacity Charge merged into 
   peak_high: 7.0291, peak_low: 2.9539, standard_high: 2.6838, standard_low: 2.2239,
   offpeak_high: 1.8387, offpeak_low: 1.7095, network_surcharge: 0.07, water: 0, sewer: 0,
 };
-const RATES_C = { // Jul 2026: Network Surcharge absent from the statement (see note above)
-  service_charge: 2444.32, capacity_charge: 2185.32, demand_charge: 461.28, excess_reactive: 0.4625,
+const RATES_C = { // Jul 2026: Network Surcharge absent from the statement (see note above); Service
+  // + Capacity Charge stay merged into one line here too (confirmed by the client's "AutoZone Slips
+  // July 2026.xlsx" - only one "Service Charge" row is printed, no separate Capacity Charge line -
+  // see the correction-block comment below for the bug this replaces).
+  service_charge: 4629.64, capacity_charge: 0, demand_charge: 461.28, excess_reactive: 0.4625,
   peak_high: 7.6624, peak_low: 3.22, standard_high: 2.9256, standard_low: 2.4242,
   offpeak_high: 2.0044, offpeak_low: 1.8635, network_surcharge: 0, water: 0, sewer: 0,
 };
@@ -62,7 +68,7 @@ const MONTHS = [
   ['2026-04', '2026-04-01', '2026-05-01', '2026-01-01', RATES_B, 233.30177333333336, '2026/04/21 12:00', 0, 0, 8401.11666666667, 0, 30482.6075, 0, 11391.434746493802, 50275.1589131605, 0],
   ['2026-05', '2026-05-01', '2026-06-01', '2026-01-01', RATES_B, 184.365652, '2026/05/22 10:30', 0, 0, 7240.67495321875, 0, 27099.3198787859, 0, 10888.1029066285, 45228.0977386332, 0],
   ['2026-06', '2026-06-01', '2026-07-01', '2026-01-01', RATES_B, 196.882958, '2026/06/23 09:00', 1962.189142704, 10219.23004909, 0, 32634.789, 0, 11932.33827163, 0, 54786.35732072, 0],
-  ['2026-07', '2026-07-01', '2026-08-01', '2026-07-01', RATES_C, 202.496554, '2026/07/03 10:30', 1888.20808377967, 14946.9746689888, 0, 32731.7474997595, 0, 11734.1737871707, 0, 0, 1],
+  ['2026-07', '2026-07-01', '2026-08-01', '2026-07-01', RATES_C, 202.496554, '2026/07/03 10:30', 1888.20808377967, 14946.9746689888, 0, 32731.7474997595, 0, 11734.1737871707, 0, 0, 0],
 ];
 
 function main(dbFile = 'autozone.db') {
@@ -85,6 +91,80 @@ function main(dbFile = 'autozone.db') {
     if (slipId) created++;
   }
   if (created) console.log(`AutoZone history import: ${created} month(s) added (Jul 2025 - Jul 2026).`);
+
+  // ---------------------------------------------------------------------------------------------
+  // Corrections below: the client's 7 "AutoZone Slips <Month> 2026.xlsx" workbooks (uploaded
+  // 2026-08-07, one per month Jan-Jul 2026) are a literal export of this exact billing slip in our
+  // own Entry/Rate/Unit/Reading/Cost shape, including a "Water & Sanitation" table that was never
+  // populated for AutoZone before now (water/sewer were rate 0 for every month - see the top-of-
+  // file note, now superseded for Jan-Jul 2026 by the blocks below; Jul-Dec 2025 still has no water
+  // source and stays at 0).
+  //
+  // Water bills on a sliding scale (Step 1: first 200kL @ a lower rate, Step 2: the remainder @ a
+  // higher rate - same convention as every municipal statement in this app) but this app's schema
+  // only supports one flat rate per line item, so - same convention already used for the municipal
+  // side's own water blends - the rate stored below is an implied blended rate (cost/reading) that
+  // reproduces each month's real sliding-scale total to the cent. Sewer, by contrast, genuinely is
+  // a single flat rate every month (R52.85/kL Jan-Jun, confirmed against 6 different consumption
+  // volumes all reconciling exactly) - except July, which carries the same new-tariff-year rate
+  // bump seen elsewhere in this project (R52.85 -> R58.66, alongside water's Step rates
+  // 68.26/72.01 -> 73.72/77.77 and the demand/service rate changes already modelled below).
+  //
+  // Only water/sewer differ from the already-imported electrical rates for Jan-Jun 2026 (all still
+  // match RATES_B exactly) - so each of those 6 months gets its own new tariff version (water rate
+  // isolated per month) rather than reusing RATES_B itself, to avoid leaking one month's blended
+  // water rate into the other five. July already has its own unique tariff version (RATES_C, one
+  // month only), so it's corrected in place instead.
+  //
+  // ONE BUG ALSO FIXED HERE: RATES_C (July 2026) previously modelled Service Charge as split into
+  // two lines (service_charge R2,444.32 + capacity_charge R2,185.32, guessed by projecting the old
+  // Jul-Dec 2025 two-line style forward) - the real July workbook shows only ONE "Service Charge"
+  // line at R4,629.64, same merged style as every other 2026 month, with no separate Capacity
+  // Charge row printed at all. Corrected below: service_charge -> 4,629.64, capacity_charge -> 0,
+  // capacity_charge's reading -> 0 (was 1).
+  const setReading = db.prepare(`INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,?)
+    ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading, comment=excluded.comment`);
+
+  const WATER_MONTHS = [
+    // label, effectiveFrom, waterReadingKl, waterCost (sliding-scale total, Step1 200kL@lowRate +
+    // Step2 remainder@highRate), sewerRate (flat R/kL)
+    //
+    // January's effectiveFrom is deliberately '2026-01-02', not '2026-01-01' - the latter is
+    // already taken by the original (water=0) RATES_B tariff row seeded above, and seedTariff
+    // dedupes purely on (tariff_name, effective_from), ignoring rates - reusing '2026-01-01' here
+    // would silently resolve back to that same rate-0 row instead of creating a new one.
+    ['2026-01', '2026-01-02', 763, 54193.63, 52.85],
+    ['2026-02', '2026-02-01', 668, 47352.68, 52.85],
+    ['2026-03', '2026-03-01', 769, 54625.69, 52.85],
+    ['2026-04', '2026-04-01', 750.115, 53265.78115, 52.85],
+    ['2026-05', '2026-05-01', 776.5695, 55170.769695, 52.85],
+    ['2026-06', '2026-06-01', 755.3665, 53643.941665, 52.85],
+  ];
+  for (const [label, effectiveFrom, waterReadingKl, waterCost, sewerRate] of WATER_MONTHS) {
+    const slip = db.prepare('SELECT id, tariff_id FROM site_billing_slips WHERE label=?').get(label);
+    if (!slip) continue;
+    const newTariffId = seedTariff(db, {
+      tariffName: TARIFF_NAME, effectiveFrom, shape: CITY_POWER_LV_TOU,
+      rates: { ...RATES_B, water: waterCost / waterReadingKl, sewer: sewerRate },
+      factors: FACTORS,
+      notes: `Water/sewer added from the client's "AutoZone Slips ${label}.xlsx" - electrical rates unchanged from RATES_B.`,
+    });
+    db.prepare('UPDATE site_billing_slips SET tariff_id=?, apply_correction_factor=0 WHERE id=?').run(newTariffId, slip.id);
+    setReading.run(slip.id, 'water', waterReadingKl, null);
+    setReading.run(slip.id, 'sewer', waterReadingKl, null);
+  }
+
+  const julSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-07'").get();
+  if (julSlip) {
+    const julRate = db.prepare('UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key=?');
+    julRate.run(4629.64, julSlip.tariff_id, 'service_charge');
+    julRate.run(0, julSlip.tariff_id, 'capacity_charge');
+    julRate.run(58454.78404 / 762.052, julSlip.tariff_id, 'water');
+    julRate.run(58.66, julSlip.tariff_id, 'sewer');
+    setReading.run(julSlip.id, 'capacity_charge', 0, null);
+    setReading.run(julSlip.id, 'water', 762.052, null);
+    setReading.run(julSlip.id, 'sewer', 762.052, null);
+  }
 
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via

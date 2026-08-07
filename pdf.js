@@ -250,12 +250,18 @@ function drawTrendChart(doc, { x, y, width, height, series }) {
 // stacked max, so a category with much smaller values (e.g. Water/Sanitation next to Electricity,
 // or kL next to kWh) isn't squashed flat at the bottom of the chart. `formatValue` defaults to the
 // Rand formatter but can be swapped for qtyShort() to reuse this same chart for consumption trends.
-function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, color, formatValue = moneyShort }) {
+function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, color, formatValue = moneyShort, maxOverride }) {
   // null (see monthLabelRange/monthlyTrendForSite/monthlyTrendForMunicipal in server.js) means no
   // statement at all that month - excluded from the max-value scale, and its column is left blank
   // below instead of plotted as a genuine 0.
+  //
+  // maxOverride - lets the caller force this chart's Y-axis to a scale computed from somewhere
+  // other than just this one series (see server.js's site-billing-pdf/municipal-billing-pdf
+  // routes: the tenant billing PDF and the municipal statement PDF for the same property/category
+  // now share one axis, computed from BOTH trends' data, so a bar is visually comparable between
+  // the two documents instead of each PDF silently rescaling to its own numbers).
   const values = series.map((s) => s[seriesKey]).filter((v) => v != null);
-  const maxVal = Math.max(1, ...values);
+  const maxVal = maxOverride != null ? Math.max(1, maxOverride) : Math.max(1, ...values);
   const chartBottom = y - height;
   const n = series.length || 1;
   const colWidth = width / n;
@@ -294,7 +300,7 @@ function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, co
 // swatch + label as a mini-heading and its own Y-axis scale - replaces the single combined
 // stacked-bar chart so each utility's trend is legible on its own terms instead of all three
 // competing for the same axis.
-function drawTripleTrendCharts(doc, { x, y, width, series }) {
+function drawTripleTrendCharts(doc, { x, y, width, series, maxOverrides }) {
   const COLOR_ELEC = [0.11, 0.16, 0.34];
   const COLOR_WATER = [0.13, 0.62, 0.35];
   const COLOR_SAN = [0.93, 0.55, 0.09];
@@ -309,7 +315,10 @@ function drawTripleTrendCharts(doc, { x, y, width, series }) {
     doc.rect(x, cy - 7, 7, 7, { fill: def.color });
     doc.text(x + 11, cy - 6, def.label, { size: 9.5, bold: true });
     cy -= 20;
-    drawSingleSeriesChart(doc, { x: x + 46, y: cy, width: width - 46, height: chartHeight, series, seriesKey: def.key, color: def.color });
+    drawSingleSeriesChart(doc, {
+      x: x + 46, y: cy, width: width - 46, height: chartHeight, series, seriesKey: def.key, color: def.color,
+      maxOverride: maxOverrides ? maxOverrides[def.key] : null,
+    });
     cy -= chartHeight + 14 + 26;
   }
 }
@@ -318,7 +327,7 @@ function drawTripleTrendCharts(doc, { x, y, width, series }) {
 // drawTripleTrendCharts but for physical consumption instead of Rand cost, so a tenant can see
 // usage trends independent of tariff changes. Water consumption is stored in m3 in the schema,
 // which is numerically identical to kL (1 m3 = 1 kL), so waterM3 is simply labelled "kL".
-function drawConsumptionTrendCharts(doc, { x, y, width, series }) {
+function drawConsumptionTrendCharts(doc, { x, y, width, series, maxOverrides }) {
   const COLOR_ELEC = [0.11, 0.16, 0.34];
   const COLOR_WATER = [0.13, 0.62, 0.35];
   const defs = [
@@ -334,6 +343,7 @@ function drawConsumptionTrendCharts(doc, { x, y, width, series }) {
     drawSingleSeriesChart(doc, {
       x: x + 46, y: cy, width: width - 46, height: chartHeight, series, seriesKey: def.key, color: def.color,
       formatValue: (v) => qtyShort(v, def.unit),
+      maxOverride: maxOverrides ? maxOverrides[def.key] : null,
     });
     cy -= chartHeight + 14 + 30;
   }
@@ -619,17 +629,187 @@ function buildSiteBillingSlipPdf(data) {
     doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
     doc.text(left, ty, 'Utility Cost Excluding VAT', { size: 11, bold: true }); ty -= 8;
     doc.line(left, ty, right, ty); ty -= 30;
-    drawTripleTrendCharts(doc, { x: left + 46, y: ty, width: right - left - 46, series: data.monthlyTrend });
+    drawTripleTrendCharts(doc, { x: left + 46, y: ty, width: right - left - 46, series: data.monthlyTrend, maxOverrides: data.axisMaxOverrides && data.axisMaxOverrides.cost });
 
     doc.newPage();
     let cy = PAGE_H - 50;
     doc.text(left, cy, propertyName, { size: 16, bold: true }); cy -= 14;
     doc.text(left, cy, 'Consumption Trend', { size: 11, bold: true }); cy -= 8;
     doc.line(left, cy, right, cy); cy -= 30;
-    drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend });
+    drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend, maxOverrides: data.axisMaxOverrides && data.axisMaxOverrides.consumption });
   }
 
   return doc.build();
 }
 
-module.exports = { PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, money };
+// ---------------- recovery: tenant billing vs municipal statement (flat_site) ----------------
+// See flat_site_recovery.js for the comparison logic. `rows` here is buildRecoveryRows()'s output
+// (chronological ascending) - a row with either side missing (no site slip or no municipal
+// statement for that label) has row.site/row.municipal null and row.recovery null; both the chart
+// and tables below render those as "no data" rather than plotting/summing a false zero.
+
+// Grouped two-bar-per-month chart (Tenant vs Municipal), with the recovery (site - municipal)
+// printed above each pair, colour-coded green/red - same visual language as drawTrendChart/
+// drawSingleSeriesChart (gridlines, month ticks) but two side-by-side bars per column instead of
+// one stacked or single bar.
+function drawGroupedComparisonChart(doc, { x, y, width, height, series }) {
+  const COLOR_A = [0.11, 0.16, 0.34]; // Tenant Billing - matches the Electricity navy used everywhere else
+  const COLOR_B = [0.39, 0.45, 0.55]; // Municipal Statement - neutral slate, reads as "external/reference"
+  const COLOR_POS = [0.05, 0.5, 0.2], COLOR_NEG = [0.75, 0.15, 0.15];
+
+  const values = series.flatMap((s) => [s.totalSiteRand, s.totalMunicipalRand]).filter((v) => v != null);
+  const maxVal = Math.max(1, ...values);
+  const chartBottom = y - height;
+  const n = series.length || 1;
+  const colWidth = width / n;
+  const barWidth = Math.min(16, colWidth * 0.28);
+  const gap = 5;
+
+  const legendItems = [['Tenant Billing', COLOR_A], ['Municipal Statement', COLOR_B]];
+  let lx = x + width - 210;
+  const ly = y + 16;
+  for (const [label, color] of legendItems) {
+    doc.rect(lx, ly, 7, 7, { fill: color });
+    doc.text(lx + 10, ly + 1, label, { size: 8 });
+    lx += 105;
+  }
+  doc.currentOps.push('0 0 0 rg'); // rect()'s fill colour otherwise bleeds into every text() draw
+  // below (rg is a persistent graphics-state param, not scoped to one shape) - reset to black.
+
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const v = (maxVal * t) / ticks;
+    const ty = chartBottom + (height * t) / ticks;
+    doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
+    const label = moneyShort(v);
+    doc.text(x - 6 - textWidth(label, { size: 6 }), ty - 3, label, { size: 6 });
+  }
+
+  series.forEach((s, i) => {
+    const colCenter = x + i * colWidth + colWidth / 2;
+    if (s.site == null || s.municipal == null) {
+      doc.text(colCenter - textWidth('no data', { size: 6 }) / 2, chartBottom + 4, 'no data', { size: 6 });
+      doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
+      return;
+    }
+    const aH = (s.totalSiteRand / maxVal) * height;
+    const bH = (s.totalMunicipalRand / maxVal) * height;
+    const aX = colCenter - gap / 2 - barWidth;
+    const bX = colCenter + gap / 2;
+    doc.rect(aX, chartBottom, barWidth, aH, { fill: COLOR_A });
+    doc.rect(bX, chartBottom, barWidth, bH, { fill: COLOR_B });
+
+    const recovery = s.totalRecoveryRand;
+    const recColor = recovery >= 0 ? COLOR_POS : COLOR_NEG;
+    const recLabel = `${recovery >= 0 ? '+' : ''}${moneyShort(recovery)}`;
+    const topH = Math.max(aH, bH);
+    // doc.text() has no colour param (every other label in this app is plain black) - push the
+    // coloured text op directly, same "rg" fill-colour operator doc.rect()'s fill uses, since Tj
+    // paints with the current non-stroking (fill) colour by default.
+    const recX = colCenter - textWidth(recLabel, { size: 6.5, bold: true }) / 2;
+    const recY = chartBottom + topH + 5;
+    doc.currentOps.push(`${recColor[0]} ${recColor[1]} ${recColor[2]} rg BT /F2 6.5 Tf ${recX.toFixed(2)} ${recY.toFixed(2)} Td (${escapePdfText(recLabel)}) Tj ET`);
+    doc.currentOps.push('0 0 0 rg'); // reset fill colour - "rg" is a persistent graphics-state
+    // parameter, not scoped to the BT/ET text block above, so every doc.text() call after this
+    // point (which never sets its own colour) would otherwise silently inherit red/green.
+    doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
+  });
+
+  doc.line(x, chartBottom, x + width, chartBottom, 0.75);
+}
+
+// One Tenant/Municipal/Recovery table (Rand + Qty) for one utility, `rows` newest-first.
+function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, qtyLabel, qtyDp = 2 }) {
+  doc.text(left, y, title, { size: 11, bold: true }); y -= 16;
+  const numW = (right - left - 62) / 6;
+  const edges = [1, 2, 3, 4, 5, 6].map((n) => left + 62 + numW * n);
+  const headers1 = [['Rand (Excl VAT)', 0, 3], ['Qty', 3, 3]];
+  const sub = ['Tenant', 'Municipal', 'Recovery', 'Tenant', 'Municipal', 'Recovery'];
+
+  doc.text(left, y, 'Month', { bold: true, size: 7.5 });
+  for (const [label, startIdx, span] of headers1) {
+    const groupLeft = startIdx === 0 ? left + 62 : edges[startIdx - 1];
+    const groupRight = edges[startIdx + span - 1];
+    const lw = textWidth(label, { bold: true, size: 7.5 });
+    doc.text(groupLeft + (groupRight - groupLeft - lw) / 2, y, label, { bold: true, size: 7.5 });
+  }
+  y -= 10;
+  sub.forEach((label, i) => {
+    doc.text(edges[i] - textWidth(label, { bold: true, size: 6.5 }), y, label, { bold: true, size: 6.5 });
+  });
+  y -= 4; doc.line(left, y, right, y); y -= 11;
+
+  const colorFor = (v) => (v > 0.005 ? [0.05, 0.5, 0.2] : (v < -0.005 ? [0.75, 0.15, 0.15] : [0.4, 0.4, 0.4]));
+  const drawRightSigned = (val, ex, yy, fmt, dp) => {
+    if (val == null) { doc.text(ex - textWidth('-', { size: 7.5 }), yy, '-', { size: 7.5 }); return; }
+    const str = `${val > 0.005 ? '+' : ''}${fmt(val, dp)}`;
+    const w = textWidth(str, { size: 7.5, bold: true });
+    const c = colorFor(val);
+    doc.currentOps.push(`${c[0]} ${c[1]} ${c[2]} rg BT /F2 7.5 Tf ${(ex - w).toFixed(2)} ${yy.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
+    doc.currentOps.push('0 0 0 rg'); // reset - see drawGroupedComparisonChart's note on "rg" being
+    // a persistent (not text-block-scoped) graphics-state parameter.
+  };
+
+  for (const r of rows) {
+    doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
+    const site = r.site, muni = r.municipal, rec = r.recovery;
+    const siteRandStr = site ? money(site[randKey]) : 'no bill';
+    doc.text(edges[0] - textWidth(siteRandStr, { size: 7.5 }), y, siteRandStr, { size: 7.5 });
+    const muniRandStr = muni ? money(muni[randKey]) : 'no statement';
+    doc.text(edges[1] - textWidth(muniRandStr, { size: 7.5 }), y, muniRandStr, { size: 7.5 });
+    drawRightSigned(rec ? rec[randKey] : null, edges[2], y, money);
+    const siteQtyStr = site ? site[qtyKey].toLocaleString('en-US', { minimumFractionDigits: qtyDp, maximumFractionDigits: qtyDp }) : '-';
+    doc.text(edges[3] - textWidth(siteQtyStr, { size: 7.5 }), y, siteQtyStr, { size: 7.5 });
+    const muniQtyStr = muni ? muni[qtyKey].toLocaleString('en-US', { minimumFractionDigits: qtyDp, maximumFractionDigits: qtyDp }) : '-';
+    doc.text(edges[4] - textWidth(muniQtyStr, { size: 7.5 }), y, muniQtyStr, { size: 7.5 });
+    drawRightSigned(rec ? rec[qtyKey] : null, edges[5], y, (v, dp) => v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }), qtyDp);
+    y -= 13;
+  }
+  return y;
+}
+
+function buildRecoveryPdf(data) {
+  const doc = new PDFDoc();
+  const left = 42, right = PAGE_W - 42;
+  let y = PAGE_H - 50;
+  const propertyName = (data.propertyName || '').toUpperCase();
+  const rows = data.rows || [];
+
+  doc.registerImage('Logo', LOGO);
+  const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
+  doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
+
+  doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
+  doc.text(left, y, 'Recovery - Tenant Billing vs Municipal Statement', { size: 10 }); y -= 6;
+  y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
+  doc.line(left, y, right, y); y -= 16;
+  doc.text(left, y, 'Property Rates, Refuse and Sundry are excluded from every figure below - real municipal-only', { size: 7.5 });
+  y -= 10;
+  doc.text(left, y, 'costs, but never billed through to the client (see flat_site_recovery.js).', { size: 7.5 });
+  y -= 26;
+
+  if (rows.length) {
+    drawGroupedComparisonChart(doc, { x: left + 46, y, width: right - left - 46, height: 220, series: rows });
+  } else {
+    doc.text(left, y - 20, 'No overlapping billing/municipal data yet.', { size: 9 });
+  }
+
+  doc.newPage();
+  let ty = PAGE_H - 50;
+  doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
+  doc.text(left, ty, 'Recovery Detail (newest first)', { size: 11, bold: true }); ty -= 8;
+  doc.line(left, ty, right, ty); ty -= 24;
+
+  const rowsDesc = [...rows].reverse();
+  ty = drawRecoveryTable(doc, { title: 'Electricity', rows: rowsDesc, left, right, y: ty, randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', qtyDp: 0 });
+  ty -= 22;
+  ty = drawRecoveryTable(doc, { title: 'Water', rows: rowsDesc, left, right, y: ty, randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', qtyDp: 2 });
+  ty -= 22;
+  ty = drawRecoveryTable(doc, { title: 'Sewer', rows: rowsDesc, left, right, y: ty, randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', qtyDp: 2 });
+
+  doc.text(left, 30, `Generated ${data.generatedAt || ''}`, { size: 7 });
+
+  return doc.build();
+}
+
+module.exports = { PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, money };

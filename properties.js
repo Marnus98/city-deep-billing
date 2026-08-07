@@ -44,6 +44,11 @@ module.exports = [
     dbFile: 'field-street.db',
     seedFile: './field-street/seed',
     billingModel: 'flat_site',
+    // Has a real municipal_import.js (see field-street/municipal_import.js) alongside its own
+    // client billing - so the "Recovery" nav tab (tenant billing vs the real municipal bill, see
+    // flat_site_recovery.js) applies here. Loper Road and Cranbrook Flavours don't have this flag -
+    // no municipal statements have been imported for either yet.
+    hasMunicipalStatements: true,
   },
   {
     slug: 'bob-martin',
@@ -51,6 +56,7 @@ module.exports = [
     dbFile: 'bob-martin.db',
     seedFile: './bob-martin/import_history',
     billingModel: 'flat_site',
+    hasMunicipalStatements: true,
   },
   {
     slug: 'loper-road',
@@ -65,6 +71,7 @@ module.exports = [
     dbFile: 'autozone.db',
     seedFile: './autozone/import_history',
     billingModel: 'flat_site',
+    hasMunicipalStatements: true,
   },
   {
     slug: 'cranbrook-flavours',

@@ -21,9 +21,15 @@ function layout({ title, user, active, body }) {
   // Slips" tab instead. Audit Log is common to both, since every property writes to its own copy.
   const currentProp = properties.find((p) => p.slug === (user && user.currentProperty));
   const isFlatSite = currentProp && currentProp.billingModel === 'flat_site';
+  // "Recovery" only makes sense once a property has both its own client billing AND a real
+  // municipal statement to compare against - see properties.js's hasMunicipalStatements flag and
+  // flat_site_recovery.js. Loper Road/Cranbrook Flavours don't have municipal data yet, so they
+  // simply don't get this tab.
   const nav = isFlatSite
     ? [
-      ['/dashboard', 'Dashboard'], ['/site-billing', 'Billing Slips'], ['/municipal-billing', 'Municipal Account'], ['/audit-log', 'Audit Log'],
+      ['/dashboard', 'Dashboard'], ['/site-billing', 'Billing Slips'], ['/municipal-billing', 'Municipal Account'],
+      ...(currentProp.hasMunicipalStatements ? [['/recovery', 'Recovery']] : []),
+      ['/audit-log', 'Audit Log'],
     ]
     : [
       ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
@@ -1024,6 +1030,138 @@ function siteBillingDetailPage({ user, slip, tariff, calc, basePath = '/site-bil
   return layout({ title: `${pageTitle} - ${slip.label}`, user, active: basePath, body });
 }
 
+// ---------------- Recovery: tenant billing vs municipal statement (flat_site) ----------------
+// See flat_site_recovery.js for the comparison logic and properties.js's hasMunicipalStatements
+// for which properties get this page at all. `rows` is buildRecoveryRows()'s output, chronological
+// ascending (oldest first) - used as-is for the chart (reads left-to-right in time order) and
+// reversed for the tables below it (newest-first, matching every other list page in this app).
+function shortMonthLabel(label) {
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const m = /^(\d{4})-(\d{2})$/.exec(label || '');
+  if (!m) return esc(label);
+  return `${MONTHS[Number(m[2]) - 1]} ${m[1].slice(2)}`;
+}
+function shortMoney(n) {
+  const v = Number(n || 0);
+  const neg = v < 0;
+  const abs = Math.abs(v);
+  const s = abs >= 1000 ? `R${(abs / 1000).toFixed(abs >= 100000 ? 0 : 1)}k` : `R${abs.toFixed(0)}`;
+  return (neg ? '-' : '') + s;
+}
+function recoveryCell(v) {
+  if (v == null) return '<span class="text-slate-400">&mdash;</span>';
+  const cls = v > 0.005 ? 'text-green-600' : (v < -0.005 ? 'text-red-600' : 'text-slate-500');
+  const sign = v > 0.005 ? '+' : '';
+  return `<span class="${cls} font-medium">${sign}${money(v)}</span>`;
+}
+function recoveryQtyCell(v, dp = 2) {
+  if (v == null) return '<span class="text-slate-400">&mdash;</span>';
+  const cls = v > 0.005 ? 'text-green-600' : (v < -0.005 ? 'text-red-600' : 'text-slate-500');
+  const sign = v > 0.005 ? '+' : '';
+  return `<span class="${cls} font-medium">${sign}${fmtNum(v, dp)}</span>`;
+}
+
+function recoveryChart(rows) {
+  const maxVal = Math.max(1, ...rows.flatMap((r) => [r.totalSiteRand, r.totalMunicipalRand]).filter((v) => v != null));
+  const chartHeight = 180;
+  const columns = rows.map((r) => {
+    if (!r.site || !r.municipal) {
+      return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:64px">
+        <div class="text-xs text-slate-400 mb-1" style="height:${chartHeight}px" >
+          <div class="flex items-end justify-center h-full">no data</div>
+        </div>
+        <div class="text-xs text-slate-500 mt-2">${shortMonthLabel(r.label)}</div>
+      </div>`;
+    }
+    const siteH = Math.max(1, Math.round((r.totalSiteRand / maxVal) * chartHeight));
+    const muniH = Math.max(1, Math.round((r.totalMunicipalRand / maxVal) * chartHeight));
+    const recovery = r.totalRecoveryRand;
+    const recoveryCls = recovery >= 0 ? 'text-green-600' : 'text-red-600';
+    const sign = recovery >= 0 ? '+' : '';
+    return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:64px">
+      <div class="text-[11px] font-semibold ${recoveryCls} mb-1">${sign}${shortMoney(recovery)}</div>
+      <div class="flex items-end gap-1.5" style="height:${chartHeight}px">
+        <div class="flex flex-col items-center justify-end h-full">
+          <div class="text-[9px] text-slate-500 mb-0.5">${shortMoney(r.totalSiteRand)}</div>
+          <div class="rounded-t-sm" style="width:18px;height:${siteH}px;background:#1c2957"></div>
+        </div>
+        <div class="flex flex-col items-center justify-end h-full">
+          <div class="text-[9px] text-slate-500 mb-0.5">${shortMoney(r.totalMunicipalRand)}</div>
+          <div class="rounded-t-sm" style="width:18px;height:${muniH}px;background:#64748b"></div>
+        </div>
+      </div>
+      <div class="text-xs text-slate-500 mt-2">${shortMonthLabel(r.label)}</div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="bg-white rounded-lg border p-4 mb-6">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+      <div class="font-semibold">Monthly Total: Tenant Billing vs Municipal Statement</div>
+      <div class="flex items-center gap-4 text-xs text-slate-500">
+        <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#1c2957"></span>Tenant Billing</span>
+        <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#64748b"></span>Municipal Statement</span>
+        <span class="text-slate-400">&middot;</span>
+        <span class="text-green-600 font-medium">Green</span>&nbsp;= over-recovery,
+        <span class="text-red-600 font-medium">Red</span>&nbsp;= under-recovery
+      </div>
+    </div>
+    <div class="flex items-end gap-2 border-b pb-1 overflow-x-auto">${columns}</div>
+  </div>`;
+}
+
+// One Tenant/Municipal/Recovery R+Qty table for one utility (Electricity, Water or Sewer).
+// `rows` is newest-first (already reversed by the caller).
+function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qtyDp = 2 }) {
+  const trs = rows.map((r) => {
+    const site = r.site, muni = r.municipal, rec = r.recovery;
+    return `<tr class="border-t">
+      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td>
+      <td class="px-3 py-1.5 text-sm text-right">${site ? money(site[randKey]) : '<span class="text-slate-400">no bill</span>'}</td>
+      <td class="px-3 py-1.5 text-sm text-right">${muni ? money(muni[randKey]) : '<span class="text-slate-400">no statement</span>'}</td>
+      <td class="px-3 py-1.5 text-sm text-right">${recoveryCell(rec ? rec[randKey] : null)}</td>
+      <td class="px-3 py-1.5 text-sm text-right text-slate-500">${site ? fmtNum(site[qtyKey], qtyDp) : '&mdash;'}</td>
+      <td class="px-3 py-1.5 text-sm text-right text-slate-500">${muni ? fmtNum(muni[qtyKey], qtyDp) : '&mdash;'}</td>
+      <td class="px-3 py-1.5 text-sm text-right">${recoveryQtyCell(rec ? rec[qtyKey] : null, qtyDp)}</td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold ${badgeClass}">${esc(title)}</div>
+    <table class="w-full">
+      <thead>
+        <tr class="text-left text-slate-500 bg-slate-50 text-xs">
+          <th class="px-3 py-1.5" rowspan="2">Month</th>
+          <th class="px-3 py-1.5 text-right" colspan="3">Rand (Excl VAT)</th>
+          <th class="px-3 py-1.5 text-right" colspan="3">${esc(qtyLabel)}</th>
+        </tr>
+        <tr class="text-left text-slate-500 bg-slate-50 text-xs">
+          <th class="px-3 py-1 text-right">Tenant</th><th class="px-3 py-1 text-right">Municipal</th><th class="px-3 py-1 text-right">Recovery</th>
+          <th class="px-3 py-1 text-right">Tenant</th><th class="px-3 py-1 text-right">Municipal</th><th class="px-3 py-1 text-right">Recovery</th>
+        </tr>
+      </thead>
+      <tbody>${trs || `<tr><td class="px-4 py-6 text-slate-400" colspan="7">No data yet.</td></tr>`}</tbody>
+    </table>
+  </div>`;
+}
+
+function recoveryPage({ user, rows, propertyName }) {
+  const rowsDesc = [...rows].reverse();
+  const body = `
+  <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="text-2xl font-bold">Recovery</h1>
+      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)} - tenant billing slips vs the real municipal statement, month by month. Property Rates, Refuse and Sundry are excluded on both sides (never billed through to the client) - see flat_site_recovery.js.</p>
+    </div>
+    <a href="/recovery-pdf" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download PDF</a>
+  </div>
+  ${rows.length ? recoveryChart(rows) : '<div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No overlapping billing/municipal data yet.</div>'}
+  ${recoveryTable('Electricity', '', rowsDesc, { randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh' })}
+  ${recoveryTable('Water', 'bg-green-50', rowsDesc, { randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL' })}
+  ${recoveryTable('Sewer', 'bg-green-50', rowsDesc, { randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL' })}
+  `;
+  return layout({ title: 'Recovery', user, active: '/recovery', body });
+}
+
 module.exports = {
   esc, money, fmtNum, layout, loginPage, dashboardPage, tenantsPage, tenantDetailPage,
   metersPage, tariffsPage, billingPeriodsPage, newBillingPeriodPage, readingsCapturePage,
@@ -1031,4 +1169,5 @@ module.exports = {
   solarBillingSlipsPage, municipalAccountsPage,
   reconciliationPage, auditLogPage, statusColor,
   siteBillingListPage, siteBillingFormPage, siteBillingDetailPage,
+  recoveryPage,
 };

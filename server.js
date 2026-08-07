@@ -8,13 +8,14 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
-const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf } = require('./pdf');
+const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
 const properties = require('./properties');
 const { seedUsers } = require('./shared_seed_users');
 const calcFlatSite = require('./calc_flat_site');
+const flatSiteRecovery = require('./flat_site_recovery');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -604,6 +605,22 @@ function monthlyTrendForSite(asOfStartDate) {
   });
 }
 
+// Combines two monthlyTrend series (site + municipal, either order) into one Y-axis max per
+// category - used so the client billing PDF and the municipal statement PDF for the same property
+// share one scale per chart (see pdf.js's drawSingleSeriesChart maxOverride) instead of each PDF
+// silently rescaling to its own numbers, which made a bar impossible to compare by eye between the
+// two documents. Properties with no municipal data (Loper Road, Cranbrook Flavours) simply get an
+// empty seriesB here, so this is a no-op there - the max just comes from seriesA as before.
+function combinedAxisMax(seriesA, seriesB, keys) {
+  const overrides = {};
+  for (const key of keys) {
+    const values = [...(seriesA || []), ...(seriesB || [])]
+      .map((s) => s[key]).filter((v) => v != null);
+    overrides[key] = Math.max(1, ...values, 0);
+  }
+  return overrides;
+}
+
 route('GET', '/site-billing', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
   const slips = all('SELECT * FROM site_billing_slips ORDER BY start_date DESC');
@@ -719,14 +736,52 @@ route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
   const readings = getSlipReadings(slip.id);
   const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
   const monthlyTrend = monthlyTrendForSite(slip.start_date);
+  // Same-scale axis vs this property's municipal statement PDF (see combinedAxisMax above) - an
+  // empty municipal trend (no municipal_import.js for this property) just leaves the scale as
+  // monthlyTrend's own max, so this is harmless for Loper Road/Cranbrook Flavours too.
+  const municipalTrendForAxis = monthlyTrendForMunicipal(slip.start_date);
+  const axisMaxOverrides = {
+    cost: combinedAxisMax(monthlyTrend, municipalTrendForAxis, ['elec', 'water', 'sanitation']),
+    consumption: combinedAxisMax(monthlyTrend, municipalTrendForAxis, ['elecKwh', 'waterM3']),
+  };
   const propertyName = currentPropertyName(user);
   const pdfBuf = buildSiteBillingSlipPdf({
-    propertyName, slip, tariff, calc, monthlyTrend,
+    propertyName, slip, tariff, calc, monthlyTrend, axisMaxOverrides,
     generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
   });
   audit(user.userId, 'pdf_download', 'site_billing_slip', slip.id, null, null, null, slip.label);
   const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-${slip.label}.pdf"` });
+  res.end(pdfBuf);
+});
+
+// ---------------- recovery: tenant billing vs municipal statement (flat_site) ----------------
+// Only meaningful for a property with both its own client billing AND a real municipal statement
+// to compare against - see properties.js's hasMunicipalStatements flag. Guarded the same way the
+// dashboard redirect above guards billingModel: a direct hit on either route from a property
+// without the flag just bounces to that property's site-billing list instead of rendering an
+// all-"no data" page.
+function currentPropHasMunicipal(user) {
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  return !!(currentProp && currentProp.hasMunicipalStatements);
+}
+
+route('GET', '/recovery', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!currentPropHasMunicipal(user)) return redirect(res, '/site-billing');
+  const rows = flatSiteRecovery.buildRecoveryRows(currentDb(), { limit: 12 });
+  send(res, 200, views.recoveryPage({ user, rows, propertyName: currentPropertyName(user) }));
+});
+
+route('GET', '/recovery-pdf', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!currentPropHasMunicipal(user)) return redirect(res, '/site-billing');
+  const rows = flatSiteRecovery.buildRecoveryRows(currentDb(), { limit: 12 });
+  const propertyName = currentPropertyName(user);
+  const pdfBuf = buildRecoveryPdf({ propertyName, rows, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
+  audit(user.userId, 'pdf_download', 'recovery', null, null, null, null, null);
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-recovery.pdf"` });
   res.end(pdfBuf);
 });
 
@@ -925,9 +980,15 @@ route('GET', '/municipal-billing-pdf/:id', async (req, res, params) => {
   const readings = getMunicipalStatementReadings(slip.id);
   const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
   const monthlyTrend = monthlyTrendForMunicipal(slip.start_date);
+  // Same-scale axis vs this property's own client billing PDF - see combinedAxisMax above.
+  const siteTrendForAxis = monthlyTrendForSite(slip.start_date);
+  const axisMaxOverrides = {
+    cost: combinedAxisMax(monthlyTrend, siteTrendForAxis, ['elec', 'water', 'sanitation']),
+    consumption: combinedAxisMax(monthlyTrend, siteTrendForAxis, ['elecKwh', 'waterM3']),
+  };
   const propertyName = currentPropertyName(user);
   const pdfBuf = buildSiteBillingSlipPdf({
-    propertyName, slip, tariff, calc, monthlyTrend, subtitle: 'Municipal Account Statement',
+    propertyName, slip, tariff, calc, monthlyTrend, axisMaxOverrides, subtitle: 'Municipal Account Statement',
     generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
   });
   audit(user.userId, 'pdf_download', 'municipal_statement_slip', slip.id, null, null, null, slip.label);
