@@ -31,6 +31,8 @@ const SITE_MAP = {
 function get(db, sql, params = []) { return db.prepare(sql).get(...params); }
 function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 
+// Exported for tenant_recovery.js's own municipal-side matching (same date-overlap method, just
+// anchored to a billing_period's dates instead of another statement's reading dates).
 function daysOverlap(aStart, aEnd, bStart, bEnd) {
   const s = aStart > bStart ? aStart : bStart;
   const e = aEnd < bEnd ? aEnd : bEnd;
@@ -236,9 +238,10 @@ function electricityLineItems(s) {
 // Trailing up-to-12-statement Electricity/Water/Sanitation trend (excl. VAT) for one municipal
 // account, chronological ascending - feeds the PDF's trend chart, same shape monthlyTrendForTenant
 // already produces for the tenant PDF chart ({label, elec, water, sanitation}), just re-derived
-// from municipal_statements instead of bill_line_items. label is a synthetic "YYYY-MM" derived
-// from statement_date so pdf.js's shortMonthLabel() (built for billing_periods.label) can format it
-// the same way.
+// from municipal_statements instead of bill_line_items. label is statement_for - the consumption
+// period's own start month (see the 2026-08-07 labelling fix note in seed_wingfield_municipal.js) -
+// NOT derived from statement_date, which would be the invoice's issue month instead (one month
+// later than the usage each statement actually covers).
 function monthlyTrendForAccount(db, accountId, asOfStatementDate) {
   const rows = all(db, `
     SELECT statement_for, statement_date, elec_excl_vat, water_excl_vat, sanitation_excl_vat
@@ -247,13 +250,14 @@ function monthlyTrendForAccount(db, accountId, asOfStatementDate) {
     ORDER BY statement_date DESC LIMIT 12
   `, [accountId, asOfStatementDate || null, asOfStatementDate || null]);
   return rows.reverse().map((r) => ({
-    label: r.statement_date ? r.statement_date.slice(0, 7).replace('/', '-') : r.statement_for,
+    label: r.statement_for,
     elec: r.elec_excl_vat || 0, water: r.water_excl_vat || 0, sanitation: r.sanitation_excl_vat || 0,
   }));
 }
 
 // Same trend, but summed across every account (for the "All Accounts Combined" PDF) - grouped by
-// the synthetic YYYY-MM label so accounts on slightly different statement dates within the same
+// statement_for (the consumption period's own label, not a statement_date-derived one - see
+// monthlyTrendForAccount above) so accounts on slightly different statement dates within the same
 // month still land in one combined bar.
 function monthlyTrendAllAccounts(db, asOfStatementDate) {
   const rows = all(db, `
@@ -264,7 +268,7 @@ function monthlyTrendAllAccounts(db, asOfStatementDate) {
   `, [asOfStatementDate || null, asOfStatementDate || null]);
   const byLabel = new Map();
   for (const r of rows) {
-    const label = r.statement_date ? r.statement_date.slice(0, 7).replace('/', '-') : r.statement_for;
+    const label = r.statement_for;
     if (!byLabel.has(label)) byLabel.set(label, { label, elec: 0, water: 0, sanitation: 0 });
     const agg = byLabel.get(label);
     agg.elec += r.elec_excl_vat || 0; agg.water += r.water_excl_vat || 0; agg.sanitation += r.sanitation_excl_vat || 0;
@@ -273,7 +277,7 @@ function monthlyTrendAllAccounts(db, asOfStatementDate) {
 }
 
 module.exports = {
-  SITE_MAP, buildComparison, bestOverlappingPeriod, ourSiteTotals, cojSiteTotals,
+  SITE_MAP, buildComparison, bestOverlappingPeriod, ourSiteTotals, cojSiteTotals, daysOverlap,
   allStatementLabels, buildCombinedStatement, ourAllSitesTotals, buildComparisonAll,
   electricityLineItems, monthlyTrendForAccount, monthlyTrendAllAccounts,
 };

@@ -37,6 +37,12 @@ module.exports = [
     dbFile: 'wingfield.db',
     seedFile: './wingfield/seed_wingfield', // added once a Wingfield workbook is imported - see README
     billingModel: 'tenant',
+    // Enables the "Recovery" nav tab for this tenant-model property (see tenant_recovery.js and
+    // municipal_compare.js's SITE_MAP) - the value is the site name tenant_recovery.js compares
+    // against, matching SITE_MAP's own 'Refinery' -> 'Wingfield Business Park' mapping. City Deep
+    // isn't set up with this yet (its own municipal data spans 4 accounts across 3 sites, more setup
+    // than a single flag - can follow the same pattern once wanted).
+    recoverySiteName: 'Wingfield Business Park',
   },
   {
     slug: 'field-street',

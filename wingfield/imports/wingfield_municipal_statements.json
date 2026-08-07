@@ -5,7 +5,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 183000000.0,
   "statement_date": "2025-06-30",
-  "statement_for": "2025-06",
+  "statement_for": "2025-05",
   "due_date": "2025-07-25",
   "invoice_number": "2210755502-2025-06-30",
   "property_rates": {
@@ -65,7 +65,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2025-07-28",
-  "statement_for": "2025-07",
+  "statement_for": "2025-06",
   "due_date": "2025-08-25",
   "invoice_number": "2210755502-2025-07-28",
   "property_rates": {
@@ -125,7 +125,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2025-08-28",
-  "statement_for": "2025-08",
+  "statement_for": "2025-07",
   "due_date": "2025-09-25",
   "invoice_number": "2210755502-2025-08-28",
   "property_rates": {
@@ -185,7 +185,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2025-09-29",
-  "statement_for": "2025-09",
+  "statement_for": "2025-08",
   "due_date": "2025-10-25",
   "invoice_number": "2210755502-2025-09-29",
   "property_rates": {
@@ -245,7 +245,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2025-10-28",
-  "statement_for": "2025-10",
+  "statement_for": "2025-09",
   "due_date": "2025-11-25",
   "invoice_number": "2210755502-2025-10-28",
   "property_rates": {
@@ -305,7 +305,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2025-11-27",
-  "statement_for": "2025-11",
+  "statement_for": "2025-10",
   "due_date": "2025-12-25",
   "invoice_number": "2210755502-2025-11-27",
   "property_rates": {
@@ -365,7 +365,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2025-12-29",
-  "statement_for": "2025-12",
+  "statement_for": "2025-11",
   "due_date": "2026-01-25",
   "invoice_number": "2210755502-2025-12-29",
   "property_rates": {
@@ -425,7 +425,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2026-01-28",
-  "statement_for": "2026-01",
+  "statement_for": "2025-12",
   "due_date": "2026-02-25",
   "invoice_number": "2210755502-2026-01-28",
   "property_rates": {
@@ -485,7 +485,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2026-02-27",
-  "statement_for": "2026-02",
+  "statement_for": "2026-01",
   "due_date": "2026-03-25",
   "invoice_number": "2210755502-2026-02-27",
   "property_rates": {
@@ -545,7 +545,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2026-03-27",
-  "statement_for": "2026-03",
+  "statement_for": "2026-02",
   "due_date": "2026-04-25",
   "invoice_number": "2210755502-2026-03-27",
   "property_rates": {
@@ -605,7 +605,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2026-04-29",
-  "statement_for": "2026-04",
+  "statement_for": "2026-03",
   "due_date": "2026-05-25",
   "invoice_number": "2210755502-2026-04-29",
   "property_rates": {
@@ -665,7 +665,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2026-05-31",
-  "statement_for": "2026-05",
+  "statement_for": "2026-04",
   "due_date": "2026-06-25",
   "invoice_number": "2210755502-2026-05-31",
   "property_rates": {
@@ -725,7 +725,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2026-06-30",
-  "statement_for": "2026-06",
+  "statement_for": "2026-05",
   "due_date": "2026-07-25",
   "invoice_number": "2210755502-2026-06-30",
   "property_rates": {
@@ -782,7 +782,7 @@
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
   "statement_date": "2026-07-28",
-  "statement_for": "2026-07",
+  "statement_for": "2026-06",
   "due_date": "2026-08-25",
   "invoice_number": "2210755502-2026-07-28",
   "property_rates": {

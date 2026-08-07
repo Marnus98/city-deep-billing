@@ -16,6 +16,7 @@ const properties = require('./properties');
 const { seedUsers } = require('./shared_seed_users');
 const calcFlatSite = require('./calc_flat_site');
 const flatSiteRecovery = require('./flat_site_recovery');
+const tenantRecovery = require('./tenant_recovery');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -759,28 +760,38 @@ route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
   res.end(pdfBuf);
 });
 
-// ---------------- recovery: tenant billing vs municipal statement (flat_site) ----------------
+// ---------------- recovery: tenant billing vs municipal statement ----------------
 // Only meaningful for a property with both its own client billing AND a real municipal statement
-// to compare against - see properties.js's hasMunicipalStatements flag. Guarded the same way the
-// dashboard redirect above guards billingModel: a direct hit on either route from a property
-// without the flag just bounces to that property's site-billing list instead of rendering an
-// all-"no data" page.
-function currentPropHasMunicipal(user) {
+// to compare against. Two independent backing implementations share this one pair of routes -
+// flat_site_recovery.js (label-matched, gated by properties.js's hasMunicipalStatements) for the
+// flat_site properties, tenant_recovery.js (date-overlap matched, gated by recoverySiteName) for
+// tenant-model properties like Wingfield - see each module's own header comment for why the
+// matching method differs. Guarded the same way the dashboard redirect above guards billingModel: a
+// direct hit on either route from a property without the relevant flag just bounces to /dashboard
+// instead of rendering an all-"no data" page.
+function currentPropRecoveryRows(user) {
   const currentProp = properties.find((p) => p.slug === user.currentProperty);
-  return !!(currentProp && currentProp.hasMunicipalStatements);
+  if (!currentProp) return null;
+  if (currentProp.billingModel === 'flat_site' && currentProp.hasMunicipalStatements) {
+    return flatSiteRecovery.buildRecoveryRows(currentDb(), { limit: 12 });
+  }
+  if (currentProp.recoverySiteName) {
+    return tenantRecovery.buildRecoveryRows(currentDb(), currentProp.recoverySiteName, { limit: 12 });
+  }
+  return null;
 }
 
 route('GET', '/recovery', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
-  if (!currentPropHasMunicipal(user)) return redirect(res, '/site-billing');
-  const rows = flatSiteRecovery.buildRecoveryRows(currentDb(), { limit: 12 });
+  const rows = currentPropRecoveryRows(user);
+  if (!rows) return redirect(res, '/dashboard');
   send(res, 200, views.recoveryPage({ user, rows, propertyName: currentPropertyName(user) }));
 });
 
 route('GET', '/recovery-pdf', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
-  if (!currentPropHasMunicipal(user)) return redirect(res, '/site-billing');
-  const rows = flatSiteRecovery.buildRecoveryRows(currentDb(), { limit: 12 });
+  const rows = currentPropRecoveryRows(user);
+  if (!rows) return redirect(res, '/dashboard');
   const propertyName = currentPropertyName(user);
   const pdfBuf = buildRecoveryPdf({ propertyName, rows, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
   audit(user.userId, 'pdf_download', 'recovery', null, null, null, null, null);

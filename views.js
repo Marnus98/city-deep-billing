@@ -35,6 +35,9 @@ function layout({ title, user, active, body }) {
       ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
       ['/billing-periods', 'Billing Periods'], ['/billing', 'Billing'], ['/solar-billing-slips', 'Solar Billing Slips'],
       ['/municipal-accounts', 'Municipality'],
+      // Same gate as the flat_site side above, just keyed off recoverySiteName instead of
+      // hasMunicipalStatements - see tenant_recovery.js and properties.js's own comment on this field.
+      ...(currentProp && currentProp.recoverySiteName ? [['/recovery', 'Recovery']] : []),
       ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
     ];
   // Property switcher - auto-submits on change (same pattern as the Municipality Accounts page's
@@ -1207,7 +1210,7 @@ function recoveryPage({ user, rows, propertyName }) {
   <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
     <div>
       <h1 class="text-2xl font-bold">Recovery</h1>
-      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)} - tenant billing slips vs the real municipal statement, month by month. Property Rates, Refuse and Sundry are excluded on both sides (never billed through to the client) - see flat_site_recovery.js.</p>
+      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)} - tenant billing vs the real municipal statement, month by month. Property Rates, Refuse and Sundry are excluded on both sides (never billed through to the client) - see flat_site_recovery.js / tenant_recovery.js.</p>
     </div>
     <a href="/recovery-pdf" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download PDF</a>
   </div>

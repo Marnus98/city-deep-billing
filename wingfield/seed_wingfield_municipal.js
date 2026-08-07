@@ -13,6 +13,18 @@
 // rate (unambiguous - Peak/Standard/Off-peak rates never overlap across any of the 14 months),
 // verified against a reference table the client independently rebuilt from these same invoices.
 //
+// LABELLING FIX (2026-08-07): every statement's `statement_for` was originally set to its own
+// statement_date's month (when Ekurhuleni issued/dated the invoice) - but the invoice always goes
+// out about a month after its reading period ends, so this labelled every statement one month LATE
+// versus the consumption it actually covers (e.g. the statement dated 2026-07-28, covering the
+// 2026-06-01 to 2026-07-01 reading period, was labelled "2026-07" - really June's usage). Corrected
+// in wingfield_municipal_statements.json (and extract_wingfield_municipal.py, for future
+// re-extractions) to use the electricity reading period's own start month instead, matching every
+// other property in this app's convention (label = consumption period start) - shifts every one of
+// the 14 statements back exactly one month (2026-07 -> 2026-06, etc). invoice_number is untouched
+// (it's keyed off the statement's own literal issue date, not statement_for), so re-running this
+// script after the fix safely UPDATEs each existing row in place rather than duplicating it.
+//
 // Ekurhuleni quirk worth knowing: three of the fourteen statements (Nov 2025, Dec 2025, Jan 2026)
 // carry one-off "INTERIM"/"INTERIM REVERSAL" water & sewer adjustment lines instead of the usual
 // "WATER n kl"/"SEWER-BUSINESS n kl" lines (an estimated-reading correction, not a mistake), and

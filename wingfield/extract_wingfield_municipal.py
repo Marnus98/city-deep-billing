@@ -154,13 +154,20 @@ def extract(fname):
     computed_total_incl = round(
         property_rates["incl_vat"] + elec_incl + water_incl + sewer_incl + refuse_incl + sundry_incl, 2)
 
+    # statement_for is the month the CONSUMPTION happened in (electricity reading period start),
+    # not the month the statement was issued/dated - Ekurhuleni invoices roughly a month after the
+    # reading period ends, so statement_date[:7] would label a statement by its issue month, one
+    # month later than the usage it actually covers. Every one of the 14 statements confirmed this
+    # is exactly a 1-month gap (reading_period start's month == statement_date's month minus one) -
+    # matches the convention every other property in this app uses (label = consumption period
+    # start), and is what lets a label-matched tenant-billing-vs-municipal comparison work at all.
     return {
         "file": fname,
         "account": account_number,
         "address": "0 Jones St, Witkoppie 64-IR",
         "market_value": market_value,
         "statement_date": statement_date,
-        "statement_for": statement_date[:7],
+        "statement_for": elec_reading_period[0][:7] if elec_reading_period else statement_date[:7],
         "due_date": due_date,
         "invoice_number": f"{account_number}-{statement_date}",
         "property_rates": property_rates,
