@@ -1,9 +1,15 @@
 // field-street/municipal_import.js - imports 8 Field Street's actual Ekurhuleni municipal account
 // statements (as opposed to seed.js/import_history.js, which are what HolmStone bills the client -
 // see db.js's municipal_tariffs/municipal_statement_slips for why these live in a separate set of
-// tables). Source: 9 real "COPY TAX INVOICE" statements the client uploaded (Sep-Dec 2025, Jan/Feb/
-// Mar/May/Jun 2026 - April 2026's statement wasn't provided, so that month is simply missing here,
-// same as Jul 2025/Aug 2025/Jul 2026 are outside this batch entirely).
+// tables). Source: 10 real "COPY TAX INVOICE" statements the client uploaded (Sep 2025 - Jun 2026,
+// no gaps - April 2026 was added 2026-08-07, filling what had been the one missing month; Jul 2025/
+// Aug 2025/Jul 2026 are outside this batch entirely).
+//
+// April 2026's water/sewer section carries a large "INTERIM REVERSAL" crediting back March 2026's
+// own INTERIM-estimated 178kL reading once the meter was actually read (Curr/Prev reading dates span
+// 2026-03-11 to 2026-05-13, a ~2-month gap covering both months) - handled the same NET-of-reversal
+// way as every other INTERIM REVERSAL month in this file (October 2025 above): 183kL net (the true
+// 361kL reading less March's already-booked 178kL estimate), not the 361kL gross figure printed.
 //
 // EXTRACTION METHOD - every reading/cost figure below was read directly off each statement (exact,
 // not estimated); every "rate" is *computed* as cost/reading, matching the convention set by the
@@ -77,8 +83,8 @@ const MONTHS = [
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 105.4619441296, network_demand: 146.0899979153, peak_low: 3.4150000675, standard_low: 2.2314000184, offpeak_low: 1.6926000222, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 613.992, comment: 'Demand=613.992' }, network_demand: { reading: 613.992, comment: 'Demand=613.992' },
       peak_low: 50579.999, standard_low: 108870.0, offpeak_low: 140578.8,
-      water: { reading: 25, comment: 'NET of a true 835kL reading less an 810kL INTERIM REVERSAL credit correcting prior over-estimated months - see file header notes' },
-      sewer: { reading: 25, comment: 'NET of a true 835kL reading less an 810kL INTERIM REVERSAL credit correcting prior over-estimated months - see file header notes' } } },
+      water: { reading: 25, comment: 'NET of a true 835kL reading (meter read window 2025-08-11 to 2025-11-12, 93 days) less an 810kL INTERIM REVERSAL credit correcting prior over-estimated months - see file header notes' },
+      sewer: { reading: 25, comment: 'NET of a true 835kL reading (meter read window 2025-08-11 to 2025-11-12, 93 days) less an 810kL INTERIM REVERSAL credit correcting prior over-estimated months - see file header notes' } } },
   { label: '2025-11', startDate: '2025-11-01', endDate: '2025-12-01',
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 105.9847977701, network_demand: 146.0899923563, peak_low: 3.4150000831, standard_low: 2.23140002, offpeak_low: 1.6926000338, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 610.963, comment: 'Demand=610.963' }, network_demand: { reading: 610.963, comment: 'Demand=610.963' },
@@ -101,8 +107,13 @@ const MONTHS = [
       peak_low: 43357.2, standard_low: 94513.199, offpeak_low: 122659.2,
       water: { reading: 178, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 178, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
-  // April 2026: no statement uploaded - gap in the municipal history, unlike the client's own
-  // continuous site-billing history.
+  { label: '2026-04', startDate: '2026-04-01', endDate: '2026-05-01',
+    rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 104.3011959892079, network_demand: 146.08999315427053,
+      peak_low: 3.4150000000000005, standard_low: 2.231399958634992, offpeak_low: 1.6925999884364658, refuse: 584.46, water: 49.10999999999999, sewer: 18.91 },
+    readings: { network_access: { reading: 620.825, comment: 'Demand=620.825' }, network_demand: { reading: 620.825, comment: 'Demand=620.825' },
+      peak_low: 42366.000, standard_low: 100775.999, offpeak_low: 138366.000,
+      water: { reading: 183, comment: 'NET of a true 361kL reading (meter read window 2026-03-11 to 2026-05-13, 63 days) less a 178kL INTERIM REVERSAL credit correcting March 2026\'s over-estimated INTERIM reading - see file header notes' },
+      sewer: { reading: 183, comment: 'NET of a true 361kL reading (meter read window 2026-03-11 to 2026-05-13, 63 days) less a 178kL INTERIM REVERSAL credit correcting March 2026\'s over-estimated INTERIM reading - see file header notes' } } },
   { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01',
     rates: { property_rates: 21367.38, fixed_charge: 5207.09, network_access: 99.7044862663, network_demand: 146.0899975853, peak_low: 3.4149999012, standard_low: 2.2314000295, offpeak_low: 1.6926000101, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 617.061, comment: 'Demand=617.061' }, network_demand: { reading: 617.061, comment: 'Demand=617.061' },
@@ -128,7 +139,7 @@ function main(dbFile = 'field-street.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`8 Field Street municipal account import: ${created} statement(s) added (Sep 2025 - Jun 2026, Apr 2026 missing).`);
+  if (created) console.log(`8 Field Street municipal account import: ${created} statement(s) added (Sep 2025 - Jun 2026, no gaps).`);
   return db;
 }
 

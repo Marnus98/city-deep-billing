@@ -1,11 +1,31 @@
 // loper-road/municipal_import.js - imports Loper Road - Sandvic's actual Ekurhuleni municipal
 // account statements (as opposed to import_history.js, which is what HolmStone bills the client -
 // see db.js's municipal_tariffs/municipal_statement_slips for why these live in a separate set of
-// tables, same split as field-street/bob-martin/autozone's municipal imports). Source: 4 real "COPY
-// TAX INVOICE" statements the client uploaded, covering Dec 2025 and Jan/Feb/Mar 2026 consumption
-// (invoiced ~1 month later than the consumption period itself, e.g. the Dec 2025 consumption
-// statement is invoiced/dated 2026-01-28 - labelled here by consumption period start, same
-// convention as every other property's municipal import).
+// tables, same split as field-street/bob-martin/autozone's municipal imports). Source: 6 real "COPY
+// TAX INVOICE" statements the client uploaded, covering Dec 2025 and Jan/Feb/Mar/Apr/Jun 2026
+// consumption (invoiced ~1 month later than the consumption period itself, e.g. the Dec 2025
+// consumption statement is invoiced/dated 2026-01-28 - labelled here by consumption period start,
+// same convention as every other property's municipal import).
+//
+// ACCOUNT CHANGEOVER (2026-04/05): Ekurhuleni account 1711418291 (the account behind every month
+// through Mar 2026) was closed out and its deposit transferred to a brand new account, 1712424685,
+// sometime around late April/May 2026 - confirmed by the old account's own final statement (0 kWh
+// consumption, a pure water/sewer "INTERIM REVERSAL" credit, and an explicit "TRANSFER DEPOSIT-
+// 1712424685" / "REVERSE DEPOSIT- 1712424685" ledger pair, netting to a -R8,526.31 refund-shaped
+// "TOTAL CURRENT LEVY" - not a real utility charge for any period, so NOT imported as its own
+// statement here). The new account's own first statement (invoiced 2026-06-30) has a stretched
+// ~61-day reading period (2026-04-01 to 2026-06-01) covering BOTH April's and May's consumption in
+// one combined bill - imported below as '2026-04' (matching the reading period's own start month,
+// same convention as everywhere else in this app), with no separate '2026-05' entry - May's usage
+// genuinely has no standalone figure to report, it's baked into this one combined statement. The new
+// account's SECOND statement (invoiced 2026-07-28) is back to a clean one-month cycle and covers
+// June 2026 normally, imported as '2026-06'.
+//
+// The new account's statements also show a near-zero "Refuse: Litterpicking" charge (R0.16-R0.17,
+// down from R278.72) - not a service change, just the new account's own municipal record still
+// carrying a placeholder Area of 1m2 (vs the old account's correct 1,672m2) that Ekurhuleni hasn't
+// re-populated yet; and no separate "Environmental Levy" refuse line at all this account (refuse_levy
+// recorded as 0 for both new-account months) - genuinely absent from these 2 statements, not omitted.
 //
 // EXTRACTION METHOD: every reading/cost figure below was read directly off each statement's
 // itemised "ELECTRICITY SERVICE"/"WATER SERVICE"/"SEWERAGE"/"REFUSE REMOVAL" lines (exact, not
@@ -74,6 +94,25 @@ const MONTHS = [
       // other month (see file header note).
       water: { reading: 55, comment: 'INTERIM estimate (1kL + 54kL across the 2 water meters), not an actual meter read this cycle' },
       sewer: { reading: 55, comment: 'INTERIM estimate (1kL + 54kL across the 2 water meters), not an actual meter read this cycle' } } },
+  // New account 1712424685's first statement - stretched ~61-day reading period (2026-04-01 to
+  // 2026-06-01) combining April's and May's consumption into one bill - see file header note on the
+  // account changeover. A one-off R1.46 "Interest on Arrears" ledger charge on this statement is
+  // excluded here (not a utility charge, same convention as every other property's one-off penalty/
+  // interest exclusions), so this month's own total sits R1.46 below the statement's own printed
+  // "TOTAL CURRENT LEVY" of R31,494.77 - expected, not a reconciliation error.
+  { label: '2026-04', startDate: '2026-04-01', endDate: '2026-06-01',
+    rates: { fixed_charge: 3389.73, energy_charge: 11131.49 / 4916.520, demand_charge: 6839.45 / 28.240,
+      network_access: 3507.92 / 28.240, refuse_litter: 0.16, refuse_levy: 0, water: 49.11, sewer: 18.91 },
+    readings: { energy_charge: 4916.520,
+      demand_charge: { reading: 28.240, comment: 'Demand=28.240' }, network_access: { reading: 28.240, comment: 'Demand=28.240' },
+      water: { reading: 37, comment: 'Covers a combined ~61-day Apr-May reading period (new account 1712424685) - see file header note' },
+      sewer: { reading: 37, comment: 'Covers a combined ~61-day Apr-May reading period (new account 1712424685) - see file header note' } } },
+  { label: '2026-06', startDate: '2026-06-01', endDate: '2026-07-01',
+    rates: { fixed_charge: 4338.39, energy_charge: 20876.02 / 4524.200, demand_charge: 6510.07 / 26.880,
+      network_access: 3507.92 / 26.880, refuse_litter: 0.17, refuse_levy: 0, water: 1837.05 / 37, sewer: 18.91 },
+    readings: { energy_charge: 4524.200,
+      demand_charge: { reading: 26.880, comment: 'Demand=26.880' }, network_access: { reading: 26.880, comment: 'Demand=26.880' },
+      water: 37, sewer: 37 } },
 ];
 
 function main(dbFile = 'loper-road.db') {
@@ -89,7 +128,7 @@ function main(dbFile = 'loper-road.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`Loper Road - Sandvic municipal account import: ${created} statement(s) added (Dec 2025 - Mar 2026).`);
+  if (created) console.log(`Loper Road - Sandvic municipal account import: ${created} statement(s) added (Dec 2025, Jan-Apr 2026, Jun 2026 - May 2026's usage is folded into Apr's combined statement, see file header note).`);
   return db;
 }
 

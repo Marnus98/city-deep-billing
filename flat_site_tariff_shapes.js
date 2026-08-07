@@ -225,8 +225,45 @@ const EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD = [
   ...WATER_SEWER_ITEMS,
 ];
 
+// Ekurhuleni municipal account statement shape for Cranbrook Flavours (see
+// cranbrook-flavours/municipal_import.js) - structurally identical to EKURHULENI_MUNICIPAL_E_TOU_8FS
+// (same municipality/tariff class: Property Rates, Fixed Charge, a kVA-based "Network Demand" that
+// tracks its own reading at a rock-steady ~R146.09/kVA, a near-flat "Network Access Charge" that
+// barely moves with kVA despite sharing the same meter reading - same quirk already flagged on 8
+// Field Street's own statements - Peak/Standard/Off-Peak energy, a single combined Refuse line, and
+// Water/Sewer), with two genuinely new line items this site's statements need that 8FS's never did:
+//
+// - "sundry": one-off, VAT-charged administrative fees that appear ad-hoc on this account (an
+//   "APPL CLEARANCE FIGURES - ELECTRONIC APPL" fee in Nov 2025, a "FINAL NOTICE" fee in Jun 2026) -
+//   neither is a utility charge, but both sit *inside* this statement's own printed "TOTAL CURRENT
+//   LEVY" (unlike Loper Road's one-off "Interest on Arrears", which sat outside it) - so they're
+//   recorded here rather than excluded, keeping every month's reconciliation exact to the cent
+//   instead of silently sitting a few Rand short. See the site's own import script for full detail
+//   on which fee landed in which month.
+// - "deposit": a new-account opening deposit ("DEPOSIT-JOURNAL", Mar 2026 only, when account
+//   2618624004 first appears in this batch) - genuinely VAT-exempt on the statement (unlike
+//   "sundry" above), so kept as its own line rather than folded into "sundry" where it would
+//   otherwise be taxed 15% by this app's own VAT calc and throw the reconciliation off by that
+//   deposit's own VAT amount.
+const EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK = [
+  { key: 'property_rates', label: 'Property Rates (Industrial)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal', vatExempt: true },
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'network_demand', label: 'Network Demand', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'peak_high', label: 'Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'peak_low', label: 'Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_high', label: 'Standard Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_low', label: 'Standard Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_high', label: 'Off-Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'refuse', label: 'Refuse Removal', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  { key: 'sundry', label: 'Sundry / Once-off Charges', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: true, section: 'municipal' },
+  { key: 'deposit', label: 'Account Deposit', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: true, section: 'municipal', vatExempt: true },
+  ...WATER_SEWER_ITEMS,
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
-  EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD,
+  EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
 };

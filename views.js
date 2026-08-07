@@ -2,6 +2,16 @@
 // dependency). Tailwind is loaded from the CDN by the *browser* viewing the page - that's
 // independent of this sandbox's own package-registry access, so it's safe to rely on here.
 const properties = require('./properties');
+const { daysBetween, LONG_PERIOD_DAYS } = require('./municipal_compare');
+
+// Small amber flag shown next to any reading/billing period longer than a normal ~1-month cycle
+// (see municipal_compare.js's LONG_PERIOD_DAYS) - surfaces multi-month/combined statements and
+// tenant bills right on the page instead of only being visible by reading the exact dates.
+function periodBadge(startDate, endDate) {
+  const days = daysBetween(startDate, endDate);
+  if (days == null || days <= LONG_PERIOD_DAYS) return '';
+  return ` <span class="badge bg-amber-100 text-amber-700 border border-amber-300" title="This period is ${days} days, longer than a normal billing cycle">${days}-day period</span>`;
+}
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -702,7 +712,7 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
         <table class="w-full text-sm">
           ${catTableHead}
           <tbody>
-            ${catRowHtml('Electricity' + (s.elec_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.elec_reading_start)} to ${esc(s.elec_reading_end)})</span>` : ''), s.elec_consumption_kwh, 'kWh', s.elec_excl_vat, s.elec_vat, s.elec_incl_vat)}
+            ${catRowHtml('Electricity' + (s.elec_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.elec_reading_start)} to ${esc(s.elec_reading_end)})</span>${periodBadge(s.elec_reading_start, s.elec_reading_end)}` : ''), s.elec_consumption_kwh, 'kWh', s.elec_excl_vat, s.elec_vat, s.elec_incl_vat)}
             ${elecSubRowsClean}
             ${catRow('Total (Excl VAT)', null, null, s.elec_excl_vat, s.elec_vat, s.elec_incl_vat, { total: true })}
           </tbody>
@@ -717,7 +727,7 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
         <table class="w-full text-sm">
           ${catTableHead}
           <tbody>
-            ${catRowHtml('Water' + (s.water_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.water_reading_start)} to ${esc(s.water_reading_end)})</span>` : ''), s.water_consumption_kl, 'KL', s.water_excl_vat, s.water_vat, s.water_incl_vat)}
+            ${catRowHtml('Water' + (s.water_reading_start ? ` <span class="text-slate-400 text-xs">(${esc(s.water_reading_start)} to ${esc(s.water_reading_end)})</span>${periodBadge(s.water_reading_start, s.water_reading_end)}` : ''), s.water_consumption_kl, 'KL', s.water_excl_vat, s.water_vat, s.water_incl_vat)}
             ${catRowHtml('Sanitation <span class="text-slate-400 text-xs">(billed on water consumption)</span>', s.water_consumption_kl, 'KL', s.sanitation_excl_vat, s.sanitation_vat, s.sanitation_incl_vat)}
             ${catRow('Total (Excl VAT)', null, null, waterSanExcl, waterSanVat, waterSanIncl, { total: true })}
           </tbody>
@@ -806,7 +816,7 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
       </tr></thead>
       <tbody>
       ${statements.slice().reverse().map((s) => `<tr class="border-b last:border-0 ${statement && s.id === statement.id ? 'bg-slate-50' : ''}">
-        <td class="px-4 py-2 font-medium">${esc(s.statement_for)}</td>
+        <td class="px-4 py-2 font-medium">${esc(s.statement_for)}${periodBadge(s.elec_reading_start, s.elec_reading_end) || periodBadge(s.water_reading_start, s.water_reading_end)}</td>
         <td class="px-4 py-2 text-slate-500">${esc(s.statement_date)}</td>
         <td class="px-4 py-2 text-right">${fmtNum(s.elec_consumption_kwh, 0)}</td>
         <td class="px-4 py-2 text-right">${fmtNum(s.water_consumption_kl, 0)}</td>
@@ -898,7 +908,7 @@ function siteBillingListPage({ user, rows, basePath = '/site-billing', pageTitle
       <tbody>
       ${rows.map(({ row, calc }) => `<tr class="border-b last:border-0">
         <td class="px-4 py-2 font-medium">${esc(row.label)}</td>
-        <td class="px-4 py-2 text-slate-500">${esc(row.start_date)} to ${esc(row.end_date)}</td>
+        <td class="px-4 py-2 text-slate-500">${esc(row.start_date)} to ${esc(row.end_date)}${periodBadge(row.start_date, row.end_date)}</td>
         <td class="px-4 py-2 text-right">${money(calc.elecTotal + (calc.municipalTotal || 0))}</td>
         <td class="px-4 py-2 text-right">${money(calc.waterTotal)}</td>
         <td class="px-4 py-2 text-right font-medium">${money(calc.total)}</td>
@@ -1042,7 +1052,7 @@ function siteBillingDetailPage({ user, slip, tariff, calc, basePath = '/site-bil
       </form>
     </div>
   </div>
-  <p class="text-sm text-slate-500 mb-4">${tariff && tariff.tariff_name ? `${esc(tariff.tariff_name)} &middot; ` : ''}Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}.${(!hideCorrectionNote && slip.apply_correction_factor === 0) ? ' <span class="text-amber-600">Correction factor not applied to this month.</span>' : ''}</p>
+  <p class="text-sm text-slate-500 mb-4">${tariff && tariff.tariff_name ? `${esc(tariff.tariff_name)} &middot; ` : ''}Reading period ${esc(slip.start_date)} to ${esc(slip.end_date)}.${periodBadge(slip.start_date, slip.end_date)}${(!hideCorrectionNote && slip.apply_correction_factor === 0) ? ' <span class="text-amber-600">Correction factor not applied to this month.</span>' : ''}</p>
 
   ${calc.municipalItems && calc.municipalItems.length ? `
   <div class="bg-white rounded-lg border mb-4 overflow-hidden">
@@ -1174,8 +1184,13 @@ function recoveryChart(rows) {
 function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qtyDp = 2 }) {
   const trs = rows.map((r) => {
     const site = r.site, muni = r.municipal, rec = r.recovery;
+    // Flag the month itself if either side's own reading period ran long (municipal statement takes
+    // priority since that's the real utility bill - see flat_site_recovery.js/tenant_recovery.js,
+    // which both now carry startDate/endDate through onto site/municipal alongside the figures).
+    const flagSide = (muni && daysBetween(muni.startDate, muni.endDate) > LONG_PERIOD_DAYS) ? muni
+      : (site && daysBetween(site.startDate, site.endDate) > LONG_PERIOD_DAYS) ? site : null;
     return `<tr class="border-t">
-      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td>
+      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}${flagSide ? periodBadge(flagSide.startDate, flagSide.endDate) : ''}</td>
       <td class="px-3 py-1.5 text-sm text-right">${site ? money(site[randKey]) : '<span class="text-slate-400">no bill</span>'}</td>
       <td class="px-3 py-1.5 text-sm text-right">${muni ? money(muni[randKey]) : '<span class="text-slate-400">no statement</span>'}</td>
       <td class="px-3 py-1.5 text-sm text-right">${recoveryCell(rec ? rec[randKey] : null)}</td>

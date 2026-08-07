@@ -7,6 +7,7 @@
 // swap this for pdfkit/puppeteer once normal npm access is available; the raw PDF this produces
 // is fully spec-valid in the meantime (verified by re-rendering it with poppler/pdftoppm).
 const LOGO = require('./logo_asset');
+const { daysBetween, LONG_PERIOD_DAYS } = require('./municipal_compare');
 
 function escapePdfText(s) {
   return String(s ?? '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
@@ -372,8 +373,10 @@ function buildBillingSlipPdf(data) {
   doc.text(right - 180, y, 'Invoice No:', { bold: true }); doc.text(right - 100, y, data.invoiceNumber); y -= 15;
   doc.text(left, y, 'Unit / Site:', { bold: true }); doc.text(left + 90, y, data.unit || '-');
   doc.text(right - 180, y, 'Billing Month:', { bold: true }); doc.text(right - 100, y, data.periodLabel); y -= 15;
+  const tenantDays = daysBetween(data.startDate, data.endDate);
+  const tenantReadingPeriodStr = `${data.startDate} to ${data.endDate}${tenantDays != null && tenantDays > LONG_PERIOD_DAYS ? ` (${tenantDays} days)` : ''}`;
   doc.text(left, y, 'Account No:', { bold: true }); doc.text(left + 90, y, data.accountNumber || '-');
-  doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, `${data.startDate} to ${data.endDate}`); y -= 15;
+  doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, tenantReadingPeriodStr); y -= 15;
   doc.text(left, y, 'VAT No:', { bold: true }); doc.text(left + 90, y, data.vatNumber || '-');
   doc.text(right - 180, y, 'Due Date:', { bold: true }); doc.text(right - 100, y, data.dueDate || '-'); y -= 20;
 
@@ -497,9 +500,13 @@ function buildMunicipalStatementPdf(data) {
   // Property Rates is intentionally left off this statement - it's a separate municipal charge,
   // not a utility, and the client asked for it out of the "Total Charges" picture (still recorded
   // in the DB, just not shown here or included in the total below).
-  catLine(`Electricity (${data.elecReadingStart || '?'} to ${data.elecReadingEnd || '?'})`, fmtQty(data.elecConsumptionKwh, 'kWh'), data.elecExclVat, data.elecVat, data.elecInclVat);
+  const periodSuffix = (start, end) => {
+    const d = daysBetween(start, end);
+    return d != null && d > LONG_PERIOD_DAYS ? `, ${d} days` : '';
+  };
+  catLine(`Electricity (${data.elecReadingStart || '?'} to ${data.elecReadingEnd || '?'}${periodSuffix(data.elecReadingStart, data.elecReadingEnd)})`, fmtQty(data.elecConsumptionKwh, 'kWh'), data.elecExclVat, data.elecVat, data.elecInclVat);
   for (const l of data.elecLines || []) catLine(l.label, fmtQty(l.qty, l.unit || ''), l.rand, null, l.rand, { indent: true });
-  catLine(`Water (${data.waterReadingStart || '?'} to ${data.waterReadingEnd || '?'})`, fmtQty(data.waterConsumptionKl, 'KL'), data.waterExclVat, data.waterVat, data.waterInclVat);
+  catLine(`Water (${data.waterReadingStart || '?'} to ${data.waterReadingEnd || '?'}${periodSuffix(data.waterReadingStart, data.waterReadingEnd)})`, fmtQty(data.waterConsumptionKl, 'KL'), data.waterExclVat, data.waterVat, data.waterInclVat);
   catLine('Sanitation (billed on water consumption)', fmtQty(data.waterConsumptionKl, 'KL'), data.sanitationExclVat, data.sanitationVat, data.sanitationInclVat);
   catLine('Refuse', null, data.refuseExclVat, data.refuseVat, data.refuseInclVat);
   catLine('Sundry', null, data.sundryExclVat, data.sundryVat, data.sundryInclVat);
@@ -577,8 +584,10 @@ function buildSiteBillingSlipPdf(data) {
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 18;
 
+  const slipDays = daysBetween(data.slip.start_date, data.slip.end_date);
+  const readingPeriodStr = `${data.slip.start_date} to ${data.slip.end_date}${slipDays != null && slipDays > LONG_PERIOD_DAYS ? ` (${slipDays} days)` : ''}`;
   doc.text(left, y, 'Period:', { bold: true }); doc.text(left + 90, y, data.slip.label);
-  doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, `${data.slip.start_date} to ${data.slip.end_date}`); y -= 15;
+  doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, readingPeriodStr); y -= 15;
   doc.text(left, y, 'Tariff:', { bold: true }); doc.text(left + 90, y, (data.tariff && data.tariff.tariff_name) || '-');
   doc.text(right - 180, y, 'Status:', { bold: true }); doc.text(right - 100, y, data.slip.status); y -= 20;
 
@@ -750,9 +759,15 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
     // a persistent (not text-block-scoped) graphics-state parameter.
   };
 
+  let flaggedAny = false;
   for (const r of rows) {
-    doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
     const site = r.site, muni = r.municipal, rec = r.recovery;
+    // Same long-period flag as the on-screen Recovery table (see views.js's recoveryTable) -
+    // municipal statement's own period takes priority since that's the real utility bill.
+    const flagSide = (muni && daysBetween(muni.startDate, muni.endDate) > LONG_PERIOD_DAYS) ? muni
+      : (site && daysBetween(site.startDate, site.endDate) > LONG_PERIOD_DAYS) ? site : null;
+    if (flagSide) flaggedAny = true;
+    doc.text(left, y, shortMonthLabel(r.label) + (flagSide ? '*' : ''), { size: 7.5, bold: true });
     const siteRandStr = site ? money(site[randKey]) : 'no bill';
     doc.text(edges[0] - textWidth(siteRandStr, { size: 7.5 }), y, siteRandStr, { size: 7.5 });
     const muniRandStr = muni ? money(muni[randKey]) : 'no statement';
@@ -764,6 +779,10 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
     doc.text(edges[4] - textWidth(muniQtyStr, { size: 7.5 }), y, muniQtyStr, { size: 7.5 });
     drawRightSigned(rec ? rec[qtyKey] : null, edges[5], y, (v, dp) => v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }), qtyDp);
     y -= 13;
+  }
+  if (flaggedAny) {
+    doc.text(left, y - 2, `* period longer than ${LONG_PERIOD_DAYS} days (combined/multi-month statement) - see the Municipal Account page for exact dates`, { size: 6.5 });
+    y -= 12;
   }
   return y;
 }

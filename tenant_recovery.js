@@ -46,6 +46,7 @@ function siteSideFor(db, siteName, periodId) {
     WHERE s.name = ? AND b.billing_period_id = ?
   `, [siteName, periodId]);
   if (!consumption.tenant_count) return null;
+  const period = get(db, 'SELECT start_date, end_date FROM billing_periods WHERE id=?', [periodId]);
   const charges = get(db, `
     SELECT
       COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) AS elec_rand,
@@ -64,6 +65,10 @@ function siteSideFor(db, siteName, periodId) {
     // every municipal statement in this app already uses - see e.g. flat_site_tariff_shapes.js's
     // WATER_SEWER_ITEMS comment) - so sewerKl reuses waterKl rather than being tracked separately.
     waterKl: consumption.water_kl, sewerKl: consumption.water_kl,
+    // The billing_period's own dates (shared across every tenant in it, unlike a flat_site slip which
+    // has its own unique dates) - carried through so the Recovery page/PDF can flag a long period the
+    // same way the Municipal Account pages do (see municipal_compare.js's LONG_PERIOD_DAYS).
+    startDate: period && period.start_date, endDate: period && period.end_date,
   };
 }
 
@@ -77,6 +82,11 @@ function municipalSideFor(db, siteName, periodStart, periodEnd) {
   if (!accountLabels.length) return null;
   const accounts = all(db, `SELECT * FROM municipal_accounts WHERE label IN (${accountLabels.map(() => '?').join(',')})`, accountLabels);
   let elecKwh = 0, elecRand = 0, waterKl = 0, waterRand = 0, sewerRand = 0, sewerKl = 0, matched = false;
+  // Widest span across every matched statement (usually just one, since Wingfield's SITE_MAP has a
+  // single account - see file header note - but kept generic) - used the same way flat_site_recovery
+  // carries a slip's own start/end through, so a long/combined municipal statement gets flagged here
+  // too (see municipal_compare.js's LONG_PERIOD_DAYS).
+  let minStart = null, maxEnd = null;
   for (const acc of accounts) {
     const statements = all(db, 'SELECT * FROM municipal_statements WHERE municipal_account_id=?', [acc.id]);
     let best = null, bestDays = 0;
@@ -89,10 +99,14 @@ function municipalSideFor(db, siteName, periodStart, periodEnd) {
       elecKwh += best.elec_consumption_kwh || 0; elecRand += best.elec_excl_vat || 0;
       waterKl += best.water_consumption_kl || 0; waterRand += best.water_excl_vat || 0;
       sewerRand += best.sanitation_excl_vat || 0; sewerKl += best.water_consumption_kl || 0;
+      const bStart = best.elec_reading_start || best.water_reading_start;
+      const bEnd = best.elec_reading_end || best.water_reading_end;
+      if (bStart && (!minStart || bStart < minStart)) minStart = bStart;
+      if (bEnd && (!maxEnd || bEnd > maxEnd)) maxEnd = bEnd;
     }
   }
   if (!matched) return null;
-  return { elecRand, elecKwh, waterRand, waterKl, sewerRand, sewerKl };
+  return { elecRand, elecKwh, waterRand, waterKl, sewerRand, sewerKl, startDate: minStart, endDate: maxEnd };
 }
 
 // Full comparison for `siteName`: one row per billing_period (trailing `limit`, default 12,

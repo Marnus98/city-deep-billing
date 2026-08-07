@@ -100,6 +100,12 @@ require('./autozone/municipal_import').run('autozone.db');
 // 4 months provided so far) - own de-dup key (label), separate tables from the above (see db.js),
 // always safe to re-run; see loper-road/municipal_import.js for the extraction/reconciliation notes.
 require('./loper-road/municipal_import').run('loper-road.db');
+// Cranbrook Flavours' actual municipal account statements (Nov 2025, Mar/May/Jun 2026 - Dec 2025/
+// Jan/Feb 2026 missing, no statement provided) - own de-dup key (label), separate tables from the
+// above (see db.js), always safe to re-run; see cranbrook-flavours/municipal_import.js for the
+// extraction/reconciliation notes, including the account changeover and March 2026's stretched
+// ~70-day combined statement.
+require('./cranbrook-flavours/municipal_import').run('cranbrook-flavours.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {

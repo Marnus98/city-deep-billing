@@ -40,6 +40,22 @@ function daysOverlap(aStart, aEnd, bStart, bEnd) {
   return days > 0 ? days : 0;
 }
 
+// Plain day-count between two ISO dates (no overlap logic, just b-a) - used everywhere a statement/
+// bill's own reading period needs to be shown/flagged as longer than a normal ~1-month cycle (see
+// LONG_PERIOD_DAYS below). Exported for views.js/pdf.js (flat_site municipal + site-billing pages)
+// and billing.js/tenant_recovery.js (Wingfield/City Deep tenant bills).
+function daysBetween(startDate, endDate) {
+  if (!startDate || !endDate) return null;
+  const days = Math.round((new Date(endDate) - new Date(startDate)) / 86400000);
+  return Number.isFinite(days) ? days : null;
+}
+
+// A reading period longer than this is flagged in the UI/PDF as spanning more than one normal
+// billing cycle (e.g. Loper Road's 61-day Apr-Jun combined statement, Cranbrook's 70-day Mar-May
+// statement) - 35 days gives a little slack over a calendar month for statements that are a day or
+// two long either side of a clean 1-month cycle, without missing a genuinely stretched period.
+const LONG_PERIOD_DAYS = 35;
+
 // Finds the billing_period whose [start_date,end_date] overlaps [readingStart,readingEnd] the
 // most (in days). Returns null if there's no overlap at all with any period.
 function bestOverlappingPeriod(db, readingStart, readingEnd) {
@@ -280,4 +296,5 @@ module.exports = {
   SITE_MAP, buildComparison, bestOverlappingPeriod, ourSiteTotals, cojSiteTotals, daysOverlap,
   allStatementLabels, buildCombinedStatement, ourAllSitesTotals, buildComparisonAll,
   electricityLineItems, monthlyTrendForAccount, monthlyTrendAllAccounts,
+  daysBetween, LONG_PERIOD_DAYS,
 };

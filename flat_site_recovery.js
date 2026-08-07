@@ -33,13 +33,18 @@ function sumElecKwh(elecItems) {
     .reduce((s, i) => s + i.adjustedReading, 0);
 }
 
-function figuresFromCalc(calc) {
+function figuresFromCalc(calc, slip) {
   const waterItem = calc.waterItems.find((i) => i.key === 'water');
   const sewerItem = calc.waterItems.find((i) => i.key === 'sewer');
   return {
     elecRand: calc.elecTotal, elecKwh: sumElecKwh(calc.elecItems),
     waterRand: waterItem ? waterItem.cost : 0, waterKl: waterItem ? waterItem.reading : 0,
     sewerRand: sewerItem ? sewerItem.cost : 0, sewerKl: sewerItem ? sewerItem.reading : 0,
+    // The slip's own exact reading-period dates (not just the 'YYYY-MM' label) - carried through so
+    // the Recovery page/PDF can show and flag the *real* billing period, same "management meeting
+    // accuracy" ask this was added for on the Municipal Account pages themselves (see
+    // municipal_compare.js's LONG_PERIOD_DAYS / views.js's periodBadge).
+    startDate: slip.start_date, endDate: slip.end_date,
   };
 }
 
@@ -54,7 +59,7 @@ function siteSideFor(db, label) {
   const readingRows = all(db, 'SELECT * FROM site_slip_readings WHERE slip_id=?', [slip.id]);
   const readings = {}; for (const r of readingRows) readings[r.item_key] = { reading: r.reading, comment: r.comment };
   const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
-  return figuresFromCalc(calc);
+  return figuresFromCalc(calc, slip);
 }
 
 function municipalSideFor(db, label) {
@@ -65,7 +70,7 @@ function municipalSideFor(db, label) {
   const readingRows = all(db, 'SELECT * FROM municipal_statement_readings WHERE slip_id=?', [slip.id]);
   const readings = {}; for (const r of readingRows) readings[r.item_key] = { reading: r.reading, comment: r.comment };
   const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
-  return figuresFromCalc(calc);
+  return figuresFromCalc(calc, slip);
 }
 
 // Every label present in either table, chronological ascending.
