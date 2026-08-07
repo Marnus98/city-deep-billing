@@ -56,6 +56,21 @@ const EKURHULENI_INDUSTRIAL_C = [
   ...WATER_SEWER_ITEMS,
 ];
 
+// Loper Road - Sandvic's 2026/2027 tariff year (effective Jul 2026) - the same municipality/site as
+// EKURHULENI_INDUSTRIAL_C above, but the statement itself collapses the three-way Peak/Standard/
+// Off-Peak energy split into a single "Total Energy" figure per High/Low demand season - a
+// genuinely different line-item structure the old shape can't represent (not a rate change on the
+// same rows). Given its own shape/tariff version rather than forcing the collapsed total into one
+// of the old peak/standard/offpeak keys, which would show a misleading row label on the bill.
+const EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27 = [
+  { key: 'basic_charge', label: 'Basic Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'total_energy_high', label: 'Total Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'total_energy_low', label: 'Total Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'demand_charge', label: 'Demand Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  ...WATER_SEWER_ITEMS,
+];
+
 // City Power (City of Johannesburg) Industrial LV TOU incl. surcharge - AutoZone. A different
 // municipality entirely from the Ekurhuleni shapes above, with two charges neither Ekurhuleni shape
 // has: Excess Reactive (R/kVArh - no correction factor defined, reactive power isn't a quantity the
@@ -101,15 +116,19 @@ const EKURHULENI_MUNICIPAL_E_TOU_8FS = [
 ];
 
 // Ekurhuleni municipal account statement shape for Bob Martin (see bob-martin/municipal_import.js) -
-// structurally close to EKURHULENI_MUNICIPAL_E_TOU_8FS above but two genuine differences on this
-// site's actual statements: "Network Access Charge" is a flat monthly fee here (identical every
-// month regardless of the kVA reading - not a per-kVA rate at all, unlike Network Demand which
-// does scale with kVA), and Refuse Removal is billed as two separate line items ("Business" bin
+// structurally close to EKURHULENI_MUNICIPAL_E_TOU_8FS above but one genuine difference on this
+// site's actual statements: Refuse Removal is billed as two separate line items ("Business" bin
 // collection and area-wide "Litter-picking"), not one combined figure.
+//
+// "Network Access Charge" shares its Reading with Network Demand (both read off the same kVA
+// meter) - its own cost barely tracks that reading month to month (mid-R56,000s regardless of kVA
+// moving around), so the "rate" shown here is only cost/reading for display consistency with the
+// rest of the app (same convention field-street's municipal import already uses for this exact
+// line) - not necessarily how Ekurhuleni's own tariff book computes it.
 const EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN = [
   { key: 'property_rates', label: 'Property Rates (Industrial)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal', vatExempt: true },
   { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
-  { key: 'network_access', label: 'Network Access Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
   { key: 'network_demand', label: 'Network Demand', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
   { key: 'peak_high', label: 'Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'peak_low', label: 'Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
@@ -122,7 +141,53 @@ const EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN = [
   ...WATER_SEWER_ITEMS,
 ];
 
+// City of Johannesburg municipal account statement shape for AutoZone (see
+// autozone/municipal_import.js) - a genuinely different municipality/format from the Ekurhuleni
+// shapes above (City of Johannesburg + City Power + Johannesburg Water + PIKITUP, each its own
+// VAT-registered sub-account on one combined statement). factorType is null throughout: these are
+// the municipality's own meter readings already, nothing to gross up.
+//
+// Peak/Standard/Off-Peak ARE printed directly on this statement (unlike Ekurhuleni's), so no
+// implied-rate classification is needed there. The _high variants exist for the same reason they do
+// on the client's own site-billing shapes: some reading periods straddle a mid-cycle tariff/season
+// change and the statement itself prints two rate rows for the same category that cycle (see e.g.
+// May 2026's dual Off-Peak/Peak/Standard rows) - both _low and _high can be non-zero in the same
+// month here, unlike a strict winter/summer split.
+//
+// "Reactive Energy Charge" is its own line (usually R0.0000/kVArh, i.e. free, except when reactive
+// demand exceeds a threshold - Jan 2026 is the one month in this batch where it's actually billed).
+//
+// "Network Surcharge" isn't printed with its own rate/reading on the statement (just a Rand total),
+// but it reconciles cleanly to 0.06 x total kWh consumed every month - shown here as an implied
+// R/kWh rate against that same total for display consistency with the rest of the app.
+//
+// Water/Sewer: Johannesburg Water bills off a single combined meter/register here (unlike Bob
+// Martin's two physical meters) - reading = that register's own KL difference most months. One
+// exception: see the water/sewer INTERIM REVERSAL note in autozone/municipal_import.js for March
+// 2026, and the mid-cycle Step-1/Step-2 tariff-change blend for June 2026 - both handled as an
+// implied blended R/kL rate against that month's own reading, same convention as the water blends
+// already used elsewhere in this app.
+const AUTOZONE_COJ_MUNICIPAL = [
+  { key: 'property_rates', label: 'Property Rates (Industrial)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal', vatExempt: true },
+  { key: 'peak_high', label: 'Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'peak_low', label: 'Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_high', label: 'Standard Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_low', label: 'Standard Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_high', label: 'Off-Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'surcharge_tou', label: 'Surcharge - TOU', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'reactive_energy', label: 'Reactive Energy Charge', unit: 'R/kVArh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'network_surcharge', label: 'Network Surcharge (City Power)', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'demand_charge', label: 'Demand Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'service_charge', label: 'Service Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'water', label: 'Water Consumption', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+  { key: 'demand_management_levy', label: 'Demand Management Levy', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'water' },
+  { key: 'sewer', label: 'Sewer', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+  { key: 'refuse', label: 'Refuse Removal (PIKITUP)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  { key: 'sundry_surcharge', label: 'Sundry Surcharge (excl. Property Rates)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+];
+
 module.exports = {
-  EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, CITY_POWER_LV_TOU, EKURHULENI_MUNICIPAL_E_TOU_8FS,
-  EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN,
+  EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
+  EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
 };

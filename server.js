@@ -89,6 +89,11 @@ require('./cranbrook-flavours/import_history').run('cranbrook-flavours.db');
 // missing, no statement provided for it) - own de-dup key (label), separate tables from the above
 // (see db.js), always safe to re-run; see bob-martin/municipal_import.js for extraction notes.
 require('./bob-martin/municipal_import').run('bob-martin.db');
+// AutoZone's actual municipal account statements (Dec 2025, Jan/Mar/Apr/May/Jun 2026 - Feb 2026 and
+// Jul 2026 missing, no statement provided for either) - own de-dup key (label), separate tables from
+// the above (see db.js), always safe to re-run; see autozone/municipal_import.js for the tariff-year
+// change / meter-not-read / INTERIM REVERSAL anomaly notes flagged during extraction.
+require('./autozone/municipal_import').run('autozone.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {

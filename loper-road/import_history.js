@@ -12,10 +12,12 @@
 //    second block is actually December 2025, mislabelled in the source file - imported here as
 //    '2025-12'.
 // 2. July 2026 uses a collapsed "Total Energy - High/Low Demand" format instead of the detailed
-//    Peak/Standard/Off-Peak split used every other month - structurally incompatible with this
-//    site's line-item shape, so it is deliberately NOT imported. The site's history here stops at
-//    June 2026; July 2026 onward can be entered via the live "Add Billing Slip" form once the
-//    client confirms how that statement should be broken down.
+//    Peak/Standard/Off-Peak split used every other month - a genuinely new 2026/2027 tariff year
+//    (see "Loper Road Slips July 2026.xlsx", confirmed against its own "Tariff" sheet), not just a
+//    rate change on the same rows. Structurally incompatible with the Jul 2025-Jun 2026 shape above,
+//    so it gets its own shape (EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27) and its own tariff
+//    version below, rather than forcing the collapsed total into one of the old peak/standard/
+//    offpeak keys.
 //
 // Correction factors: per the client's instruction, reusing the same 4 factor constants already
 // applied to 8 Field Street "for now" (Demand Charge gets the kva factor here, same as Network
@@ -26,7 +28,7 @@
 // Safe to re-run on every boot - see flat_site_seed_helpers.js.
 const { open, migrate } = require('../db');
 const { seedUsers: seedUsersShared } = require('../shared_seed_users');
-const { EKURHULENI_INDUSTRIAL_C } = require('../flat_site_tariff_shapes');
+const { EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27 } = require('../flat_site_tariff_shapes');
 const { seedTariff, seedSlip } = require('../flat_site_seed_helpers');
 
 const FACTORS = { kva_factor: 1.038681688, peak_factor: 1.017448464, standard_factor: 1.017563209, offpeak_factor: 1.017174764 };
@@ -77,6 +79,30 @@ function main(dbFile = 'loper-road.db') {
     if (slipId) created++;
   }
   if (created) console.log(`Loper Road - Sandvic history import: ${created} month(s) added (Jul 2025 - Jun 2026).`);
+
+  // July 2026: new 2026/2027 tariff year, collapsed Total Energy High/Low format (see file header
+  // note #2) - taken from "Loper Road Slips July 2026.xlsx", its own tariff version/shape since the
+  // line items themselves changed, not just the rates. Reconciles exactly to that sheet's own
+  // printed Total (Excl VAT) of R39,891.40.
+  const RATES_JUL26 = {
+    basic_charge: 3695.14, total_energy_high: 4.9344, total_energy_low: 2.4001,
+    network_access: 104.9, demand_charge: 257.85, water: 0, sewer: 0,
+  };
+  const jul26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-07-01',
+    shape: EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, rates: RATES_JUL26, factors: FACTORS,
+    notes: 'New 2026/2027 tariff year - collapsed Total Energy High/Low format replaces the '
+      + 'Peak/Standard/Off-Peak split used through Jun 2026.',
+  });
+  const julSlipId = seedSlip(db, jul26TariffId, {
+    label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
+    readings: {
+      network_access: { reading: 29.220024, comment: '2026/07/06 08:00' }, demand_charge: { reading: 29.220024, comment: '2026/07/06 08:00' },
+      total_energy_high: 5187.3970000272, total_energy_low: 0,
+    },
+  });
+  if (julSlipId) created++;
+  if (julSlipId) console.log('Loper Road - Sandvic history import: July 2026 (new tariff year) added.');
 
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via

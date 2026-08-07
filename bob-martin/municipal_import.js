@@ -7,15 +7,17 @@
 //
 // EXTRACTION METHOD - every reading/cost figure below was read directly off each statement (exact,
 // not estimated); every "rate" is computed as cost/reading (same convention as field-street's
-// municipal import). Two things about this site's statement layout that differ from 8 Field
-// Street's:
-// 1. "Network Access Charge" is a genuinely FLAT monthly fee here (R56,621.33 in all 5 statements,
-//    completely unrelated to any meter reading) - unlike "Network Demand" (a real per-kVA charge,
-//    reading = the Demand meter's kVA figure, rate a rock-steady ~R158.13/kVA every month). Modelled
-//    as a fixed_reading=1 flat item, same as Fixed Charge, not a per-kVA rate.
-// 2. Refuse Removal is billed as two separate flat lines every month - "Business" bin collection
-//    (R584.46) and area-wide "Litter-picking" (R1,159.56) - kept as two line items rather than
-//    combined into one, since the source statement itself never merges them.
+// municipal import). One thing about this site's statement layout that differs from 8 Field
+// Street's: Refuse Removal is billed as two separate flat lines every month - "Business" bin
+// collection (R584.46) and area-wide "Litter-picking" (R1,159.56) - kept as two line items rather
+// than combined into one, since the source statement itself never merges them.
+//
+// "Network Access Charge" shares its Reading with Network Demand - both are read off the same kVA
+// meter (the statement's own "Demand = X" line covers both charges). Its cost barely tracks that
+// reading (mid-R56,000s regardless of kVA moving around, ~R56,621.33 every month bar a few cents),
+// so the "rate" shown for this row is only cost/reading for display consistency, same caveat
+// field-street's municipal import already flags for this exact line - not necessarily how
+// Ekurhuleni's own tariff book computes it.
 //
 // Peak/Standard/Off-Peak are not printed as labels matching our own terminology - the statement's
 // own meter labels ("PEAK" on meter P, "STD" on meter S, "OFF-P" on meter O) were cross-checked by
@@ -59,42 +61,42 @@ const TARIFF_NAME = 'Ekurhuleni_Municipal_Account_Bob Martin';
 
 const MONTHS = [
   { label: '2025-12', startDate: '2025-12-01', endDate: '2026-01-01',
-    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 56621.33, network_demand: 158.1300026916,
+    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 117.2308536409, network_demand: 158.1300026916,
       peak_low: 3.5610002549, standard_low: 2.3425999488, offpeak_low: 1.7875999204,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
-    readings: { network_demand: { reading: 482.990, comment: 'Demand=482.990' },
+    readings: { network_access: { reading: 482.990, comment: 'Demand=482.990' }, network_demand: { reading: 482.990, comment: 'Demand=482.990' },
       peak_low: 6591.120, standard_low: 17688.479, offpeak_low: 14871.840,
       water: 125, sewer: 125 } },
   { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01',
-    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 56621.33, network_demand: 158.1300062562,
+    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 116.1427443258, network_demand: 158.1300062562,
       peak_low: 3.5610002360, standard_low: 2.3425999923, offpeak_low: 1.7875998850,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
-    readings: { network_demand: { reading: 487.515, comment: 'Demand=487.515' },
+    readings: { network_access: { reading: 487.515, comment: 'Demand=487.515' }, network_demand: { reading: 487.515, comment: 'Demand=487.515' },
       peak_low: 17966.160, standard_low: 46865.039, offpeak_low: 31333.919,
       water: { reading: 35, comment: 'NET of a true 22kL+138kL reading less a 14kL+111kL INTERIM REVERSAL credit correcting Dec 2025\'s over-estimated INTERIM reading - see file header notes' },
       sewer: { reading: 35, comment: 'NET of a true 22kL+138kL reading less a 14kL+111kL INTERIM REVERSAL credit correcting Dec 2025\'s over-estimated INTERIM reading - see file header notes' } } },
   { label: '2026-02', startDate: '2026-02-01', endDate: '2026-03-01',
-    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 56621.33, network_demand: 158.1300033636,
+    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 119.0323957282, network_demand: 158.1300033636,
       peak_low: 3.5609997756, standard_low: 2.3426000812, offpeak_low: 1.7875999493,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
-    readings: { network_demand: { reading: 475.680, comment: 'Demand=475.680' },
+    readings: { network_access: { reading: 475.680, comment: 'Demand=475.680' }, network_demand: { reading: 475.680, comment: 'Demand=475.680' },
       peak_low: 20141.279, standard_low: 51040.560, offpeak_low: 31566.000,
       water: { reading: 105, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 105, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
   { label: '2026-03', startDate: '2026-03-01', endDate: '2026-04-01',
-    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 56621.33, network_demand: 158.1300044120,
+    rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 119.5281682559, network_demand: 158.1300044120,
       peak_low: 3.5609999273, standard_low: 2.3425999654, offpeak_low: 1.7876000753,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
-    readings: { network_demand: { reading: 473.707, comment: 'Demand=473.707' },
+    readings: { network_access: { reading: 473.707, comment: 'Demand=473.707' }, network_demand: { reading: 473.707, comment: 'Demand=473.707' },
       peak_low: 26956.319, standard_low: 60130.800, offpeak_low: 39897.839,
       water: { reading: 105, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 105, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
   // April 2026: no statement uploaded - gap in the municipal history, same as field-street's Apr 2026.
   { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01',
-    rates: { property_rates: 20500.67, fixed_charge: 3069.24, network_access: 56621.33, network_demand: 158.1299972967,
+    rates: { property_rates: 20500.67, fixed_charge: 3069.24, network_access: 113.3798496180, network_demand: 158.1299972967,
       peak_low: 3.5609998931, standard_low: 2.3425999338, offpeak_low: 1.7875999936,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
-    readings: { network_demand: { reading: 499.395, comment: 'Demand=499.395' },
+    readings: { network_access: { reading: 499.395, comment: 'Demand=499.395' }, network_demand: { reading: 499.395, comment: 'Demand=499.395' },
       peak_low: 20961.840, standard_low: 49038.480, offpeak_low: 33419.999,
       water: 107, sewer: 107 } },
 ];
