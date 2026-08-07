@@ -187,7 +187,46 @@ const AUTOZONE_COJ_MUNICIPAL = [
   { key: 'sundry_surcharge', label: 'Sundry Surcharge (excl. Property Rates)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
 ];
 
+// Ekurhuleni municipal account statement shape for Loper Road - Sandvic (see
+// loper-road/municipal_import.js) - structurally quite different from the other two Ekurhuleni
+// municipal shapes above, because this statement bills electricity completely differently from how
+// HolmStone bills the client for the same site: no Peak/Standard/Off-Peak TOU split at all, just one
+// flat "Energy Charge" meter reading (meter S021409628) alongside a separate Demand meter (meter
+// D021409628) - confirmed across all 4 months in this batch reconciling exactly to each statement's
+// own "TOTAL CURRENT LEVY" figure with no TOU breakdown anywhere on the page. No Property Rates line
+// either (unlike 8 Field Street/Bob Martin/AutoZone) - this account genuinely doesn't bill it.
+//
+// "Network Access Charge" is a flat R3,507.92 every single month in this batch regardless of the
+// Demand meter's kVA moving around - same "barely tracks its own reading" behaviour already flagged
+// for Bob Martin's identical line item; reading here reuses the Demand meter's own kVA purely for
+// display consistency with the rest of the app, not because Ekurhuleni's tariff book actually prices
+// it that way.
+//
+// Refuse Removal is two separate flat lines here too, like Bob Martin, but with different labels
+// ("Litterpicking" priced per m2 of the unit, "Environmental Levy" a flat account-wide charge) -
+// kept as two line items since the statement never merges them.
+//
+// Water/Sewer: two physical meters (100064836, 10351198), combined into one reading/cost per month
+// exactly like Bob Martin's two-meter site - one meter reads a real, moving consumption most months
+// (10351198, steady ~54-62kL/month), the other normally reads Cons=0 (100064836, effectively idle)
+// except March 2026 where it briefly shows an INTERIM 1kL. Rate is a clean flat R49.11/kL for water
+// and R18.91/kL for sewer across all 4 months (no sliding scale, no mid-cycle change) - the exact
+// same two rates already seen on Bob Martin's own statements, consistent with both being Ekurhuleni
+// accounts on the same tariff book. Each statement double-prints a second, R0.00 Sewer line
+// alongside the real one (same harmless duplicate-line quirk already seen on Bob Martin's
+// statements) - not imported, since it never carries a reading or cost.
+const EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD = [
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'energy_charge', label: 'Energy Charge', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'demand_charge', label: 'Demand Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'refuse_litter', label: 'Refuse Removal - Litterpicking', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  { key: 'refuse_levy', label: 'Refuse Removal - Environmental Levy', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  ...WATER_SEWER_ITEMS,
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
+  EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD,
 };

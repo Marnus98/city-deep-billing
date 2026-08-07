@@ -64,6 +64,7 @@ module.exports = [
     dbFile: 'loper-road.db',
     seedFile: './loper-road/import_history',
     billingModel: 'flat_site',
+    hasMunicipalStatements: true,
   },
   {
     slug: 'autozone',

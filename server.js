@@ -95,6 +95,10 @@ require('./bob-martin/municipal_import').run('bob-martin.db');
 // the above (see db.js), always safe to re-run; see autozone/municipal_import.js for the tariff-year
 // change / meter-not-read / INTERIM REVERSAL anomaly notes flagged during extraction.
 require('./autozone/municipal_import').run('autozone.db');
+// Loper Road - Sandvic's actual municipal account statements (Dec 2025, Jan/Feb/Mar 2026 - the only
+// 4 months provided so far) - own de-dup key (label), separate tables from the above (see db.js),
+// always safe to re-run; see loper-road/municipal_import.js for the extraction/reconciliation notes.
+require('./loper-road/municipal_import').run('loper-road.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {

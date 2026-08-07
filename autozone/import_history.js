@@ -18,10 +18,13 @@
 // factor (factorType: null in the shape) - reactive power and the flat total-energy surcharge
 // aren't quantities that factor was calibrated against.
 //
-// Water/Sewer: Jul-Dec 2025 has no source for these yet (rate 0, unused). Jan-Jul 2026 now bills
-// real water/sewer figures, added via the correction blocks below the MONTHS loop, taken from the
-// client's 7 "AutoZone Slips <Month> 2026.xlsx" workbooks - see those blocks' comments for the
-// sliding-scale/blended-rate details.
+// Water/Sewer: Jul-Sep 2025 has no source for these yet (rate 0, unused). Oct 2025 - Jul 2026 now
+// bills real water/sewer figures, added via the correction blocks below the MONTHS loop, taken from
+// the client's 10 "AutoZone Slips <Month>.xlsx" workbooks (Oct/Nov/Dec 2025 + Jan-Jul 2026) - see
+// those blocks' comments for the sliding-scale/blended-rate details. Oct/Nov/Dec 2025's reference
+// workbooks also revealed the same Service/Capacity Charge merge bug fixed for July 2026 below -
+// see the OCT_DEC_2025 correction block's comment for details. Jul/Aug/Sep 2025 have no reference
+// workbook yet, so stay on the original split-line RATES_A style pending one.
 //
 // Safe to re-run on every boot - see flat_site_seed_helpers.js.
 const { open, migrate } = require('../db');
@@ -150,6 +153,43 @@ function main(dbFile = 'autozone.db') {
       notes: `Water/sewer added from the client's "AutoZone Slips ${label}.xlsx" - electrical rates unchanged from RATES_B.`,
     });
     db.prepare('UPDATE site_billing_slips SET tariff_id=?, apply_correction_factor=0 WHERE id=?').run(newTariffId, slip.id);
+    setReading.run(slip.id, 'water', waterReadingKl, null);
+    setReading.run(slip.id, 'sewer', waterReadingKl, null);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Oct/Nov/Dec 2025 corrections: the client's 3 "AutoZone Slips <Month> 2025.xlsx" reference
+  // workbooks (uploaded 2026-08-07) confirm every electrical reading/rate already seeded above for
+  // these 3 months (from RATES_A) matches exactly - no electricity changes needed. Two things don't
+  // match though:
+  // 1. Water/Sewer were never billed for these months (rate 0) - now added below, same sliding-
+  //    scale/blended-rate convention as WATER_MONTHS above (Step1 200kL@68.26 + Step2 remainder@
+  //    72.01 for water, flat R52.85/kL for sewer - both reconcile to the cent against each
+  //    workbook's own printed sliding-scale totals).
+  // 2. The workbooks each show a single merged "Service Charge: R4,246.99" line - not the split
+  //    `service_charge: 2242.29 + capacity_charge: 2004.70` RATES_A currently models (same total
+  //    either way, since 2242.29 + 2004.70 = 4246.99 exactly, but the wrong line-item split - the
+  //    same bug already found and fixed for RATES_C/July 2026 above). Corrected below to the merged
+  //    style for these 3 specific months only, since that's what their reference workbooks show.
+  //    Jul/Aug/Sep 2025 have no reference workbook yet, so are left on the original split style
+  //    pending one - RATES_A itself is untouched; these 3 months get their own new tariff versions.
+  const OCT_DEC_2025_MONTHS = [
+    // label, effectiveFrom, waterReadingKl, waterCost (sliding-scale total), sewerRate (flat R/kL)
+    ['2025-10', '2025-10-01', 727.463, 51634.61063, 52.85],
+    ['2025-11', '2025-11-01', 733.1745, 52045.895745, 52.85],
+    ['2025-12', '2025-12-01', 785, 55777.85, 52.85],
+  ];
+  for (const [label, effectiveFrom, waterReadingKl, waterCost, sewerRate] of OCT_DEC_2025_MONTHS) {
+    const slip = db.prepare('SELECT id, tariff_id FROM site_billing_slips WHERE label=?').get(label);
+    if (!slip) continue;
+    const newTariffId = seedTariff(db, {
+      tariffName: TARIFF_NAME, effectiveFrom, shape: CITY_POWER_LV_TOU,
+      rates: { ...RATES_A, service_charge: 4246.99, capacity_charge: 0, water: waterCost / waterReadingKl, sewer: sewerRate },
+      factors: FACTORS,
+      notes: `Water/sewer added and Service/Capacity Charge merged from the client's "AutoZone Slips ${label}.xlsx" - other electrical rates unchanged from RATES_A.`,
+    });
+    db.prepare('UPDATE site_billing_slips SET tariff_id=?, apply_correction_factor=0 WHERE id=?').run(newTariffId, slip.id);
+    setReading.run(slip.id, 'capacity_charge', 0, null);
     setReading.run(slip.id, 'water', waterReadingKl, null);
     setReading.run(slip.id, 'sewer', waterReadingKl, null);
   }
