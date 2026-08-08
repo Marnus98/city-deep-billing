@@ -35,6 +35,17 @@ function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 // so summing bills.electricity_consumption_kwh in the same row set as the line-item join would fan
 // out and multiply it by however many line items each bill has (the exact bug municipal_compare.js's
 // own ourSiteTotals already had to avoid - see its comment).
+//
+// water/sewer category lists (see calc.js's calcWaterMeterLine + billing.js's own water_levy push):
+// a tenant's water bill can carry water_charge/water_surcharge/water_levy (water+common-area levy)
+// and sanitation/sanitation_surcharge (sewer) as up to 5 separate bill_line_items rows - matching
+// only 'water_charge'/'sanitation_charge' (the original, narrower filter here) silently dropped the
+// surcharge and levy rows from water, and matched NOTHING for sewer at all since City Deep's own
+// data uses category 'sanitation', not 'sanitation_charge' (confirmed: R0 sewer on every City Deep
+// Recovery row despite real sanitation charges on the tenant's own bill). 'sanitation_charge' is
+// still included here too - Wingfield's older bill data uses that exact category name instead of
+// 'sanitation' and has no separate surcharge/levy rows at all, so both conventions need to be
+// covered for the two properties' data to compare correctly.
 function siteSideFor(db, siteName, periodId) {
   const consumption = get(db, `
     SELECT COALESCE(SUM(b.electricity_consumption_kwh),0) AS elec_kwh,
@@ -50,8 +61,8 @@ function siteSideFor(db, siteName, periodId) {
   const charges = get(db, `
     SELECT
       COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) AS elec_rand,
-      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category='water_charge' THEN bli.amount END), 0) AS water_rand,
-      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category='sanitation_charge' THEN bli.amount END), 0) AS sewer_rand
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('water_charge','water_surcharge','water_levy') THEN bli.amount END), 0) AS water_rand,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_charge','sanitation_surcharge') THEN bli.amount END), 0) AS sewer_rand
     FROM bill_line_items bli
     JOIN bills b ON b.id = bli.bill_id
     JOIN tenants t ON t.id = b.tenant_id
@@ -93,8 +104,8 @@ function siteSideForTenants(db, tenantNames, periodId) {
   const charges = get(db, `
     SELECT
       COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) AS elec_rand,
-      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category='water_charge' THEN bli.amount END), 0) AS water_rand,
-      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category='sanitation_charge' THEN bli.amount END), 0) AS sewer_rand
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('water_charge','water_surcharge','water_levy') THEN bli.amount END), 0) AS water_rand,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_charge','sanitation_surcharge') THEN bli.amount END), 0) AS sewer_rand
     FROM bill_line_items bli
     JOIN bills b ON b.id = bli.bill_id
     JOIN tenants t ON t.id = b.tenant_id
@@ -136,7 +147,15 @@ function municipalSideFor(db, siteName, periodStart, periodEnd) {
     const statements = all(db, 'SELECT * FROM municipal_statements WHERE municipal_account_id=?', [acc.id]);
     let best = null, bestDays = 0;
     for (const s of statements) {
-      const d = municipalCompare.daysOverlap(periodStart, periodEnd, s.elec_reading_start || s.water_reading_start, s.elec_reading_end || s.water_reading_end);
+      const sStart = s.elec_reading_start || s.water_reading_start;
+      const sEnd = s.elec_reading_end || s.water_reading_end;
+      // Gate on the statement's own midpoint falling inside this billing period, not just "any
+      // overlap at all" - see municipal_compare.js's rangeMidpointWithin for exactly why (a
+      // statement can show a few days of edge overlap with an ADJACENT period purely from month-
+      // boundary mismatch without genuinely belonging there - this was letting the same statement
+      // match two different billing periods at once and hiding a genuine "no statement yet" gap).
+      if (!municipalCompare.rangeMidpointWithin(sStart, sEnd, periodStart, periodEnd)) continue;
+      const d = municipalCompare.daysOverlap(periodStart, periodEnd, sStart, sEnd);
       if (d > bestDays) { bestDays = d; best = s; }
     }
     if (best && bestDays > 0) {

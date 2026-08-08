@@ -51,6 +51,26 @@ function daysOverlap(aStart, aEnd, bStart, bEnd) {
   return days > 0 ? days : 0;
 }
 
+// True if [start,end]'s own midpoint falls inside [rangeStart,rangeEnd] - used as a sanity gate
+// alongside daysOverlap's raw day-count everywhere a "best match" gets picked between a billing
+// period and a municipal statement (bestOverlappingPeriod, cojSiteTotals here, and
+// tenant_recovery.js's municipalSideFor). Plain day-overlap alone isn't enough: a statement/period
+// can show a few days of mechanical overlap with an ADJACENT period purely because month
+// boundaries don't align, without genuinely belonging there. Concretely: City Deep's newest
+// municipal statement covers June 2026's consumption (elec reading period 2026/06/01-2026/06/30)
+// but is invoiced under COJ's own "July 2026" label (see seed_municipal.js's header note on COJ's
+// one-month-ahead labelling) - it correctly matched June's tenant billing period (2026-05-25 to
+// 2026-06-23, contains the statement's midpoint) but was ALSO weakly matching July's billing period
+// (2026-06-23 to 2026-07-24, ~8 days of edge overlap) purely on raw day-count, showing the same
+// figures twice and hiding the genuine "no statement yet" for July's real consumption (not received
+// as of 2026-08-08). Requiring the statement's own midpoint to fall inside the candidate period
+// fixes this without needing an arbitrary overlap-percentage threshold.
+function rangeMidpointWithin(start, end, rangeStart, rangeEnd) {
+  if (!start || !end) return false;
+  const mid = (new Date(start).getTime() + new Date(end).getTime()) / 2;
+  return mid >= new Date(rangeStart).getTime() && mid <= new Date(rangeEnd).getTime();
+}
+
 // Plain day-count between two ISO dates (no overlap logic, just b-a) - used everywhere a statement/
 // bill's own reading period needs to be shown/flagged as longer than a normal ~1-month cycle (see
 // LONG_PERIOD_DAYS below). Exported for views.js/pdf.js (flat_site municipal + site-billing pages)
@@ -74,6 +94,7 @@ function bestOverlappingPeriod(db, readingStart, readingEnd) {
   const periods = all(db, 'SELECT * FROM billing_periods');
   let best = null, bestDays = 0;
   for (const p of periods) {
+    if (!rangeMidpointWithin(readingStart, readingEnd, p.start_date, p.end_date)) continue;
     const d = daysOverlap(readingStart, readingEnd, p.start_date, p.end_date);
     if (d > bestDays) { bestDays = d; best = p; }
   }
@@ -124,7 +145,10 @@ function cojSiteTotals(db, siteName, anchorStart, anchorEnd) {
     const statements = all(db, 'SELECT * FROM municipal_statements WHERE municipal_account_id=?', [acc.id]);
     let best = null, bestDays = 0;
     for (const s of statements) {
-      const d = daysOverlap(anchorStart, anchorEnd, s.elec_reading_start || s.water_reading_start, s.elec_reading_end || s.water_reading_end);
+      const sStart = s.elec_reading_start || s.water_reading_start;
+      const sEnd = s.elec_reading_end || s.water_reading_end;
+      if (!rangeMidpointWithin(sStart, sEnd, anchorStart, anchorEnd)) continue;
+      const d = daysOverlap(anchorStart, anchorEnd, sStart, sEnd);
       if (d > bestDays) { bestDays = d; best = s; }
     }
     if (best) {
@@ -233,7 +257,10 @@ function buildComparisonAll(db, combinedStatement) {
     const statements = all(db, 'SELECT * FROM municipal_statements WHERE municipal_account_id=?', [acc.id]);
     let best = null, bestDays = 0;
     for (const s of statements) {
-      const d = daysOverlap(anchorStart, anchorEnd, s.elec_reading_start || s.water_reading_start, s.elec_reading_end || s.water_reading_end);
+      const sStart = s.elec_reading_start || s.water_reading_start;
+      const sEnd = s.elec_reading_end || s.water_reading_end;
+      if (!rangeMidpointWithin(sStart, sEnd, anchorStart, anchorEnd)) continue;
+      const d = daysOverlap(anchorStart, anchorEnd, sStart, sEnd);
       if (d > bestDays) { bestDays = d; best = s; }
     }
     if (best) {
@@ -305,6 +332,7 @@ function monthlyTrendAllAccounts(db, asOfStatementDate) {
 
 module.exports = {
   SITE_MAP, buildComparison, bestOverlappingPeriod, ourSiteTotals, cojSiteTotals, daysOverlap,
+  rangeMidpointWithin,
   allStatementLabels, buildCombinedStatement, ourAllSitesTotals, buildComparisonAll,
   electricityLineItems, monthlyTrendForAccount, monthlyTrendAllAccounts,
   daysBetween, LONG_PERIOD_DAYS,
