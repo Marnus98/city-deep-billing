@@ -72,6 +72,42 @@ function siteSideFor(db, siteName, periodId) {
   };
 }
 
+// Same as siteSideFor above, but filters by an explicit list of tenant NAMES instead of matching
+// tenants.site_id via `sites.name = siteName`. Needed for City Deep's Recovery grouping, which is
+// coarser than (and in two cases diverges from) the site_id-based precinct grouping billing.js uses
+// for real bill calculation - see city-deep/recovery_groups.js's header comment for exactly why.
+// `tenantNames` is expected non-empty; an empty array would build a `NOT IN ()`-shaped broken SQL
+// list, so callers (see city-deep/recovery_groups.js) should never pass one for a real section.
+function siteSideForTenants(db, tenantNames, periodId) {
+  const placeholders = tenantNames.map(() => '?').join(',');
+  const consumption = get(db, `
+    SELECT COALESCE(SUM(b.electricity_consumption_kwh),0) AS elec_kwh,
+      COALESCE(SUM(b.water_consumption_m3),0) AS water_kl,
+      COUNT(DISTINCT b.tenant_id) AS tenant_count
+    FROM bills b
+    JOIN tenants t ON t.id = b.tenant_id
+    WHERE t.name IN (${placeholders}) AND b.billing_period_id = ?
+  `, [...tenantNames, periodId]);
+  if (!consumption.tenant_count) return null;
+  const period = get(db, 'SELECT start_date, end_date FROM billing_periods WHERE id=?', [periodId]);
+  const charges = get(db, `
+    SELECT
+      COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) AS elec_rand,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category='water_charge' THEN bli.amount END), 0) AS water_rand,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category='sanitation_charge' THEN bli.amount END), 0) AS sewer_rand
+    FROM bill_line_items bli
+    JOIN bills b ON b.id = bli.bill_id
+    JOIN tenants t ON t.id = b.tenant_id
+    WHERE t.name IN (${placeholders}) AND b.billing_period_id = ?
+  `, [...tenantNames, periodId]);
+  return {
+    elecRand: charges.elec_rand, elecKwh: consumption.elec_kwh,
+    waterRand: charges.water_rand, sewerRand: charges.sewer_rand,
+    waterKl: consumption.water_kl, sewerKl: consumption.water_kl,
+    startDate: period && period.start_date, endDate: period && period.end_date,
+  };
+}
+
 // The real municipal statement(s) covering `siteName` for the date window [periodStart, periodEnd] -
 // summed across every municipal account mapped to this site (see municipal_compare.js's SITE_MAP;
 // Wingfield only has the one, 'Refinery', but this stays generic for any future tenant-model site
@@ -87,6 +123,15 @@ function municipalSideFor(db, siteName, periodStart, periodEnd) {
   // carries a slip's own start/end through, so a long/combined municipal statement gets flagged here
   // too (see municipal_compare.js's LONG_PERIOD_DAYS).
   let minStart = null, maxEnd = null;
+  // Water's own reading period, tracked separately from electricity's - municipal_statements has
+  // always had its own water_reading_start/water_reading_end columns (see db.js and
+  // seed_municipal.js), the municipality reads water on a genuinely different cycle from
+  // electricity almost every month (confirmed here the same way it was confirmed for every
+  // flat_site property - e.g. Rittle's Oct 2025 statement: elec 2025/08/30-2025/09/28 vs water
+  // 2025/08/08-2025/09/25) - this just hadn't been surfaced out of this function yet. Falls back to
+  // the electricity dates if a statement genuinely has no water reading dates of its own (nullable
+  // column - an INTERIM/estimated month, same convention as every municipal_import.js).
+  let minWaterStart = null, maxWaterEnd = null;
   for (const acc of accounts) {
     const statements = all(db, 'SELECT * FROM municipal_statements WHERE municipal_account_id=?', [acc.id]);
     let best = null, bestDays = 0;
@@ -103,10 +148,18 @@ function municipalSideFor(db, siteName, periodStart, periodEnd) {
       const bEnd = best.elec_reading_end || best.water_reading_end;
       if (bStart && (!minStart || bStart < minStart)) minStart = bStart;
       if (bEnd && (!maxEnd || bEnd > maxEnd)) maxEnd = bEnd;
+      const wStart = best.water_reading_start || bStart;
+      const wEnd = best.water_reading_end || bEnd;
+      if (wStart && (!minWaterStart || wStart < minWaterStart)) minWaterStart = wStart;
+      if (wEnd && (!maxWaterEnd || wEnd > maxWaterEnd)) maxWaterEnd = wEnd;
     }
   }
   if (!matched) return null;
-  return { elecRand, elecKwh, waterRand, waterKl, sewerRand, sewerKl, startDate: minStart, endDate: maxEnd };
+  return {
+    elecRand, elecKwh, waterRand, waterKl, sewerRand, sewerKl,
+    startDate: minStart, endDate: maxEnd,
+    waterStartDate: minWaterStart, waterEndDate: maxWaterEnd,
+  };
 }
 
 // Full comparison for `siteName`: one row per billing_period (trailing `limit`, default 12,
@@ -133,4 +186,28 @@ function buildRecoveryRows(db, siteName, { limit = 12 } = {}) {
   });
 }
 
-module.exports = { buildRecoveryRows, siteSideFor, municipalSideFor };
+// Same as buildRecoveryRows above, but the site (tenant billing) side is filtered by an explicit
+// tenant-name list (siteSideForTenants) instead of a single sites.name match - the municipal side
+// still resolves via `siteNameForMunicipal` against SITE_MAP exactly as before. See
+// city-deep/recovery_groups.js for why City Deep needs this instead of plain buildRecoveryRows.
+function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantNames, { limit = 12 } = {}) {
+  const periods = all(db, 'SELECT * FROM billing_periods ORDER BY start_date').slice(-limit);
+  return periods.map((p) => {
+    const site = tenantNames.length ? siteSideForTenants(db, tenantNames, p.id) : null;
+    const municipal = municipalSideFor(db, siteNameForMunicipal, p.start_date, p.end_date);
+    const row = { label: p.label, site, municipal, recovery: null };
+    if (site && municipal) {
+      row.recovery = {
+        elecRand: site.elecRand - municipal.elecRand, elecKwh: site.elecKwh - municipal.elecKwh,
+        waterRand: site.waterRand - municipal.waterRand, waterKl: site.waterKl - municipal.waterKl,
+        sewerRand: site.sewerRand - municipal.sewerRand, sewerKl: site.sewerKl - municipal.sewerKl,
+      };
+      row.totalSiteRand = site.elecRand + site.waterRand + site.sewerRand;
+      row.totalMunicipalRand = municipal.elecRand + municipal.waterRand + municipal.sewerRand;
+      row.totalRecoveryRand = row.totalSiteRand - row.totalMunicipalRand;
+    }
+    return row;
+  });
+}
+
+module.exports = { buildRecoveryRows, buildRecoveryRowsForTenants, siteSideFor, siteSideForTenants, municipalSideFor };

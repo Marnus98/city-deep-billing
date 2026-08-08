@@ -33,10 +33,21 @@ function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 
 // Exported for tenant_recovery.js's own municipal-side matching (same date-overlap method, just
 // anchored to a billing_period's dates instead of another statement's reading dates).
+//
+// The min/max picks below MUST compare parsed dates, not raw strings: billing_periods stores
+// 'YYYY-MM-DD' (dashes) but municipal_statements' own reading-period columns store 'YYYY/MM/DD'
+// (slashes, matching the source COJ statements - see seed_municipal.js). String comparison of two
+// same-year dates with different separators is wrong (the separator character itself gets compared
+// before the month/day digits do - '-' sorts before '/' in ASCII, so *any* dash-dated string always
+// compared as "less than" a same-year slash-dated one, regardless of the actual date). That bug sat
+// undetected as long as Wingfield's Recovery page was the only thing exercising this path (its own
+// municipal statements happen to use dashes too) - it surfaced once City Deep's Recovery page (all-
+// slash municipal dates) started calling the same function and kept matching whichever statement
+// happened to win the broken string comparison instead of the one that actually overlapped best.
 function daysOverlap(aStart, aEnd, bStart, bEnd) {
-  const s = aStart > bStart ? aStart : bStart;
-  const e = aEnd < bEnd ? aEnd : bEnd;
-  const days = (new Date(e) - new Date(s)) / 86400000;
+  const s = Math.max(new Date(aStart).getTime(), new Date(bStart).getTime());
+  const e = Math.min(new Date(aEnd).getTime(), new Date(bEnd).getTime());
+  const days = (e - s) / 86400000;
   return days > 0 ? days : 0;
 }
 

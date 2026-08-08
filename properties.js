@@ -30,6 +30,14 @@ module.exports = [
     dbFile: 'city-deep.db',
     seedFile: './city-deep/seed',
     billingModel: 'tenant',
+    // City Deep's own municipal data spans 4 accounts across 3 real precincts (Industrial A+B,
+    // Rittle, Mini - see municipal_compare.js's SITE_MAP), and its Recovery comparison is grouped
+    // into those same 3 sections rather than one property-wide total - see
+    // city-deep/recovery_groups.js for the tenant grouping (confirmed by the client 2026-08-08) and
+    // tenant_recovery.js's buildRecoveryRowsForTenants for how each section's rows are built.
+    // Distinct from recoverySiteName (Wingfield's single-section flag) - server.js checks this one
+    // first.
+    recoveryMultiSection: true,
   },
   {
     slug: 'wingfield',

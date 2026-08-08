@@ -17,6 +17,7 @@ const { seedUsers } = require('./shared_seed_users');
 const calcFlatSite = require('./calc_flat_site');
 const flatSiteRecovery = require('./flat_site_recovery');
 const tenantRecovery = require('./tenant_recovery');
+const cityDeepRecoveryGroups = require('./city-deep/recovery_groups');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -779,31 +780,46 @@ route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
 // matching method differs. Guarded the same way the dashboard redirect above guards billingModel: a
 // direct hit on either route from a property without the relevant flag just bounces to /dashboard
 // instead of rendering an all-"no data" page.
-function currentPropRecoveryRows(user) {
+// Returns an array of { title, rows } sections - always an array so views.js/pdf.js only ever have
+// one shape to render, regardless of whether a property has one Recovery section (flat_site
+// properties, Wingfield) or several (City Deep - see properties.js's recoveryMultiSection flag and
+// city-deep/recovery_groups.js). `title` is null for a single-section property, which the view/PDF
+// layer renders as no heading at all - so this refactor is a strict no-op for every property that
+// isn't City Deep.
+function currentPropRecoverySections(user) {
   const currentProp = properties.find((p) => p.slug === user.currentProperty);
   if (!currentProp) return null;
   if (currentProp.billingModel === 'flat_site' && currentProp.hasMunicipalStatements) {
-    return flatSiteRecovery.buildRecoveryRows(currentDb(), { limit: 12 });
+    return [{ title: null, rows: flatSiteRecovery.buildRecoveryRows(currentDb(), { limit: 12 }) }];
+  }
+  if (currentProp.recoveryMultiSection) {
+    const db = currentDb();
+    return cityDeepRecoveryGroups.SECTIONS.map((sec) => ({
+      title: sec.title,
+      rows: tenantRecovery.buildRecoveryRowsForTenants(
+        db, sec.siteNameForMunicipal, cityDeepRecoveryGroups.tenantNamesForSection(db, sec.key), { limit: 12 },
+      ),
+    }));
   }
   if (currentProp.recoverySiteName) {
-    return tenantRecovery.buildRecoveryRows(currentDb(), currentProp.recoverySiteName, { limit: 12 });
+    return [{ title: null, rows: tenantRecovery.buildRecoveryRows(currentDb(), currentProp.recoverySiteName, { limit: 12 }) }];
   }
   return null;
 }
 
 route('GET', '/recovery', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
-  const rows = currentPropRecoveryRows(user);
-  if (!rows) return redirect(res, '/dashboard');
-  send(res, 200, views.recoveryPage({ user, rows, propertyName: currentPropertyName(user) }));
+  const sections = currentPropRecoverySections(user);
+  if (!sections) return redirect(res, '/dashboard');
+  send(res, 200, views.recoveryPage({ user, sections, propertyName: currentPropertyName(user) }));
 });
 
 route('GET', '/recovery-pdf', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
-  const rows = currentPropRecoveryRows(user);
-  if (!rows) return redirect(res, '/dashboard');
+  const sections = currentPropRecoverySections(user);
+  if (!sections) return redirect(res, '/dashboard');
   const propertyName = currentPropertyName(user);
-  const pdfBuf = buildRecoveryPdf({ propertyName, rows, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
+  const pdfBuf = buildRecoveryPdf({ propertyName, sections, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
   audit(user.userId, 'pdf_download', 'recovery', null, null, null, null, null);
   const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-recovery.pdf"` });

@@ -45,9 +45,10 @@ function layout({ title, user, active, body }) {
       ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
       ['/billing-periods', 'Billing Periods'], ['/billing', 'Billing'], ['/solar-billing-slips', 'Solar Billing Slips'],
       ['/municipal-accounts', 'Municipality'],
-      // Same gate as the flat_site side above, just keyed off recoverySiteName instead of
-      // hasMunicipalStatements - see tenant_recovery.js and properties.js's own comment on this field.
-      ...(currentProp && currentProp.recoverySiteName ? [['/recovery', 'Recovery']] : []),
+      // Same gate as the flat_site side above, just keyed off recoverySiteName/recoveryMultiSection
+      // instead of hasMunicipalStatements - see tenant_recovery.js and properties.js's own comments
+      // on those two fields (single Wingfield-style section vs City Deep's 3-section grouping).
+      ...(currentProp && (currentProp.recoverySiteName || currentProp.recoveryMultiSection) ? [['/recovery', 'Recovery']] : []),
       ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
     ];
   // Property switcher - auto-submits on change (same pattern as the Municipality Accounts page's
@@ -1245,8 +1246,26 @@ function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qty
   </div>`;
 }
 
-function recoveryPage({ user, rows, propertyName }) {
+// One section's chart + 3 tables (Electricity/Water/Sewer) - `title` is null for a single-section
+// property (nothing rendered above the chart, identical to this page's pre-multi-section markup),
+// or a heading like "Industrial Park (Industrial A & B accounts)" for one of City Deep's 3 grouped
+// sections - see properties.js's recoveryMultiSection flag and city-deep/recovery_groups.js.
+function recoverySectionBlock({ title, rows }) {
   const rowsDesc = [...rows].reverse();
+  return `
+  ${title ? `<h2 class="text-lg font-semibold mt-6 mb-3 first:mt-0">${esc(title)}</h2>` : ''}
+  ${rows.length ? recoveryChart(rows) : '<div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No overlapping billing/municipal data yet.</div>'}
+  ${recoveryTable('Electricity', '', rowsDesc, { randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', periodField: 'elec' })}
+  ${recoveryTable('Water', 'bg-green-50', rowsDesc, { randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', periodField: 'water' })}
+  ${recoveryTable('Sewer', 'bg-green-50', rowsDesc, { randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', periodField: 'water' })}
+  `;
+}
+
+// `sections` is always an array of { title, rows } (see server.js's currentPropRecoverySections) -
+// a single-section property (every flat_site property, Wingfield) gets one section with title:
+// null, rendering byte-identical to this page's pre-multi-section output; City Deep gets 3 titled
+// sections stacked one after another (Industrial Park, City Deep/Rittle, Mini Park).
+function recoveryPage({ user, sections, propertyName }) {
   const body = `
   <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
     <div>
@@ -1255,10 +1274,7 @@ function recoveryPage({ user, rows, propertyName }) {
     </div>
     <a href="/recovery-pdf" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download PDF</a>
   </div>
-  ${rows.length ? recoveryChart(rows) : '<div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No overlapping billing/municipal data yet.</div>'}
-  ${recoveryTable('Electricity', '', rowsDesc, { randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', periodField: 'elec' })}
-  ${recoveryTable('Water', 'bg-green-50', rowsDesc, { randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', periodField: 'water' })}
-  ${recoveryTable('Sewer', 'bg-green-50', rowsDesc, { randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', periodField: 'water' })}
+  ${sections.map(recoverySectionBlock).join('')}
   `;
   return layout({ title: 'Recovery', user, active: '/recovery', body });
 }

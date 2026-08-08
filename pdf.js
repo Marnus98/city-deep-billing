@@ -818,19 +818,23 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
   return y;
 }
 
-function buildRecoveryPdf(data) {
-  const doc = new PDFDoc();
-  const left = 42, right = PAGE_W - 42;
+// Draws one section's overview page (chart) + detail page(s) (Electricity/Water/Sewer tables).
+// `section.title` is null for a single-section property (Wingfield, every flat_site property) -
+// omitting it reproduces this function's pre-multi-section output exactly. For City Deep's 3
+// grouped sections (see properties.js's recoveryMultiSection flag / city-deep/recovery_groups.js),
+// the title is threaded into both page headers so a printed section is self-identifying on its own
+// (a client flipping through a stack of hard copies from the meeting can tell Industrial Park's
+// pages from Mini Park's without the cover page in hand).
+function drawRecoverySection(doc, { propertyName, section, left, right }) {
+  const rows = section.rows || [];
   let y = PAGE_H - 50;
-  const propertyName = (data.propertyName || '').toUpperCase();
-  const rows = data.rows || [];
 
-  doc.registerImage('Logo', LOGO);
-  const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
-  doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
+  doc.image(right - 90, PAGE_H - 32 - 90 * (LOGO.height / LOGO.width), 90, 90 * (LOGO.height / LOGO.width), 'Logo');
+  const logoH = 90 * (LOGO.height / LOGO.width);
 
   doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
   doc.text(left, y, 'Recovery - Tenant Billing vs Municipal Statement', { size: 10 }); y -= 6;
+  if (section.title) { doc.text(left, y, section.title, { size: 10, bold: true }); y -= 14; }
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 16;
   doc.text(left, y, 'Property Rates, Refuse and Sundry are excluded from every figure below - real municipal-only', { size: 7.5 });
@@ -847,7 +851,7 @@ function buildRecoveryPdf(data) {
   doc.newPage();
   let ty = PAGE_H - 50;
   doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
-  doc.text(left, ty, 'Recovery Detail (newest first)', { size: 11, bold: true }); ty -= 8;
+  doc.text(left, ty, (section.title ? `${section.title} - ` : '') + 'Recovery Detail (newest first)', { size: 11, bold: true }); ty -= 8;
   doc.line(left, ty, right, ty); ty -= 24;
 
   const rowsDesc = [...rows].reverse();
@@ -856,6 +860,25 @@ function buildRecoveryPdf(data) {
   ty = drawRecoveryTable(doc, { title: 'Water', rows: rowsDesc, left, right, y: ty, randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' });
   if (ty > 120) { ty -= 22; } else { doc.newPage(); ty = PAGE_H - 50; }
   ty = drawRecoveryTable(doc, { title: 'Sewer', rows: rowsDesc, left, right, y: ty, randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' });
+  return ty;
+}
+
+// `data.sections` is always an array of { title, rows } (see server.js's
+// currentPropRecoverySections) - one nameless section for every existing property (identical
+// output to before this was generalized for City Deep), 3 titled sections for City Deep. Each
+// section gets its own overview+detail page block, in order.
+function buildRecoveryPdf(data) {
+  const doc = new PDFDoc();
+  const left = 42, right = PAGE_W - 42;
+  const propertyName = (data.propertyName || '').toUpperCase();
+  const sections = data.sections || [{ title: null, rows: data.rows || [] }];
+
+  doc.registerImage('Logo', LOGO);
+
+  sections.forEach((section, idx) => {
+    if (idx > 0) doc.newPage();
+    drawRecoverySection(doc, { propertyName, section, left, right });
+  });
 
   doc.text(left, 30, `Generated ${data.generatedAt || ''}`, { size: 7 });
 
