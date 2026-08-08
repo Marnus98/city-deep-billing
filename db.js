@@ -438,6 +438,20 @@ function migrate(db) {
   const stCols = db.prepare("PRAGMA table_info(site_tariffs)").all().map((c) => c.name);
   if (!stCols.includes('tariff_name')) db.exec('ALTER TABLE site_tariffs ADD COLUMN tariff_name TEXT');
 
+  // A municipal statement's own `start_date`/`end_date` has always meant the ELECTRICITY reading
+  // period by convention (see every property's own municipal_import.js) - but the water/sewer meter
+  // on these same statements is very often read on a genuinely different cycle (different start day,
+  // different length), sometimes by weeks. These two columns let a statement carry water's own period
+  // alongside electricity's, instead of silently reusing the electricity dates for water too - see
+  // municipal_seed_helpers.js's seedMunicipalStatement and flat_site_recovery.js/views.js/pdf.js's
+  // Recovery table, which now show both periods (and their day counts) side by side for the client
+  // over/under-recovery meeting. Nullable: left blank for statements where water was INTERIM
+  // (estimated, no real reading that cycle) or the source PDF didn't print a water reading date at
+  // all - a genuine "we don't know" is left blank rather than guessed.
+  const mssCols = db.prepare("PRAGMA table_info(municipal_statement_slips)").all().map((c) => c.name);
+  if (!mssCols.includes('water_start_date')) db.exec('ALTER TABLE municipal_statement_slips ADD COLUMN water_start_date TEXT');
+  if (!mssCols.includes('water_end_date')) db.exec('ALTER TABLE municipal_statement_slips ADD COLUMN water_end_date TEXT');
+
   // One-time bridge: any flat_site data written before site_tariff_items/site_slip_readings
   // existed (8 Field Street was the only flat_site property back then, always on the Ekurhuleni E
   // TOU shape) lives in site_tariffs'/site_billing_slips' legacy fixed columns. If the new tables

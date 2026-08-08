@@ -72,6 +72,14 @@
 // field-street) rather than grouped into an era, for the same reason: nothing to lose by keeping
 // each month's own precise implied rate, and it costs nothing since each label is already unique.
 //
+// WATER'S OWN READING PERIOD (added 2026-08-08, for the client's over/under-recovery meeting): water
+// is read on its own cycle here too, genuinely different from electricity's calendar-month cycle -
+// e.g. May 2026's water is read 2026-05-05 to 2026-06-02, while that statement's electricity is
+// 2026-05-01 to 2026-06-01. Every month with a real (non-INTERIM) water reading now carries its own
+// waterStartDate/waterEndDate so the Recovery page/PDF can show both periods side by side. Left unset
+// for Dec 2025/Feb 2026/Mar 2026, where water was INTERIM (estimated) and the statement itself prints
+// no water reading date.
+//
 // Safe to re-run on every boot: each statement is looked up by its unique label ('2025-12' etc) and
 // skipped if already present - see municipal_seed_helpers.js.
 const { open, migrate } = require('../db');
@@ -88,7 +96,7 @@ const MONTHS = [
     readings: { network_access: { reading: 482.990, comment: 'Demand=482.990' }, network_demand: { reading: 482.990, comment: 'Demand=482.990' },
       peak_low: 6591.120, standard_low: 17688.479, offpeak_low: 14871.840,
       water: 125, sewer: 125 } },
-  { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01',
+  { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01', waterStartDate: '2025-12-05', waterEndDate: '2026-02-09',
     rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 116.1427443258, network_demand: 158.1300062562,
       peak_low: 3.5610002360, standard_low: 2.3425999923, offpeak_low: 1.7875998850,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
@@ -112,7 +120,7 @@ const MONTHS = [
       peak_low: 26956.319, standard_low: 60130.800, offpeak_low: 39897.839,
       water: { reading: 105, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 105, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
-  { label: '2026-04', startDate: '2026-04-01', endDate: '2026-05-01',
+  { label: '2026-04', startDate: '2026-04-01', endDate: '2026-05-01', waterStartDate: '2026-02-09', waterEndDate: '2026-05-05',
     rates: { property_rates: 20500.72, fixed_charge: 3069.24, network_access: 113.79845163779902, network_demand: 158.13000695396317,
       peak_low: 3.561000186249003, standard_low: 2.3426000256245123, offpeak_low: 1.7876001233835248,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
@@ -120,7 +128,7 @@ const MONTHS = [
       peak_low: 13745.040, standard_low: 33350.879, offpeak_low: 23860.560,
       water: { reading: 99, comment: 'NET of a true 50kL+259kL (=309kL) reading (meter read window 2026-02-09 to 2026-05-05, 85 days) less a 26kL+184kL (=210kL) INTERIM REVERSAL credit correcting Feb/Mar 2026\'s over-estimated INTERIM readings - see file header notes' },
       sewer: { reading: 99, comment: 'NET of a true 50kL+259kL (=309kL) reading (meter read window 2026-02-09 to 2026-05-05, 85 days) less a 26kL+184kL (=210kL) INTERIM REVERSAL credit correcting Feb/Mar 2026\'s over-estimated INTERIM readings - see file header notes' } } },
-  { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01',
+  { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01', waterStartDate: '2026-05-05', waterEndDate: '2026-06-02',
     rates: { property_rates: 20500.67, fixed_charge: 3069.24, network_access: 113.3798496180, network_demand: 158.1299972967,
       peak_low: 3.5609998931, standard_low: 2.3425999338, offpeak_low: 1.7875999936,
       refuse_business: 584.46, refuse_litter: 1159.56, water: 49.11, sewer: 18.91 },
@@ -131,7 +139,7 @@ const MONTHS = [
   // _low (see file header notes); low-season keys simply aren't billed this month (no reading, rate
   // defaults to 0, same "unused row" convention used throughout this app for a line item that
   // genuinely isn't billed in a given period).
-  { label: '2026-06', startDate: '2026-06-01', endDate: '2026-07-01',
+  { label: '2026-06', startDate: '2026-06-01', endDate: '2026-07-01', waterStartDate: '2026-06-02', waterEndDate: '2026-07-06',
     rates: { property_rates: 20806.70, fixed_charge: 6154.68, network_access: 114.08230577047067, network_demand: 158.12999677627337,
       peak_high: 10.867900172828001, standard_high: 3.177400049399529, offpeak_high: 1.9636000812810848,
       refuse_business: 604.33, refuse_litter: 1199.21, water: 49.90368, sewer: 18.91 },
@@ -149,7 +157,8 @@ function main(dbFile = 'bob-martin.db') {
       tariffName: TARIFF_NAME, effectiveFrom: m.startDate, shape: EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, rates: m.rates,
     });
     const slipId = seedMunicipalStatement(db, tariffId, {
-      label: m.label, startDate: m.startDate, endDate: m.endDate, readings: m.readings,
+      label: m.label, startDate: m.startDate, endDate: m.endDate,
+      waterStartDate: m.waterStartDate, waterEndDate: m.waterEndDate, readings: m.readings,
     });
     if (slipId) created++;
   }

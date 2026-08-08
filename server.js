@@ -576,14 +576,18 @@ function monthLabelRange(startLabel, endLabel) {
   return labels;
 }
 
-// elecKwh sums every row whose item_key starts with peak_/standard_/offpeak_ (matches by key, not
-// factor_type - a municipal statement's items never carry a factor_type at all, since there's
-// nothing to gross up on the municipality's own meter reading, so filtering on factor_type would
-// silently zero out every municipal consumption figure). Correctly excludes AutoZone's Network
-// Surcharge row (key 'network_surcharge' - a derived R/kWh figure, not an independent reading) and
-// every municipal-only row (property_rates, refuse - key doesn't match the prefixes either).
+// elecKwh sums every row tagged unit R/kWh (matches by unit, not key/factor_type - a municipal
+// statement's items never carry a factor_type at all, since there's nothing to gross up on the
+// municipality's own meter reading, so filtering on factor_type would silently zero out every
+// municipal consumption figure; matching by key prefix alone used to miss Loper Road's non-TOU
+// shapes, which use a flat 'energy_charge' key on the municipal side and 'total_energy_high'/
+// 'total_energy_low' on the site side from July 2026 - see flat_site_tariff_shapes.js). Excludes
+// AutoZone's Network Surcharge row (key 'network_surcharge', also unit R/kWh, but its "reading" is
+// a copy of that month's total metered kWh, not an independent consumption figure - see
+// autozone/municipal_import.js) and every municipal-only row (property_rates, refuse - unit R/c,
+// not R/kWh).
 function sumElecKwh(elecItems) {
-  return elecItems.filter((i) => i.key.startsWith('peak_') || i.key.startsWith('standard_') || i.key.startsWith('offpeak_'))
+  return elecItems.filter((i) => i.unit === 'R/kWh' && i.key !== 'network_surcharge')
     .reduce((s, i) => s + i.adjustedReading, 0);
 }
 

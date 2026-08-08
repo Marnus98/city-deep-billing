@@ -1179,18 +1179,44 @@ function recoveryChart(rows) {
   </div>`;
 }
 
+// Compact "Ours: ... / Municipal: ..." two-line period readout for one Recovery table row - printed
+// under the month label so a hard-copy of this page carries the exact billing range (and its day
+// count) for both sides, not just the Rand/quantity figures - added 2026-08-08 for the client's
+// over/under-recovery meeting, where the whole point is showing WHY two figures differ, and a
+// mismatched reading period is very often the reason (see e.g. field-street/municipal_import.js's
+// water-period notes: the municipality reads water on a different cycle from electricity almost
+// every month, while HolmStone always bills the client on one uniform calendar-month cycle).
+function periodLine(prefix, start, end) {
+  if (!start || !end) return `<div class="text-xs text-slate-400 font-normal">${esc(prefix)}: unknown</div>`;
+  const d = daysBetween(start, end);
+  return `<div class="text-xs text-slate-400 font-normal">${esc(prefix)}: ${esc(start)} &rarr; ${esc(end)}${d != null ? ` (${d}d)` : ''}</div>`;
+}
+
 // One Tenant/Municipal/Recovery R+Qty table for one utility (Electricity, Water or Sewer).
-// `rows` is newest-first (already reversed by the caller).
-function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qtyDp = 2 }) {
+// `rows` is newest-first (already reversed by the caller). `periodField` picks which of the
+// municipal side's two period pairs applies to THIS utility - 'elec' uses municipal.startDate/
+// endDate (every shape's convention), 'water' uses municipal.waterStartDate/waterEndDate when the
+// source statement had its own water reading dates, falling back to the electricity dates otherwise
+// (an INTERIM/estimated month, or a scanned statement with no extractable water dates - see each
+// property's own municipal_import.js). The site (tenant billing) side always uses one uniform
+// period for every utility - HolmStone bills water on the same calendar-month cycle as electricity,
+// it's only the municipality's own meter-read cycle that splits them apart.
+function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qtyDp = 2, periodField = 'elec' }) {
   const trs = rows.map((r) => {
     const site = r.site, muni = r.municipal, rec = r.recovery;
-    // Flag the month itself if either side's own reading period ran long (municipal statement takes
-    // priority since that's the real utility bill - see flat_site_recovery.js/tenant_recovery.js,
-    // which both now carry startDate/endDate through onto site/municipal alongside the figures).
-    const flagSide = (muni && daysBetween(muni.startDate, muni.endDate) > LONG_PERIOD_DAYS) ? muni
-      : (site && daysBetween(site.startDate, site.endDate) > LONG_PERIOD_DAYS) ? site : null;
-    return `<tr class="border-t">
-      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}${flagSide ? periodBadge(flagSide.startDate, flagSide.endDate) : ''}</td>
+    const ourStart = site && site.startDate, ourEnd = site && site.endDate;
+    const muniStart = muni && (periodField === 'water' ? (muni.waterStartDate || muni.startDate) : muni.startDate);
+    const muniEnd = muni && (periodField === 'water' ? (muni.waterEndDate || muni.endDate) : muni.endDate);
+    // Flag the month itself if either side's own period for THIS utility ran long (municipal takes
+    // priority since that's the real utility bill).
+    const flagStart = (muniStart && daysBetween(muniStart, muniEnd) > LONG_PERIOD_DAYS) ? muniStart
+      : (ourStart && daysBetween(ourStart, ourEnd) > LONG_PERIOD_DAYS) ? ourStart : null;
+    const flagEnd = flagStart === muniStart ? muniEnd : ourEnd;
+    return `<tr class="border-t align-top">
+      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}${flagStart ? periodBadge(flagStart, flagEnd) : ''}
+        ${site ? periodLine('Ours', ourStart, ourEnd) : ''}
+        ${muni ? periodLine('Municipal', muniStart, muniEnd) : ''}
+      </td>
       <td class="px-3 py-1.5 text-sm text-right">${site ? money(site[randKey]) : '<span class="text-slate-400">no bill</span>'}</td>
       <td class="px-3 py-1.5 text-sm text-right">${muni ? money(muni[randKey]) : '<span class="text-slate-400">no statement</span>'}</td>
       <td class="px-3 py-1.5 text-sm text-right">${recoveryCell(rec ? rec[randKey] : null)}</td>
@@ -1205,7 +1231,7 @@ function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qty
     <table class="w-full">
       <thead>
         <tr class="text-left text-slate-500 bg-slate-50 text-xs">
-          <th class="px-3 py-1.5" rowspan="2">Month</th>
+          <th class="px-3 py-1.5" rowspan="2">Month / Billing Period</th>
           <th class="px-3 py-1.5 text-right" colspan="3">Rand (Excl VAT)</th>
           <th class="px-3 py-1.5 text-right" colspan="3">${esc(qtyLabel)}</th>
         </tr>
@@ -1230,9 +1256,9 @@ function recoveryPage({ user, rows, propertyName }) {
     <a href="/recovery-pdf" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download PDF</a>
   </div>
   ${rows.length ? recoveryChart(rows) : '<div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No overlapping billing/municipal data yet.</div>'}
-  ${recoveryTable('Electricity', '', rowsDesc, { randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh' })}
-  ${recoveryTable('Water', 'bg-green-50', rowsDesc, { randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL' })}
-  ${recoveryTable('Sewer', 'bg-green-50', rowsDesc, { randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL' })}
+  ${recoveryTable('Electricity', '', rowsDesc, { randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', periodField: 'elec' })}
+  ${recoveryTable('Water', 'bg-green-50', rowsDesc, { randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', periodField: 'water' })}
+  ${recoveryTable('Sewer', 'bg-green-50', rowsDesc, { randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', periodField: 'water' })}
   `;
   return layout({ title: 'Recovery', user, active: '/recovery', body });
 }

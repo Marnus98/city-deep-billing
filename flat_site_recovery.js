@@ -25,11 +25,21 @@ const calcFlatSite = require('./calc_flat_site');
 function get(db, sql, params = []) { return db.prepare(sql).get(...params); }
 function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 
-// Same convention as server.js's own sumElecKwh (see monthlyTrendForSite/monthlyTrendForMunicipal)
-// - works unmodified against either a site tariff's items or a municipal tariff's items, since
-// every shape in flat_site_tariff_shapes.js uses these same peak_/standard_/offpeak_ key prefixes.
+// Sums every line item actually billed in kWh - matching on `unit === 'R/kWh'` rather than the
+// key name, since not every shape uses TOU peak_/standard_/offpeak_ keys. Loper Road's municipal
+// shape (EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD) has no TOU split at all, just a single flat
+// `energy_charge` line - and Loper Road's own site/client shape switches to a non-TOU
+// total_energy_high/total_energy_low pair (EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27) from July
+// 2026 onward. Every energy-consumption row in flat_site_tariff_shapes.js, TOU or not, is tagged
+// unit: 'R/kWh' - and nothing else in a shape (R/c fixed charges, R/kVA demand/network charges) is,
+// so this catches every current and future flat_site electricity shape without needing per-key
+// special-casing here. One deliberate exclusion: AutoZone's `network_surcharge` row is also tagged
+// R/kWh (its rate is genuinely R/kWh - 0.06 x total kWh) but its "reading" is a *copy* of that same
+// month's total metered kWh (see autozone/municipal_import.js's own "Total metered kWh
+// (peak+standard+offpeak) this cycle" comment on that field), not an independent consumption figure -
+// summing it in would double the kWh total for AutoZone.
 function sumElecKwh(elecItems) {
-  return elecItems.filter((i) => i.key.startsWith('peak_') || i.key.startsWith('standard_') || i.key.startsWith('offpeak_'))
+  return elecItems.filter((i) => i.unit === 'R/kWh' && i.key !== 'network_surcharge')
     .reduce((s, i) => s + i.adjustedReading, 0);
 }
 
@@ -43,8 +53,17 @@ function figuresFromCalc(calc, slip) {
     // The slip's own exact reading-period dates (not just the 'YYYY-MM' label) - carried through so
     // the Recovery page/PDF can show and flag the *real* billing period, same "management meeting
     // accuracy" ask this was added for on the Municipal Account pages themselves (see
-    // municipal_compare.js's LONG_PERIOD_DAYS / views.js's periodBadge).
+    // municipal_compare.js's LONG_PERIOD_DAYS / views.js's periodBadge). This is the ELECTRICITY
+    // reading period by convention (see every municipal_import.js) - HolmStone's own client billing
+    // (site_billing_slips) has no separate water period at all, it bills water on the same calendar-
+    // month cycle as electricity, so `waterStartDate`/`waterEndDate` stay unset on the site side and
+    // the Recovery table falls back to these same dates there.
     startDate: slip.start_date, endDate: slip.end_date,
+    // Only present on the municipal side (site_billing_slips has no water_start_date/water_end_date
+    // column) and only for months the source statement actually printed its own water reading dates -
+    // see municipal_import.js's own file header notes on which months are INTERIM (estimated, no
+    // reading date at all).
+    waterStartDate: slip.water_start_date || null, waterEndDate: slip.water_end_date || null,
   };
 }
 

@@ -79,7 +79,7 @@ const { seedMunicipalTariff, seedMunicipalStatement } = require('../municipal_se
 const TARIFF_NAME = 'Ekurhuleni_Municipal_Account_Cranbrook Flavours';
 
 const MONTHS = [
-  { label: '2025-11', startDate: '2025-11-01', endDate: '2025-12-01',
+  { label: '2025-11', startDate: '2025-11-01', endDate: '2025-12-01', waterStartDate: '2025-11-07', waterEndDate: '2025-12-11',
     rates: { property_rates: 56974.18, fixed_charge: 5207.09, network_access: 10163.45 / 83.432, network_demand: 12188.58 / 83.432,
       peak_low: 3083.74 / 902.999, standard_low: 8500.30 / 3809.400, offpeak_low: 3659.06 / 2161.799,
       refuse: 584.46, sundry: 110.92, water: 12031.95 / 245, sewer: 4632.95 / 245 },
@@ -90,7 +90,7 @@ const MONTHS = [
   // Stretched ~70-day combined statement (new account 2618624004's first) - see file header note.
   // No electricity billed this cycle. Water/sewer are the NET of an INTERIM REVERSAL correcting a
   // prior over-estimate - see file header note for the meter-by-meter netting.
-  { label: '2026-03', startDate: '2026-03-06', endDate: '2026-05-15',
+  { label: '2026-03', startDate: '2026-03-06', endDate: '2026-05-15', waterStartDate: '2026-03-06', waterEndDate: '2026-05-15',
     rates: { deposit: 61836.46, water: 16500.96 / 336, sewer: 6353.76 / 336 },
     readings: {
       deposit: { reading: 1, comment: 'DEPOSIT-JOURNAL - new account 2618624004 opening deposit (one-off, VAT-exempt, non-utility) - see file header note' },
@@ -99,7 +99,7 @@ const MONTHS = [
   // Clean 1-month electricity cycle (2026-05-01 to 2026-06-01); water/sewer meter read window is
   // slightly offset (2026-05-15 to 2026-06-12) but picks up exactly where March's combined period
   // left off - see file header note.
-  { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01',
+  { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01', waterStartDate: '2026-05-15', waterEndDate: '2026-06-12',
     rates: { fixed_charge: 5207.09, network_access: 10163.45 / 60.299, network_demand: 8809.08 / 60.299,
       peak_low: 2999.73 / 878.399, standard_low: 6720.98 / 3012.000, offpeak_low: 3741.32 / 2210.399,
       water: 10509.54 / 214, sewer: 4046.74 / 214 },
@@ -131,7 +131,8 @@ function main(dbFile = 'cranbrook-flavours.db') {
       tariffName: TARIFF_NAME, effectiveFrom: m.startDate, shape: EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK, rates: m.rates,
     });
     const slipId = seedMunicipalStatement(db, tariffId, {
-      label: m.label, startDate: m.startDate, endDate: m.endDate, readings: m.readings,
+      label: m.label, startDate: m.startDate, endDate: m.endDate,
+      waterStartDate: m.waterStartDate, waterEndDate: m.waterEndDate, readings: m.readings,
     });
     if (slipId) created++;
   }

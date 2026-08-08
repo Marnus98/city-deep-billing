@@ -728,25 +728,35 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series }) {
 }
 
 // One Tenant/Municipal/Recovery table (Rand + Qty) for one utility, `rows` newest-first.
-function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, qtyLabel, qtyDp = 2 }) {
-  doc.text(left, y, title, { size: 11, bold: true }); y -= 16;
+// `periodField` picks which municipal period pair applies ('elec' or 'water') - see views.js's
+// recoveryTable, this is the PDF's mirror of the same on-screen billing-range/day-count readout
+// added 2026-08-08 for the client's over/under-recovery meeting.
+function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, qtyLabel, qtyDp = 2, periodField = 'elec' }) {
   const numW = (right - left - 62) / 6;
   const edges = [1, 2, 3, 4, 5, 6].map((n) => left + 62 + numW * n);
   const headers1 = [['Rand (Excl VAT)', 0, 3], ['Qty', 3, 3]];
   const sub = ['Tenant', 'Municipal', 'Recovery', 'Tenant', 'Municipal', 'Recovery'];
 
-  doc.text(left, y, 'Month', { bold: true, size: 7.5 });
-  for (const [label, startIdx, span] of headers1) {
-    const groupLeft = startIdx === 0 ? left + 62 : edges[startIdx - 1];
-    const groupRight = edges[startIdx + span - 1];
-    const lw = textWidth(label, { bold: true, size: 7.5 });
-    doc.text(groupLeft + (groupRight - groupLeft - lw) / 2, y, label, { bold: true, size: 7.5 });
-  }
-  y -= 10;
-  sub.forEach((label, i) => {
-    doc.text(edges[i] - textWidth(label, { bold: true, size: 6.5 }), y, label, { bold: true, size: 6.5 });
-  });
-  y -= 4; doc.line(left, y, right, y); y -= 11;
+  // Draws the title + column header, returning the y just below it - factored out so a mid-table
+  // page break (see the per-row loop below, needed now each row takes ~26pt instead of 13pt once
+  // the billing-range/day-count line was added) can redraw it at the top of the new page.
+  const drawHeader = (yy, withTitle) => {
+    if (withTitle) { doc.text(left, yy, title, { size: 11, bold: true }); yy -= 16; }
+    doc.text(left, yy, 'Month / Billing Period', { bold: true, size: 7.5 });
+    for (const [label, startIdx, span] of headers1) {
+      const groupLeft = startIdx === 0 ? left + 62 : edges[startIdx - 1];
+      const groupRight = edges[startIdx + span - 1];
+      const lw = textWidth(label, { bold: true, size: 7.5 });
+      doc.text(groupLeft + (groupRight - groupLeft - lw) / 2, yy, label, { bold: true, size: 7.5 });
+    }
+    yy -= 10;
+    sub.forEach((label, i) => {
+      doc.text(edges[i] - textWidth(label, { bold: true, size: 6.5 }), yy, label, { bold: true, size: 6.5 });
+    });
+    yy -= 4; doc.line(left, yy, right, yy); yy -= 11;
+    return yy;
+  };
+  y = drawHeader(y, true);
 
   const colorFor = (v) => (v > 0.005 ? [0.05, 0.5, 0.2] : (v < -0.005 ? [0.75, 0.15, 0.15] : [0.4, 0.4, 0.4]));
   const drawRightSigned = (val, ex, yy, fmt, dp) => {
@@ -759,15 +769,29 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
     // a persistent (not text-block-scoped) graphics-state parameter.
   };
 
+  const periodStr = (start, end) => {
+    if (!start || !end) return 'unknown';
+    const d = daysBetween(start, end);
+    return `${start} to ${end}${d != null ? ` (${d}d)` : ''}`;
+  };
+
   let flaggedAny = false;
   for (const r of rows) {
+    // Page break: each row now takes ~26pt (main line + billing-range line) instead of the 13pt it
+    // used to, before the billing-range/day-count readout was added - a full 12-month table no
+    // longer reliably fits on one page. Redraw the column header (no title, avoids implying a new
+    // table) at the top of the new page and carry on.
+    if (y < 90) { doc.newPage(); y = drawHeader(PAGE_H - 50, false); }
     const site = r.site, muni = r.municipal, rec = r.recovery;
+    const ourStart = site && site.startDate, ourEnd = site && site.endDate;
+    const muniStart = muni && (periodField === 'water' ? (muni.waterStartDate || muni.startDate) : muni.startDate);
+    const muniEnd = muni && (periodField === 'water' ? (muni.waterEndDate || muni.endDate) : muni.endDate);
     // Same long-period flag as the on-screen Recovery table (see views.js's recoveryTable) -
-    // municipal statement's own period takes priority since that's the real utility bill.
-    const flagSide = (muni && daysBetween(muni.startDate, muni.endDate) > LONG_PERIOD_DAYS) ? muni
-      : (site && daysBetween(site.startDate, site.endDate) > LONG_PERIOD_DAYS) ? site : null;
-    if (flagSide) flaggedAny = true;
-    doc.text(left, y, shortMonthLabel(r.label) + (flagSide ? '*' : ''), { size: 7.5, bold: true });
+    // municipal statement's own period for THIS utility takes priority since that's the real bill.
+    const flagged = (muniStart && daysBetween(muniStart, muniEnd) > LONG_PERIOD_DAYS)
+      || (ourStart && daysBetween(ourStart, ourEnd) > LONG_PERIOD_DAYS);
+    if (flagged) flaggedAny = true;
+    doc.text(left, y, shortMonthLabel(r.label) + (flagged ? '*' : ''), { size: 7.5, bold: true });
     const siteRandStr = site ? money(site[randKey]) : 'no bill';
     doc.text(edges[0] - textWidth(siteRandStr, { size: 7.5 }), y, siteRandStr, { size: 7.5 });
     const muniRandStr = muni ? money(muni[randKey]) : 'no statement';
@@ -778,10 +802,17 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
     const muniQtyStr = muni ? muni[qtyKey].toLocaleString('en-US', { minimumFractionDigits: qtyDp, maximumFractionDigits: qtyDp }) : '-';
     doc.text(edges[4] - textWidth(muniQtyStr, { size: 7.5 }), y, muniQtyStr, { size: 7.5 });
     drawRightSigned(rec ? rec[qtyKey] : null, edges[5], y, (v, dp) => v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }), qtyDp);
-    y -= 13;
+    y -= 10;
+    // Exact billing range + day count for both sides, printed under the main row - see views.js's
+    // periodLine for why this was added (client over/under-recovery meeting, hard-copy handout).
+    if (site || muni) {
+      doc.text(left, y, `Ours: ${periodStr(ourStart, ourEnd)}   |   Municipal: ${periodStr(muniStart, muniEnd)}`, { size: 6.5 });
+      y -= 10;
+    }
+    y -= 6;
   }
   if (flaggedAny) {
-    doc.text(left, y - 2, `* period longer than ${LONG_PERIOD_DAYS} days (combined/multi-month statement) - see the Municipal Account page for exact dates`, { size: 6.5 });
+    doc.text(left, y - 2, `* period longer than ${LONG_PERIOD_DAYS} days (combined/multi-month statement)`, { size: 6.5 });
     y -= 12;
   }
   return y;
@@ -820,11 +851,11 @@ function buildRecoveryPdf(data) {
   doc.line(left, ty, right, ty); ty -= 24;
 
   const rowsDesc = [...rows].reverse();
-  ty = drawRecoveryTable(doc, { title: 'Electricity', rows: rowsDesc, left, right, y: ty, randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', qtyDp: 0 });
-  ty -= 22;
-  ty = drawRecoveryTable(doc, { title: 'Water', rows: rowsDesc, left, right, y: ty, randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', qtyDp: 2 });
-  ty -= 22;
-  ty = drawRecoveryTable(doc, { title: 'Sewer', rows: rowsDesc, left, right, y: ty, randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', qtyDp: 2 });
+  ty = drawRecoveryTable(doc, { title: 'Electricity', rows: rowsDesc, left, right, y: ty, randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', qtyDp: 0, periodField: 'elec' });
+  if (ty > 120) { ty -= 22; } else { doc.newPage(); ty = PAGE_H - 50; }
+  ty = drawRecoveryTable(doc, { title: 'Water', rows: rowsDesc, left, right, y: ty, randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' });
+  if (ty > 120) { ty -= 22; } else { doc.newPage(); ty = PAGE_H - 50; }
+  ty = drawRecoveryTable(doc, { title: 'Sewer', rows: rowsDesc, left, right, y: ty, randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' });
 
   doc.text(left, 30, `Generated ${data.generatedAt || ''}`, { size: 7 });
 

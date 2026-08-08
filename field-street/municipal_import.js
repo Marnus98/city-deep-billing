@@ -64,6 +64,15 @@
 // there's no stable multi-month rate to de-dup against here the way the client's own site billing
 // tariff naturally groups into eras.
 //
+// WATER'S OWN READING PERIOD (added 2026-08-08, for the client's over/under-recovery meeting): the
+// municipality reads this site's water meter on its own ~30-day cycle, genuinely different from the
+// electricity meter's calendar-month cycle - e.g. May 2026's water is read 2026-05-13 to 2026-06-15,
+// while that same statement's electricity is 2026-05-01 to 2026-06-01. Every month below now carries
+// its own waterStartDate/waterEndDate (see municipal_seed_helpers.js's seedMunicipalStatement) so the
+// Recovery page/PDF can show both periods side by side instead of implying water was read on the
+// same cycle as electricity. Left unset for the 3 months water was INTERIM (estimated) that cycle -
+// Sep 2025, Mar 2026, Jun 2026 - since the statement itself prints no water reading date then.
+//
 // Safe to re-run on every boot: each statement is looked up by its unique label ('2025-09' etc) and
 // skipped if already present - see municipal_seed_helpers.js.
 const { open, migrate } = require('../db');
@@ -74,51 +83,55 @@ const TARIFF_NAME = 'Ekurhuleni_Municipal_Account_8 Field Street';
 
 const MONTHS = [
   { label: '2025-09', startDate: '2025-09-01', endDate: '2025-10-01',
+    // No waterStartDate/waterEndDate: this month's water was INTERIM (estimated), so the statement
+    // itself prints no water reading dates at all - genuinely unknown, not omitted.
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 103.5181712524, network_demand: 146.0899953799, peak_low: 3.4150000851, standard_low: 2.2314000249, offpeak_low: 1.6926000188, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 625.521, comment: 'Demand=625.521' }, network_demand: { reading: 625.521, comment: 'Demand=625.521' },
       peak_low: 46982.4, standard_low: 109165.2, offpeak_low: 149848.799,
       water: { reading: 405, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 405, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
-  { label: '2025-10', startDate: '2025-10-01', endDate: '2025-11-01',
+  { label: '2025-10', startDate: '2025-10-01', endDate: '2025-11-01', waterStartDate: '2025-08-11', waterEndDate: '2025-11-12',
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 105.4619441296, network_demand: 146.0899979153, peak_low: 3.4150000675, standard_low: 2.2314000184, offpeak_low: 1.6926000222, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 613.992, comment: 'Demand=613.992' }, network_demand: { reading: 613.992, comment: 'Demand=613.992' },
       peak_low: 50579.999, standard_low: 108870.0, offpeak_low: 140578.8,
       water: { reading: 25, comment: 'NET of a true 835kL reading (meter read window 2025-08-11 to 2025-11-12, 93 days) less an 810kL INTERIM REVERSAL credit correcting prior over-estimated months - see file header notes' },
       sewer: { reading: 25, comment: 'NET of a true 835kL reading (meter read window 2025-08-11 to 2025-11-12, 93 days) less an 810kL INTERIM REVERSAL credit correcting prior over-estimated months - see file header notes' } } },
-  { label: '2025-11', startDate: '2025-11-01', endDate: '2025-12-01',
+  { label: '2025-11', startDate: '2025-11-01', endDate: '2025-12-01', waterStartDate: '2025-11-12', waterEndDate: '2025-12-12',
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 105.9847977701, network_demand: 146.0899923563, peak_low: 3.4150000831, standard_low: 2.23140002, offpeak_low: 1.6926000338, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 610.963, comment: 'Demand=610.963' }, network_demand: { reading: 610.963, comment: 'Demand=610.963' },
       peak_low: 41081.999, standard_low: 95668.799, offpeak_low: 127966.8, water: 205, sewer: 205 } },
-  { label: '2025-12', startDate: '2025-12-01', endDate: '2026-01-01',
+  { label: '2025-12', startDate: '2025-12-01', endDate: '2026-01-01', waterStartDate: '2025-12-12', waterEndDate: '2026-01-09',
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 108.1352442248, network_demand: 146.0899980461, peak_low: 3.4150001266, standard_low: 2.2313999627, offpeak_low: 1.6925999886, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 598.813, comment: 'Demand=598.813' }, network_demand: { reading: 598.813, comment: 'Demand=598.813' },
       peak_low: 31598.4, standard_low: 77500.799, offpeak_low: 110949.599, water: 125, sewer: 125 } },
-  { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01',
+  { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01', waterStartDate: '2026-01-09', waterEndDate: '2026-02-11',
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 104.6843035277, network_demand: 146.0900036052, peak_low: 3.415000096, standard_low: 2.2314000044, offpeak_low: 1.6925999993, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 618.553, comment: 'Demand=618.553' }, network_demand: { reading: 618.553, comment: 'Demand=618.553' },
       peak_low: 41684.4, standard_low: 89745.599, offpeak_low: 115960.8, water: 189, sewer: 189 } },
-  { label: '2026-02', startDate: '2026-02-01', endDate: '2026-03-01',
+  { label: '2026-02', startDate: '2026-02-01', endDate: '2026-03-01', waterStartDate: '2026-02-11', waterEndDate: '2026-03-11',
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 109.2286009726, network_demand: 146.0900038629, peak_low: 3.4150000375, standard_low: 2.2314000458, offpeak_low: 1.6925999802, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 592.819, comment: 'Demand=592.819' }, network_demand: { reading: 592.819, comment: 'Demand=592.819' },
       peak_low: 37720.799, standard_low: 80308.8, offpeak_low: 104607.599, water: 215, sewer: 215 } },
   { label: '2026-03', startDate: '2026-03-01', endDate: '2026-04-01',
+    // No waterStartDate/waterEndDate: INTERIM again this month, no water reading dates printed.
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 102.6700840986, network_demand: 146.0900001268, peak_low: 3.4150000461, standard_low: 2.2313999762, offpeak_low: 1.6925999843, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 630.688, comment: 'Demand=630.688' }, network_demand: { reading: 630.688, comment: 'Demand=630.688' },
       peak_low: 43357.2, standard_low: 94513.199, offpeak_low: 122659.2,
       water: { reading: 178, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 178, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
-  { label: '2026-04', startDate: '2026-04-01', endDate: '2026-05-01',
+  { label: '2026-04', startDate: '2026-04-01', endDate: '2026-05-01', waterStartDate: '2026-03-11', waterEndDate: '2026-05-13',
     rates: { property_rates: 21367.42, fixed_charge: 5207.09, network_access: 104.3011959892079, network_demand: 146.08999315427053,
       peak_low: 3.4150000000000005, standard_low: 2.231399958634992, offpeak_low: 1.6925999884364658, refuse: 584.46, water: 49.10999999999999, sewer: 18.91 },
     readings: { network_access: { reading: 620.825, comment: 'Demand=620.825' }, network_demand: { reading: 620.825, comment: 'Demand=620.825' },
       peak_low: 42366.000, standard_low: 100775.999, offpeak_low: 138366.000,
       water: { reading: 183, comment: 'NET of a true 361kL reading (meter read window 2026-03-11 to 2026-05-13, 63 days) less a 178kL INTERIM REVERSAL credit correcting March 2026\'s over-estimated INTERIM reading - see file header notes' },
       sewer: { reading: 183, comment: 'NET of a true 361kL reading (meter read window 2026-03-11 to 2026-05-13, 63 days) less a 178kL INTERIM REVERSAL credit correcting March 2026\'s over-estimated INTERIM reading - see file header notes' } } },
-  { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01',
+  { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01', waterStartDate: '2026-05-13', waterEndDate: '2026-06-15',
     rates: { property_rates: 21367.38, fixed_charge: 5207.09, network_access: 99.7044862663, network_demand: 146.0899975853, peak_low: 3.4149999012, standard_low: 2.2314000295, offpeak_low: 1.6926000101, refuse: 584.46, water: 49.11, sewer: 18.91 },
     readings: { network_access: { reading: 617.061, comment: 'Demand=617.061' }, network_demand: { reading: 617.061, comment: 'Demand=617.061' },
       peak_low: 46411.199, standard_low: 105610.799, offpeak_low: 142605.6, water: 222, sewer: 222 } },
   { label: '2026-06', startDate: '2026-06-01', endDate: '2026-07-01',
+    // No waterStartDate/waterEndDate: INTERIM again this month, no water reading dates printed.
     rates: { property_rates: 21686.33, fixed_charge: 6195.35, network_access: 101.1165981342, network_demand: 146.0899982411, peak_high: 10.4902000955, standard_high: 3.040299987, offpeak_high: 1.8609000333, refuse: 604.33, water: 49.65, sewer: 19.2260103627 },
     readings: { network_access: { reading: 602.634, comment: 'Demand=602.634' }, network_demand: { reading: 602.634, comment: 'Demand=602.634' },
       peak_high: 41880.0, standard_high: 95230.8, offpeak_high: 116686.8,
@@ -135,7 +148,8 @@ function main(dbFile = 'field-street.db') {
       tariffName: TARIFF_NAME, effectiveFrom: m.startDate, shape: EKURHULENI_MUNICIPAL_E_TOU_8FS, rates: m.rates,
     });
     const slipId = seedMunicipalStatement(db, tariffId, {
-      label: m.label, startDate: m.startDate, endDate: m.endDate, readings: m.readings,
+      label: m.label, startDate: m.startDate, endDate: m.endDate,
+      waterStartDate: m.waterStartDate, waterEndDate: m.waterEndDate, readings: m.readings,
     });
     if (slipId) created++;
   }

@@ -65,13 +65,13 @@ const { seedMunicipalTariff, seedMunicipalStatement } = require('../municipal_se
 const TARIFF_NAME = 'Ekurhuleni_Municipal_Account_Loper Road - Sandvic';
 
 const MONTHS = [
-  { label: '2025-12', startDate: '2025-12-01', endDate: '2026-01-01',
+  { label: '2025-12', startDate: '2025-12-01', endDate: '2026-01-01', waterStartDate: '2025-12-03', waterEndDate: '2026-01-08',
     rates: { fixed_charge: 3389.73, energy_charge: 6403.60 / 2828.32, demand_charge: 6490.93 / 26.801,
       network_access: 3507.92 / 26.801, refuse_litter: 278.72, refuse_levy: 584.46, water: 49.11, sewer: 18.91 },
     readings: { energy_charge: 2828.32,
       demand_charge: { reading: 26.801, comment: 'Demand=26.801' }, network_access: { reading: 26.801, comment: 'Demand=26.801' },
       water: 62, sewer: 62 } },
-  { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01',
+  { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01', waterStartDate: '2026-01-08', waterEndDate: '2026-02-05',
     rates: { fixed_charge: 3389.73, energy_charge: 7600.31 / 3356.88, demand_charge: 5909.68 / 24.401,
       network_access: 3507.92 / 24.401, refuse_litter: 278.72, refuse_levy: 584.46, water: 49.11, sewer: 18.91 },
     readings: { energy_charge: 3356.88,
@@ -94,25 +94,34 @@ const MONTHS = [
       // other month (see file header note).
       water: { reading: 55, comment: 'INTERIM estimate (1kL + 54kL across the 2 water meters), not an actual meter read this cycle' },
       sewer: { reading: 55, comment: 'INTERIM estimate (1kL + 54kL across the 2 water meters), not an actual meter read this cycle' } } },
-  // New account 1712424685's first statement - stretched ~61-day reading period (2026-04-01 to
-  // 2026-06-01) combining April's and May's consumption into one bill - see file header note on the
-  // account changeover. A one-off R1.46 "Interest on Arrears" ledger charge on this statement is
-  // excluded here (not a utility charge, same convention as every other property's one-off penalty/
-  // interest exclusions), so this month's own total sits R1.46 below the statement's own printed
-  // "TOTAL CURRENT LEVY" of R31,494.77 - expected, not a reconciliation error.
+  // New account 1712424685's first statement - stretched ~61-day ELECTRICITY reading period
+  // (2026-04-01 to 2026-06-01) combining April's and May's consumption into one bill - see file
+  // header note on the account changeover. A one-off R1.46 "Interest on Arrears" ledger charge on
+  // this statement is excluded here (not a utility charge, same convention as every other property's
+  // one-off penalty/interest exclusions), so this month's own total sits R1.46 below the statement's
+  // own printed "TOTAL CURRENT LEVY" of R31,494.77 - expected, not a reconciliation error. Water is
+  // NOT part of that combined 61-day read - it's printed as its own separate "INTERIM 37 Kl" line
+  // with no reading dates at all (an estimate, same as Feb/Mar 2026's INTERIM water above) - corrected
+  // 2026-08-08 after re-checking the source PDF; the reading itself (37kL) hadn't changed, only the
+  // comment describing it, which previously implied this was a real combined-period read.
   { label: '2026-04', startDate: '2026-04-01', endDate: '2026-06-01',
     rates: { fixed_charge: 3389.73, energy_charge: 11131.49 / 4916.520, demand_charge: 6839.45 / 28.240,
       network_access: 3507.92 / 28.240, refuse_litter: 0.16, refuse_levy: 0, water: 49.11, sewer: 18.91 },
     readings: { energy_charge: 4916.520,
       demand_charge: { reading: 28.240, comment: 'Demand=28.240' }, network_access: { reading: 28.240, comment: 'Demand=28.240' },
-      water: { reading: 37, comment: 'Covers a combined ~61-day Apr-May reading period (new account 1712424685) - see file header note' },
-      sewer: { reading: 37, comment: 'Covers a combined ~61-day Apr-May reading period (new account 1712424685) - see file header note' } } },
+      water: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - the statement prints no water reading dates at all this month (see file header note on the account changeover)' },
+      sewer: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - the statement prints no water reading dates at all this month (see file header note on the account changeover)' } } },
+  // June 2026's water is ALSO INTERIM (same 37kL estimate as April/May's combined statement, the new
+  // account's meter still hasn't had a real read) - flagged here (added 2026-08-08) since the original
+  // import left this reading uncommented, which read as a genuine meter reading rather than an
+  // estimate; the reading itself (37kL, R1,837.05) is unchanged, this only adds the missing comment.
   { label: '2026-06', startDate: '2026-06-01', endDate: '2026-07-01',
     rates: { fixed_charge: 4338.39, energy_charge: 20876.02 / 4524.200, demand_charge: 6510.07 / 26.880,
       network_access: 3507.92 / 26.880, refuse_litter: 0.17, refuse_levy: 0, water: 1837.05 / 37, sewer: 18.91 },
     readings: { energy_charge: 4524.200,
       demand_charge: { reading: 26.880, comment: 'Demand=26.880' }, network_access: { reading: 26.880, comment: 'Demand=26.880' },
-      water: 37, sewer: 37 } },
+      water: { reading: 37, comment: 'INTERIM estimate (same 37kL figure as April/May\'s combined statement) - not an actual meter read this cycle, no water reading dates printed' },
+      sewer: { reading: 37, comment: 'INTERIM estimate (same 37kL figure as April/May\'s combined statement) - not an actual meter read this cycle, no water reading dates printed' } } },
 ];
 
 function main(dbFile = 'loper-road.db') {
@@ -124,7 +133,8 @@ function main(dbFile = 'loper-road.db') {
       tariffName: TARIFF_NAME, effectiveFrom: m.startDate, shape: EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, rates: m.rates,
     });
     const slipId = seedMunicipalStatement(db, tariffId, {
-      label: m.label, startDate: m.startDate, endDate: m.endDate, readings: m.readings,
+      label: m.label, startDate: m.startDate, endDate: m.endDate,
+      waterStartDate: m.waterStartDate, waterEndDate: m.waterEndDate, readings: m.readings,
     });
     if (slipId) created++;
   }

@@ -25,10 +25,13 @@ function seedMunicipalTariff(db, { tariffName, effectiveFrom, shape, rates, fact
 
 // Idempotent by label - safe to call on every boot; skips a statement that already exists so it
 // never clobbers a figure the client has since corrected by hand.
-function seedMunicipalStatement(db, tariffId, { label, startDate, endDate, readings, applyCorrectionFactor = 0, status = 'finalised' }) {
+// waterStartDate/waterEndDate are optional - only pass them when the source statement actually
+// prints its own water/sewer reading dates (see db.js's migrate() note on these two columns); leave
+// unset for an INTERIM/estimated month rather than guessing.
+function seedMunicipalStatement(db, tariffId, { label, startDate, endDate, waterStartDate, waterEndDate, readings, applyCorrectionFactor = 0, status = 'finalised' }) {
   if (get(db, 'SELECT id FROM municipal_statement_slips WHERE label=?', [label])) return null;
-  run(db, `INSERT INTO municipal_statement_slips (label, start_date, end_date, tariff_id, apply_correction_factor, status)
-    VALUES (?,?,?,?,?,?)`, [label, startDate, endDate, tariffId, applyCorrectionFactor, status]);
+  run(db, `INSERT INTO municipal_statement_slips (label, start_date, end_date, water_start_date, water_end_date, tariff_id, apply_correction_factor, status)
+    VALUES (?,?,?,?,?,?,?,?)`, [label, startDate, endDate, waterStartDate || null, waterEndDate || null, tariffId, applyCorrectionFactor, status]);
   const slipId = get(db, 'SELECT id FROM municipal_statement_slips WHERE label=?', [label]).id;
   for (const [key, val] of Object.entries(readings || {})) {
     const reading = (val != null && typeof val === 'object') ? val.reading : val;

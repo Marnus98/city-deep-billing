@@ -57,6 +57,22 @@
 //    this app) rather than a blended single rate, since the statement already gives exact separate
 //    readings/rates for each portion - no approximation needed here.
 //
+// DATES CORRECTED 2026-08-08 (for the client's over/under-recovery meeting): startDate/endDate below
+// used to be calendar-month-rounded (e.g. Dec 2025 was stored as '2025-12-01' to '2026-01-01')
+// instead of the statement's own printed "(Reading period = ... = N days)" line - unlike every other
+// property's municipal import, which already used each statement's exact electricity reading dates.
+// Fixed here to match that same convention. This is purely a display correction - labels didn't
+// change, so nothing about which month a statement is filed under (or the Recovery page's label-
+// based matching) is affected, only the shown Reading Period text/day-count.
+//
+// WATER'S OWN READING PERIOD: City of Johannesburg prints Johannesburg Water's reading period
+// separately from City Power's electricity period, and they're often genuinely different lengths -
+// e.g. Jan 2026's electricity period is 38 days but water is 39 days over a different date range
+// entirely (2025-12-19 to 2026-01-26). Every month with extractable statement text now carries its
+// own waterStartDate/waterEndDate (see municipal_seed_helpers.js's seedMunicipalStatement) so the
+// Recovery page/PDF can show both periods side by side. April and June 2026 are scanned images with
+// no extractable text (see each entry's own comment) - left without exact dates for either utility.
+//
 // Safe to re-run on every boot: each statement is looked up by its unique label ('2025-12' etc) and
 // skipped if already present - see municipal_seed_helpers.js.
 const { open, migrate } = require('../db');
@@ -66,7 +82,11 @@ const { seedMunicipalTariff, seedMunicipalStatement } = require('../municipal_se
 const TARIFF_NAME = 'City_of_Johannesburg_Municipal_Account_AutoZone';
 
 const MONTHS = [
-  { label: '2025-12', startDate: '2025-12-01', endDate: '2026-01-01',
+  // startDate/endDate corrected 2026-08-08 to this statement's own printed electricity reading
+  // period (was previously calendar-month-rounded, '2025-12-01' to '2026-01-01') - see file header
+  // note on why every other property's municipal import already uses the statement's own exact
+  // dates, and the new file-header note below on this fix specifically.
+  { label: '2025-12', startDate: '2025-11-26', endDate: '2025-12-25', waterStartDate: '2025-11-26', waterEndDate: '2025-12-18',
     rates: {
       property_rates: 113642.78,
       peak_high: 0, peak_low: 2.9539, standard_high: 0, standard_low: 2.2239, offpeak_high: 0, offpeak_low: 1.7095,
@@ -82,7 +102,7 @@ const MONTHS = [
       demand_charge: { reading: 185.700, comment: 'Demand=185.700' },
       water: 630, sewer: 630,
     } },
-  { label: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01',
+  { label: '2026-01', startDate: '2025-12-26', endDate: '2026-02-01', waterStartDate: '2025-12-19', waterEndDate: '2026-01-26',
     rates: {
       property_rates: 113642.78,
       peak_high: 0, peak_low: 2.9539, standard_high: 0, standard_low: 2.2239, offpeak_high: 0, offpeak_low: 1.7095,
@@ -99,7 +119,7 @@ const MONTHS = [
       water: 1076, sewer: 1076,
     } },
   // February 2026: no statement uploaded - gap in the municipal history.
-  { label: '2026-03', startDate: '2026-03-01', endDate: '2026-04-01',
+  { label: '2026-03', startDate: '2026-03-02', endDate: '2026-04-01', waterStartDate: '2026-01-27', waterEndDate: '2026-03-28',
     rates: {
       property_rates: 113642.78,
       peak_high: 0, peak_low: 2.9539, standard_high: 0, standard_low: 2.2239, offpeak_high: 0, offpeak_low: 1.7095,
@@ -116,6 +136,10 @@ const MONTHS = [
       water: { reading: 1209, comment: 'NET of this cycle\'s full Step1/Step2 charge (R86,310.09 water / R63,895.65 sewer, both on the true 1,209kL reading) less two INTERIM REVERSAL credits reversing a prior cycle\'s over-estimated INTERIM charge (-R13,652.00 water, -R21,554.77 sewer per statement) - see file header note 1' },
       sewer: { reading: 1209, comment: 'NET of this cycle\'s full Step1/Step2 charge (R86,310.09 water / R63,895.65 sewer, both on the true 1,209kL reading) less two INTERIM REVERSAL credits reversing a prior cycle\'s over-estimated INTERIM charge (-R13,652.00 water, -R21,554.77 sewer per statement) - see file header note 1' },
     } },
+  // startDate/endDate left at their calendar-month approximation here (not corrected to the exact
+  // reading period like every other month in this file) - this statement is a scanned image with no
+  // extractable text (source PDF has no text layer), so the exact reading-period dates can't be
+  // re-verified the same way; water's own period is left unset for the same reason.
   { label: '2026-04', startDate: '2026-04-01', endDate: '2026-05-01',
     rates: {
       property_rates: 113642.78,
@@ -132,7 +156,7 @@ const MONTHS = [
       demand_charge: { reading: 173.700, comment: 'Demand=173.700' },
       water: 329, sewer: 329,
     } },
-  { label: '2026-05', startDate: '2026-05-01', endDate: '2026-06-01',
+  { label: '2026-05', startDate: '2026-05-02', endDate: '2026-06-01', waterStartDate: '2026-04-17', waterEndDate: '2026-05-28',
     rates: {
       property_rates: 113642.78,
       peak_high: 7.0291, peak_low: 2.9539, standard_high: 2.6838, standard_low: 2.2239, offpeak_high: 1.8387, offpeak_low: 1.7095,
@@ -148,6 +172,8 @@ const MONTHS = [
       demand_charge: { reading: 187.600, comment: 'Demand=187.600' },
       water: 2091, sewer: 2091,
     } },
+  // Same scanned-PDF limitation as April 2026 above - startDate/endDate left calendar-rounded, no
+  // water period recorded.
   { label: '2026-06', startDate: '2026-06-01', endDate: '2026-07-01',
     rates: {
       property_rates: 117733.77,
@@ -176,7 +202,8 @@ function main(dbFile = 'autozone.db') {
       tariffName: TARIFF_NAME, effectiveFrom: m.startDate, shape: AUTOZONE_COJ_MUNICIPAL, rates: m.rates,
     });
     const slipId = seedMunicipalStatement(db, tariffId, {
-      label: m.label, startDate: m.startDate, endDate: m.endDate, readings: m.readings,
+      label: m.label, startDate: m.startDate, endDate: m.endDate,
+      waterStartDate: m.waterStartDate, waterEndDate: m.waterEndDate, readings: m.readings,
     });
     if (slipId) created++;
   }
