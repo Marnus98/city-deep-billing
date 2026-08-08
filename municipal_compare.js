@@ -293,9 +293,14 @@ function electricityLineItems(s) {
 // account, chronological ascending - feeds the PDF's trend chart, same shape monthlyTrendForTenant
 // already produces for the tenant PDF chart ({label, elec, water, sanitation}), just re-derived
 // from municipal_statements instead of bill_line_items. label is statement_for - the consumption
-// period's own start month (see the 2026-08-07 labelling fix note in seed_wingfield_municipal.js) -
-// NOT derived from statement_date, which would be the invoice's issue month instead (one month
-// later than the usage each statement actually covers).
+// period's own month, NOT derived from statement_date (which would be the invoice's issue month
+// instead, generally a month or so later than the usage each statement actually covers). Wingfield
+// uses the reading period's start month (see seed_wingfield_municipal.js's 2026-08-07 fix - its
+// statements are already month-aligned, so start month and majority month are the same thing);
+// City Deep's own statements often straddle a month boundary (e.g. 26th-25th cycles), so its own
+// relabelling (2026-08-08, see city-deep/imports/municipal_statements.json) uses whichever month
+// holds the majority of the reading period's days instead, to avoid mislabelling a period that's
+// mostly in the following month.
 function monthlyTrendForAccount(db, accountId, asOfStatementDate) {
   const rows = all(db, `
     SELECT statement_for, statement_date, elec_excl_vat, water_excl_vat, sanitation_excl_vat
@@ -323,11 +328,21 @@ function monthlyTrendAllAccounts(db, asOfStatementDate) {
   const byLabel = new Map();
   for (const r of rows) {
     const label = r.statement_for;
-    if (!byLabel.has(label)) byLabel.set(label, { label, elec: 0, water: 0, sanitation: 0 });
+    // `anchorDate` - the latest statement_date seen for this label (rows arrive DESC, so the first
+    // row for a given label already is that label's latest) - used to sort chronologically below
+    // instead of comparing the 'Month YYYY' label text itself. String-sorting "April 2026" vs
+    // "August 2025" puts April first (A-p < A-u) despite being the LATER month - a real bug that
+    // got more visible once City Deep's statement_for was corrected to the consumption month (see
+    // the 2026-08-08 City Deep relabelling, mirroring seed_wingfield_municipal.js's 2026-08-07 fix)
+    // rather than COJ's own invoice-month label.
+    if (!byLabel.has(label)) byLabel.set(label, { label, elec: 0, water: 0, sanitation: 0, anchorDate: r.statement_date });
     const agg = byLabel.get(label);
     agg.elec += r.elec_excl_vat || 0; agg.water += r.water_excl_vat || 0; agg.sanitation += r.sanitation_excl_vat || 0;
   }
-  return [...byLabel.values()].sort((a, b) => a.label.localeCompare(b.label)).slice(-12);
+  return [...byLabel.values()]
+    .sort((a, b) => (a.anchorDate < b.anchorDate ? -1 : a.anchorDate > b.anchorDate ? 1 : 0))
+    .slice(-12)
+    .map(({ label, elec, water, sanitation }) => ({ label, elec, water, sanitation }));
 }
 
 module.exports = {

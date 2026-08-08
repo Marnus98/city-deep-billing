@@ -13,8 +13,18 @@
 // covers (confirmed: a statement you named "... - Feb 26.pdf" prints "Statement for March 2026"
 // inside it, because the reading period underneath runs 2026/02/14 to 2026/03/27 - mostly
 // February). Electricity and water even have their *own*, different reading periods within the
-// same statement. Store both the raw "Statement for" label and the actual reading period dates,
-// and always match periods by reading-period-date-overlap, never by label string.
+// same statement. Always match periods by reading-period-date-overlap (see municipal_compare.js's
+// daysOverlap/rangeMidpointWithin), never by label string.
+//
+// The `statement_for` value stored in municipal_statements.json is NOT COJ's own raw printed
+// label - it's been corrected (2026-08-08) to whichever calendar month holds the majority of the
+// electricity reading period's own days, same convention seed_wingfield_municipal.js's 2026-08-07
+// fix established, so the "Statement" dropdown on the Municipal Account page reads as the
+// consumption month (matching how the client thinks about it and easing comparison against the
+// Recovery page's own billing-period labels) rather than the invoice month. If you extract a new
+// statement by hand, compute this the same way: the month containing the midpoint of
+// electricity.reading_period, not reading_period[0]'s month and not the printed "Statement for"
+// text.
 const fs = require('fs');
 const path = require('path');
 const { open, migrate } = require('../db');

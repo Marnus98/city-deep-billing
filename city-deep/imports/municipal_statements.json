@@ -2,7 +2,7 @@
   {
     "file": "/tmp/muni/09)_ACCOUNT_559304053_-_Sep_25.txt",
     "account": "559304053",
-    "statement_for": "October 2025",
+    "statement_for": "September 2025",
     "statement_date": "2025/10/06",
     "invoice_number": "600002661562",
     "due_date": "2025/10/21",
@@ -66,7 +66,7 @@
   {
     "file": "/tmp/muni/10)_ACCOUNT_559304053_-_Oct_25.txt",
     "account": "559304053",
-    "statement_for": "November 2025",
+    "statement_for": "October 2025",
     "statement_date": "2025/11/05",
     "invoice_number": "600002673962",
     "due_date": "2025/11/20",
@@ -130,7 +130,7 @@
   {
     "file": "/tmp/muni/11)_ACCOUNT_559304053_-_Nov_25.txt",
     "account": "559304053",
-    "statement_for": "December 2025",
+    "statement_for": "November 2025",
     "statement_date": "2025/12/04",
     "invoice_number": "600002684778",
     "due_date": "2025/12/19",
@@ -194,7 +194,7 @@
   {
     "file": "/tmp/muni/12)_ACCOUNT_559304053_-_Dec_25.txt",
     "account": "559304053",
-    "statement_for": "January 2026",
+    "statement_for": "December 2025",
     "statement_date": "2026/01/06",
     "invoice_number": "600002697720",
     "due_date": "2026/01/21",
@@ -258,7 +258,7 @@
   {
     "file": "/tmp/muni/01)_ACCOUNT_559304053_-_Jan_26.txt",
     "account": "559304053",
-    "statement_for": "February 2026",
+    "statement_for": "January 2026",
     "statement_date": "2026/02/04",
     "invoice_number": "600002707329",
     "due_date": "2026/02/19",
@@ -322,7 +322,7 @@
   {
     "file": "/tmp/muni/02)_IND_4053_MAR_26_-_Feb_26.txt",
     "account": "559304053",
-    "statement_for": "March 2026",
+    "statement_for": "February 2026",
     "statement_date": "2026/03/05",
     "invoice_number": "600002720653",
     "due_date": "2026/03/20",
@@ -386,7 +386,7 @@
   {
     "file": "/tmp/muni/03)_COJ_2026-04-07_559304053_-_Mar_25.txt",
     "account": "559304053",
-    "statement_for": "April 2026",
+    "statement_for": "March 2026",
     "statement_date": "2026/04/07",
     "invoice_number": "600002733114",
     "due_date": "2026/04/22",
@@ -450,7 +450,7 @@
   {
     "file": "/tmp/muni/04)_COJ_2026-05-08_559304053_-_Apr_25.txt",
     "account": "559304053",
-    "statement_for": "May 2026",
+    "statement_for": "April 2026",
     "statement_date": "2026/05/08",
     "invoice_number": "600002747438",
     "due_date": "2026/05/25",
@@ -514,7 +514,7 @@
   {
     "file": "/tmp/muni/09)_ACCOUNT_559304060__-_Sep_25.txt",
     "account": "559304060",
-    "statement_for": "October 2025",
+    "statement_for": "September 2025",
     "statement_date": "2025/10/14",
     "invoice_number": "600002665796",
     "due_date": "2025/10/28",
@@ -578,7 +578,7 @@
   {
     "file": "/tmp/muni/11)_ACCOUNT_559304060__-_Nov_2025.txt",
     "account": "559304060",
-    "statement_for": "December 2025",
+    "statement_for": "September 2025",
     "statement_date": "2025/12/11",
     "invoice_number": "600002691399",
     "due_date": "2025/12/11",
@@ -642,7 +642,7 @@
   {
     "file": "/tmp/muni/11)_ACCOUNT_559304060__-_Nov_25.txt",
     "account": "559304060",
-    "statement_for": "December 2025",
+    "statement_for": "October 2025",
     "statement_date": "2025/12/31",
     "invoice_number": "600002694504",
     "due_date": "2025/12/31",
@@ -706,7 +706,7 @@
   {
     "file": "/tmp/muni/12)_ACCOUNT_559304060__-_Dec_25.txt",
     "account": "559304060",
-    "statement_for": "January 2026",
+    "statement_for": "December 2025",
     "statement_date": "2026/01/15",
     "invoice_number": "600002702711",
     "due_date": "2026/01/30",
@@ -770,7 +770,7 @@
   {
     "file": "/tmp/muni/01)_ACCOUNT_559304060__-_Jan_26.txt",
     "account": "559304060",
-    "statement_for": "February 2026",
+    "statement_for": "January 2026",
     "statement_date": "2026/02/13",
     "invoice_number": "600002714171",
     "due_date": "2026/03/02",
@@ -834,7 +834,7 @@
   {
     "file": "/tmp/muni/02)_IND_4060_MAR_26_-_Feb_26.txt",
     "account": "559304060",
-    "statement_for": "March 2026",
+    "statement_for": "February 2026",
     "statement_date": "2026/03/10",
     "invoice_number": "600002724492",
     "due_date": "2026/03/25",
@@ -898,7 +898,7 @@
   {
     "file": "/tmp/muni/03)_COJ_2026-04-08_559304060_-_Mar_25.txt",
     "account": "559304060",
-    "statement_for": "April 2026",
+    "statement_for": "March 2026",
     "statement_date": "2026/04/08",
     "invoice_number": "600002733274",
     "due_date": "2026/04/23",
@@ -962,7 +962,7 @@
   {
     "file": "/tmp/muni/04)_COJ_2026-05-12_559304060_-_Apr_25.txt",
     "account": "559304060",
-    "statement_for": "May 2026",
+    "statement_for": "November 2025",
     "statement_date": "2026/05/12",
     "invoice_number": "600002748439",
     "due_date": "2026/05/27",
@@ -1026,7 +1026,7 @@
   {
     "file": "/tmp/muni/09)_ACCOUNT_559304078_-_Sep_25.txt",
     "account": "559304078",
-    "statement_for": "October 2025",
+    "statement_for": "September 2025",
     "statement_date": "2025/10/03",
     "invoice_number": "600002660358",
     "due_date": "2025/10/20",
@@ -1090,7 +1090,7 @@
   {
     "file": "/tmp/muni/10)_ACCOUNT_559304078_-_Oct_25.txt",
     "account": "559304078",
-    "statement_for": "November 2025",
+    "statement_for": "October 2025",
     "statement_date": "2025/11/06",
     "invoice_number": "600002673947",
     "due_date": "2025/11/21",
@@ -1154,7 +1154,7 @@
   {
     "file": "/tmp/muni/11)_ACCOUNT_559304078_-_Nov_25.txt",
     "account": "559304078",
-    "statement_for": "December 2025",
+    "statement_for": "November 2025",
     "statement_date": "2025/12/04",
     "invoice_number": "600002684295",
     "due_date": "2025/12/19",
@@ -1218,7 +1218,7 @@
   {
     "file": "/tmp/muni/12)_ACCOUNT_559304078_-_Dec_25.txt",
     "account": "559304078",
-    "statement_for": "January 2026",
+    "statement_for": "December 2025",
     "statement_date": "2026/01/06",
     "invoice_number": "600002696951",
     "due_date": "2026/01/21",
@@ -1282,7 +1282,7 @@
   {
     "file": "/tmp/muni/01)_ACCOUNT_559304078_-_Jan_26.txt",
     "account": "559304078",
-    "statement_for": "February 2026",
+    "statement_for": "January 2026",
     "statement_date": "2026/02/06",
     "invoice_number": "600002708798",
     "due_date": "2026/02/23",
@@ -1346,7 +1346,7 @@
   {
     "file": "/tmp/muni/02)_MINI_MAR_26_-_Feb_26.txt",
     "account": "559304078",
-    "statement_for": "March 2026",
+    "statement_for": "February 2026",
     "statement_date": "2026/03/05",
     "invoice_number": "600002720655",
     "due_date": "2026/03/20",
@@ -1410,7 +1410,7 @@
   {
     "file": "/tmp/muni/03)_COJ_2026-04-08_559304078_-_Mar_26.txt",
     "account": "559304078",
-    "statement_for": "April 2026",
+    "statement_for": "March 2026",
     "statement_date": "2026/04/08",
     "invoice_number": "600002733275",
     "due_date": "2026/04/23",
@@ -1474,7 +1474,7 @@
   {
     "file": "/tmp/muni/04)_COJ_2026-05-06_559304078_-_Apr_26.txt",
     "account": "559304078",
-    "statement_for": "May 2026",
+    "statement_for": "April 2026",
     "statement_date": "2026/05/06",
     "invoice_number": "600002742461",
     "due_date": "2026/05/21",
@@ -1538,7 +1538,7 @@
   {
     "file": "/tmp/muni/09)_ACCOUNT_559304085_-_Sep_2025.txt",
     "account": "559304085",
-    "statement_for": "October 2025",
+    "statement_for": "September 2025",
     "statement_date": "2025/10/03",
     "invoice_number": "600002658348",
     "due_date": "2025/10/20",
@@ -1597,7 +1597,7 @@
   {
     "file": "/tmp/muni/10)_ACCOUNT_559304085_-_Oct_2025.txt",
     "account": "559304085",
-    "statement_for": "November 2025",
+    "statement_for": "October 2025",
     "statement_date": "2025/11/05",
     "invoice_number": "600002672721",
     "due_date": "2025/11/20",
@@ -1656,7 +1656,7 @@
   {
     "file": "/tmp/muni/10)_ACCOUNT_559304085_-__Oct_2025.txt",
     "account": "559304085",
-    "statement_for": "November 2025",
+    "statement_for": "September 2025",
     "statement_date": "2025/12/03",
     "invoice_number": "600002681869",
     "due_date": "2025/12/03",
@@ -1715,7 +1715,7 @@
   {
     "file": "/tmp/muni/11)_ACCOUNT_559304085_-_Nov_25.txt",
     "account": "559304085",
-    "statement_for": "December 2025",
+    "statement_for": "November 2025",
     "statement_date": "2025/12/04",
     "invoice_number": "600002684296",
     "due_date": "2025/12/19",
@@ -1774,7 +1774,7 @@
   {
     "file": "/tmp/muni/12)_ACCOUNT_559304085_-_Dec_25.txt",
     "account": "559304085",
-    "statement_for": "January 2026",
+    "statement_for": "December 2025",
     "statement_date": "2026/01/07",
     "invoice_number": "600002699021",
     "due_date": "2026/01/22",
@@ -1833,7 +1833,7 @@
   {
     "file": "/tmp/muni/01)_ACCOUNT_559304085_-_Jan_26.txt",
     "account": "559304085",
-    "statement_for": "February 2026",
+    "statement_for": "January 2026",
     "statement_date": "2026/02/06",
     "invoice_number": "600002708515",
     "due_date": "2026/02/23",
@@ -1892,7 +1892,7 @@
   {
     "file": "/tmp/muni/02)_Account_559304085_-_Feb_26.txt",
     "account": "559304085",
-    "statement_for": "March 2026",
+    "statement_for": "February 2026",
     "statement_date": "2026/03/05",
     "invoice_number": "600002720656",
     "due_date": "2026/03/20",
@@ -1951,7 +1951,7 @@
   {
     "file": "/tmp/muni/03)_COJ_2026-04-07_559304085_-_Mar_26.txt",
     "account": "559304085",
-    "statement_for": "April 2026",
+    "statement_for": "March 2026",
     "statement_date": "2026/04/07",
     "invoice_number": "600002731809",
     "due_date": "2026/04/22",
@@ -2010,7 +2010,7 @@
   {
     "file": "/tmp/muni/04)_COJ_2026-05-13_559304085_-_Apr_26.txt",
     "account": "559304085",
-    "statement_for": "May 2026",
+    "statement_for": "April 2026",
     "statement_date": "2026/05/13",
     "invoice_number": "600002749466",
     "due_date": "2026/05/28",
@@ -2069,7 +2069,7 @@
   {
     "file": "/tmp/muni/05)_COJ_2026-06-03_559304085_-_May_26.txt",
     "account": "559304085",
-    "statement_for": "June 2026",
+    "statement_for": "May 2026",
     "statement_date": "2026/06/03",
     "invoice_number": "600002755631",
     "due_date": "2026/06/18",
@@ -2128,7 +2128,7 @@
   {
     "file": "/tmp/muni/06)_COJ_2026-07-08_559304085_rittle_-_June_26.txt",
     "account": "559304085",
-    "statement_for": "July 2026",
+    "statement_for": "June 2026",
     "statement_date": "2026/07/08",
     "invoice_number": "600002766664",
     "due_date": "2026/07/23",
@@ -2187,7 +2187,7 @@
   {
     "file": "/tmp/muni/05)_COJ_2026-06-03_559304078_-_May_26.txt",
     "account": "559304078",
-    "statement_for": "June 2026",
+    "statement_for": "May 2026",
     "statement_date": "2026/06/03",
     "invoice_number": "600002755630",
     "due_date": "2026/06/18",
@@ -2251,7 +2251,7 @@
   {
     "file": "/tmp/muni/06)_COJ_2026-07-10_559304078_-_June_26.txt",
     "account": "559304078",
-    "statement_for": "July 2026",
+    "statement_for": "June 2026",
     "statement_date": "2026/07/10",
     "invoice_number": "600002769166",
     "due_date": "2026/07/27",
@@ -2315,7 +2315,7 @@
   {
     "file": "/tmp/muni/06)_COJ_2026-07-09_559304053industrial_-_June_26.txt",
     "account": "559304053",
-    "statement_for": "July 2026",
+    "statement_for": "May 2026",
     "statement_date": "2026/07/09",
     "invoice_number": "600002768938",
     "due_date": "2026/07/09",
@@ -2379,7 +2379,7 @@
   {
     "file": "/tmp/muni/05)_559304060_-_May_26.txt",
     "account": "559304060",
-    "statement_for": "June 2026",
+    "statement_for": "May 2026",
     "statement_date": "2026/06/12",
     "invoice_number": "600002761608",
     "due_date": "2026/06/29",
@@ -2443,7 +2443,7 @@
   {
     "file": "/tmp/muni/06)_559304060_-_June_26.txt",
     "account": "559304060",
-    "statement_for": "July 2026",
+    "statement_for": "June 2026",
     "statement_date": "2026/07/10",
     "invoice_number": "600002769076",
     "due_date": "2026/07/27",
