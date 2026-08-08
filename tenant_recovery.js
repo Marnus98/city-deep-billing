@@ -28,6 +28,25 @@ const municipalCompare = require('./municipal_compare');
 function get(db, sql, params = []) { return db.prepare(sql).get(...params); }
 function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 
+// Display-only consumption-month label for a billing_period, used to relabel Wingfield's Recovery
+// rows (2026-08-08 fix - see buildRecoveryRows below). billing_periods.label itself is left alone
+// everywhere else (it still drives real tenant invoice numbers in billing.js), this only changes
+// what row.label carries for Recovery page/PDF rendering.
+//
+// Wingfield's periods are NOT simple calendar-month windows (they run reading-date to reading-date,
+// e.g. 2025-07-28 to 2025-08-28 - 4 days in July, 27 in August), so "start date's month" is wrong
+// whenever a period tips more than half its days into the following month. Uses the same
+// majority-days rule as City Deep's own 2026-08-08 municipal statement_for fix: the month
+// containing the period's own temporal midpoint always holds the majority of its days (the
+// midpoint splits the range exactly in half, so whichever side has more days is the side the
+// midpoint falls on) - confirmed against Wingfield's real period dates before shipping this.
+function consumptionMonthLabel(startDate, endDate) {
+  if (!startDate) return null;
+  if (!endDate) return startDate.slice(0, 7);
+  const mid = new Date((new Date(startDate).getTime() + new Date(endDate).getTime()) / 2);
+  return `${mid.getUTCFullYear()}-${String(mid.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 // This app's own tenant billing for `siteName`, split Electricity / Water / Sewer (sanitation),
 // excl VAT, summed across every tenant for one billing period. null if no tenant was billed at all
 // that period (distinct from "billed R0", same convention flat_site_recovery.js uses). Two separate
@@ -190,7 +209,7 @@ function buildRecoveryRows(db, siteName, { limit = 12 } = {}) {
   return periods.map((p) => {
     const site = siteSideFor(db, siteName, p.id);
     const municipal = municipalSideFor(db, siteName, p.start_date, p.end_date);
-    const row = { label: p.label, site, municipal, recovery: null };
+    const row = { label: consumptionMonthLabel(p.start_date, p.end_date) || p.label, site, municipal, recovery: null };
     if (site && municipal) {
       row.recovery = {
         elecRand: site.elecRand - municipal.elecRand, elecKwh: site.elecKwh - municipal.elecKwh,
