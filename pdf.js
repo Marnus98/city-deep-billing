@@ -768,6 +768,65 @@ function drawUtilityCharts(doc, { x, y, width, series, randKey, qtyKey, qtyLabel
   return cy;
 }
 
+// Meter-accuracy check: PDF mirror of views.js's meterAccuracyPanel - average daily usage on each
+// side (using each side's own actual billing-period length, not the raw monthly total) plus the %
+// variance between them, to judge whether HolmStone's own meter and the municipality's meter are
+// reading the same real consumption (i.e. whether either meter is within reasonable accuracy
+// tolerance, or the municipal side is on an estimated/INTERIM read that month). Added 2026-08-10
+// alongside the on-screen panel - see that function's comment for the AutoZone water finding
+// (municipal avg/day swinging 11-113 kL/day against HolmStone's own flat ~25 kL/day) that prompted
+// this addition.
+function drawMeterAccuracyPanel(doc, { rows, left, right, y, qtyKey, qtyLabel, qtyDp = 2, periodField = 'elec' }) {
+  const numW = (right - left - 62) / 3;
+  const edges = [1, 2, 3].map((n) => left + 62 + numW * n);
+
+  doc.text(left, y, 'Meter Accuracy - Avg Daily Usage (Ours vs Municipal)', { size: 9.5, bold: true });
+  const tolLabel = '<=10% typical tolerance, >=25% flagged';
+  doc.text(right - textWidth(tolLabel, { size: 7 }), y, tolLabel, { size: 7 });
+  y -= 14;
+  doc.text(left, y, 'Month', { bold: true, size: 7.5 });
+  const heads = ['Our Avg/Day', 'Municipal Avg/Day', 'Variance'];
+  heads.forEach((label, i) => doc.text(edges[i] - textWidth(label, { bold: true, size: 7.5 }), y, label, { bold: true, size: 7.5 }));
+  y -= 4; doc.line(left, y, right, y); y -= 11;
+
+  const colorFor = (abs) => (abs >= 25 ? [0.75, 0.15, 0.15] : (abs >= 10 ? [0.75, 0.5, 0.05] : [0.4, 0.4, 0.4]));
+  for (const r of rows) {
+    if (y < 90) { doc.newPage(); y = PAGE_H - 50; }
+    const site = r.site, muni = r.municipal;
+    doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
+    if (!site || !muni) {
+      doc.text(edges[0] - textWidth('no overlapping data', { size: 7.5 }), y, 'no overlapping data', { size: 7.5 });
+      y -= 13;
+      continue;
+    }
+    const ourDays = daysBetween(site.startDate, site.endDate);
+    const muniStart = periodField === 'water' ? (muni.waterStartDate || muni.startDate) : muni.startDate;
+    const muniEnd = periodField === 'water' ? (muni.waterEndDate || muni.endDate) : muni.endDate;
+    const muniDays = daysBetween(muniStart, muniEnd);
+    const ourQty = site[qtyKey], muniQty = muni[qtyKey];
+    const ourAvg = ourDays ? ourQty / ourDays : null;
+    const muniAvg = muniDays ? muniQty / muniDays : null;
+    const variancePct = muniQty ? ((ourQty - muniQty) / muniQty) * 100 : null;
+    const fmtAvg = (v) => `${v.toLocaleString('en-US', { minimumFractionDigits: qtyDp, maximumFractionDigits: qtyDp })} ${qtyLabel}/day`;
+    const ourStr = ourAvg != null ? fmtAvg(ourAvg) : '-';
+    doc.text(edges[0] - textWidth(ourStr, { size: 7.5 }), y, ourStr, { size: 7.5 });
+    const muniStr = muniAvg != null ? fmtAvg(muniAvg) : '-';
+    doc.text(edges[1] - textWidth(muniStr, { size: 7.5 }), y, muniStr, { size: 7.5 });
+    if (variancePct == null) {
+      doc.text(edges[2] - textWidth('-', { size: 7.5 }), y, '-', { size: 7.5 });
+    } else {
+      const str = `${variancePct > 0 ? '+' : ''}${variancePct.toFixed(1)}%`;
+      const w = textWidth(str, { size: 7.5, bold: true });
+      const c = colorFor(Math.abs(variancePct));
+      doc.currentOps.push(`${c[0]} ${c[1]} ${c[2]} rg BT /F2 7.5 Tf ${(edges[2] - w).toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
+      doc.currentOps.push('0 0 0 rg'); // reset - see drawGroupedComparisonChart's note on "rg" being
+      // a persistent (not text-block-scoped) graphics-state parameter.
+    }
+    y -= 13;
+  }
+  return y - 8;
+}
+
 // One Tenant/Municipal/Recovery table (Rand + Qty) for one utility, `rows` newest-first.
 // `periodField` picks which municipal period pair applies ('elec' or 'water') - see views.js's
 // recoveryTable, this is the PDF's mirror of the same on-screen billing-range/day-count readout
@@ -919,11 +978,15 @@ function drawRecoverySection(doc, { propertyName, section, left, right }) {
     if (rows.length) {
       ty = drawUtilityCharts(doc, { x: left, y: ty, width: right - left, series: rows, randKey: u.randKey, qtyKey: u.qtyKey, qtyLabel: u.qtyLabel });
       ty -= 6;
+      // Meter-accuracy panel can land close to the bottom margin after two full-height charts -
+      // give it a fresh page rather than squeezing a half-cut table onto this one.
+      if (ty < 220) { doc.newPage(); ty = PAGE_H - 50; }
+      ty = drawMeterAccuracyPanel(doc, { rows: rowsDesc, left, right, y: ty, qtyKey: u.qtyKey, qtyLabel: u.qtyLabel, qtyDp: u.qtyDp, periodField: u.periodField });
     } else {
       doc.text(left, ty - 20, 'No overlapping billing/municipal data yet.', { size: 9 });
       ty -= 40;
     }
-    // The two charts above can run close to the bottom margin on a property with many months of
+    // The panel/charts above can run close to the bottom margin on a property with many months of
     // history - start the detail table fresh on the next page rather than cramming it in below.
     if (ty < 160) { doc.newPage(); ty = PAGE_H - 50; }
     ty = drawRecoveryTable(doc, { title: `${u.label} (newest first)`, rows: rowsDesc, left, right, y: ty, randKey: u.randKey, qtyKey: u.qtyKey, qtyLabel: u.qtyLabel, qtyDp: u.qtyDp, periodField: u.periodField });

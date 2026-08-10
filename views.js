@@ -1289,6 +1289,67 @@ function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qty
   </div>`;
 }
 
+// Meter-accuracy check: average daily usage for each side (using each side's own actual billing-
+// period length, not just the raw monthly total - a short/long/INTERIM-estimated period would
+// otherwise skew a straight reading comparison) and the % variance between the two. This answers a
+// different question from the Rand/quantity Recovery columns above (which show what was actually
+// billed) - it's asking whether HolmStone's own meter and the municipality's meter are reading the
+// same real consumption, i.e. whether either meter is within reasonable accuracy tolerance, or
+// whether the municipal side is running on an estimated/INTERIM read that month (see each
+// property's own municipal_import.js notes). Added 2026-08-10 after spotting AutoZone's water
+// readings swinging wildly on the municipal side (11-113 kL/day) while HolmStone's own meter stayed
+// flat (~25 kL/day) every month - a pattern that looks like municipal estimate-then-catch-up billing
+// rather than a real accuracy gap in either meter, but is exactly the kind of thing this panel is
+// meant to surface for a management-meeting conversation.
+function accuracyCell(variancePct) {
+  if (variancePct == null) return '<span class="text-slate-400">&mdash;</span>';
+  const abs = Math.abs(variancePct);
+  const cls = abs >= 25 ? 'text-red-600' : (abs >= 10 ? 'text-amber-600' : 'text-slate-600');
+  const sign = variancePct > 0 ? '+' : '';
+  return `<span class="${cls} font-medium">${sign}${variancePct.toFixed(1)}%</span>`;
+}
+
+function meterAccuracyPanel(rows, { qtyKey, qtyLabel, qtyDp = 2, periodField = 'elec' }) {
+  const trs = rows.map((r) => {
+    const site = r.site, muni = r.municipal;
+    if (!site || !muni) {
+      return `<tr class="border-t"><td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td><td class="px-3 py-1.5 text-sm text-right text-slate-400" colspan="3">no overlapping data</td></tr>`;
+    }
+    const ourDays = daysBetween(site.startDate, site.endDate);
+    const muniStart = periodField === 'water' ? (muni.waterStartDate || muni.startDate) : muni.startDate;
+    const muniEnd = periodField === 'water' ? (muni.waterEndDate || muni.endDate) : muni.endDate;
+    const muniDays = daysBetween(muniStart, muniEnd);
+    const ourQty = site[qtyKey], muniQty = muni[qtyKey];
+    const ourAvg = ourDays ? ourQty / ourDays : null;
+    const muniAvg = muniDays ? muniQty / muniDays : null;
+    const variancePct = muniQty ? ((ourQty - muniQty) / muniQty) * 100 : null;
+    return `<tr class="border-t">
+      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td>
+      <td class="px-3 py-1.5 text-sm text-right text-slate-600">${ourAvg != null ? `${fmtNum(ourAvg, qtyDp)} ${esc(qtyLabel)}/day` : '&mdash;'}</td>
+      <td class="px-3 py-1.5 text-sm text-right text-slate-600">${muniAvg != null ? `${fmtNum(muniAvg, qtyDp)} ${esc(qtyLabel)}/day` : '&mdash;'}</td>
+      <td class="px-3 py-1.5 text-sm text-right">${accuracyCell(variancePct)}</td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold text-sm flex items-center justify-between flex-wrap gap-2">
+      <span>Meter Accuracy &mdash; Avg Daily Usage (Ours vs Municipal)</span>
+      <span class="text-xs font-normal text-slate-400">&le;10% typical read tolerance &middot; &ge;25% flagged</span>
+    </div>
+    <table class="w-full">
+      <thead>
+        <tr class="text-left text-slate-500 bg-slate-50 text-xs">
+          <th class="px-3 py-1.5">Month</th>
+          <th class="px-3 py-1.5 text-right">Our Avg/Day</th>
+          <th class="px-3 py-1.5 text-right">Municipal Avg/Day</th>
+          <th class="px-3 py-1.5 text-right">Variance</th>
+        </tr>
+      </thead>
+      <tbody>${trs || `<tr><td class="px-4 py-6 text-slate-400" colspan="4">No data yet.</td></tr>`}</tbody>
+    </table>
+  </div>`;
+}
+
 // One section's chart + 3 tables (Electricity/Water/Sewer) - `title` is null for a single-section
 // property (nothing rendered above the chart, identical to this page's pre-multi-section markup),
 // or a heading like "Industrial Park (Industrial A & B accounts)" for one of City Deep's 3 grouped
@@ -1319,6 +1380,7 @@ function recoverySectionBlock({ title, rows }) {
   ${utilities.map((u) => `
   <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-6">${esc(u.label)}</h3>
   ${utilityCharts(rows, u)}
+  ${meterAccuracyPanel(rowsDesc, u)}
   ${recoveryTable(u.label, u.badgeClass, rowsDesc, u)}
   `).join('')}
   `;
