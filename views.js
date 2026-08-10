@@ -1333,7 +1333,7 @@ function meterAccuracyPanel(rows, { qtyKey, qtyLabel, qtyDp = 2, periodField = '
   return `
   <div class="bg-white rounded-lg border mb-4 overflow-hidden">
     <div class="px-4 py-2 border-b font-semibold text-sm flex items-center justify-between flex-wrap gap-2">
-      <span>Meter Accuracy &mdash; Avg Daily Usage (Ours vs Municipal)</span>
+      <span>Average Daily Usage</span>
       <span class="text-xs font-normal text-slate-400">&le;10% typical read tolerance &middot; &ge;25% flagged</span>
     </div>
     <table class="w-full">
