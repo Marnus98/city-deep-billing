@@ -781,8 +781,6 @@ function drawMeterAccuracyPanel(doc, { rows, left, right, y, qtyKey, qtyLabel, q
   const edges = [1, 2, 3].map((n) => left + 62 + numW * n);
 
   doc.text(left, y, 'Meter Accuracy - Avg Daily Usage (Ours vs Municipal)', { size: 9.5, bold: true });
-  const tolLabel = '<=10% typical tolerance, >=25% flagged';
-  doc.text(right - textWidth(tolLabel, { size: 7 }), y, tolLabel, { size: 7 });
   y -= 14;
   doc.text(left, y, 'Month', { bold: true, size: 7.5 });
   const heads = ['Our Avg/Day', 'Municipal Avg/Day', 'Variance'];
