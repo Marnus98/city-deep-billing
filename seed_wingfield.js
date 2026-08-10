@@ -13,9 +13,9 @@
 // tangled one.
 const fs = require('fs');
 const path = require('path');
-const { open, migrate } = require('./db');
+const { open, migrate } = require('../db');
 const calc = require('./calc_wingfield');
-const { seedUsers: seedUsersShared } = require('./shared_seed_users');
+const { seedUsers: seedUsersShared } = require('../shared_seed_users');
 
 let db;
 
@@ -283,14 +283,14 @@ const MONTH_FILES = [
   'wingfield_2025-07.json', 'wingfield_2025-08.json', 'wingfield_2025-09.json', 'wingfield_2025-10.json',
   'wingfield_2025-11.json', 'wingfield_2025-12.json', 'wingfield_2026-01.json', 'wingfield_2026-02.json',
   'wingfield_2026-03.json', 'wingfield_2026-04.json', 'wingfield_2026-05.json', 'wingfield_2026-06.json',
-  'wingfield_2026-07.json',
+  'wingfield_2026-07.json', 'wingfield_2026-08.json',
 ];
 
 function main(dbFile = 'wingfield.db') {
   db = open(dbFile);
   migrate(db);
   const months = MONTH_FILES
-    .map((f) => JSON.parse(fs.readFileSync(path.join(__dirname, 'wingfield_data', f), 'utf8')))
+    .map((f) => JSON.parse(fs.readFileSync(path.join(__dirname, 'imports', f), 'utf8')))
     .sort((a, b) => (a.period.start || '').localeCompare(b.period.start || ''));
   db.exec('BEGIN');
   try {

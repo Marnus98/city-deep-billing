@@ -657,16 +657,20 @@ function buildSiteBillingSlipPdf(data) {
 // statement for that label) has row.site/row.municipal null and row.recovery null; both the chart
 // and tables below render those as "no data" rather than plotting/summing a false zero.
 
-// Grouped two-bar-per-month chart (Tenant vs Municipal), with the recovery (site - municipal)
-// printed above each pair, colour-coded green/red - same visual language as drawTrendChart/
-// drawSingleSeriesChart (gridlines, month ticks) but two side-by-side bars per column instead of
-// one stacked or single bar.
-function drawGroupedComparisonChart(doc, { x, y, width, height, series }) {
+// Grouped two-bar-per-month chart (series A vs series B, e.g. Tenant vs Municipal), with the delta
+// (A - B) printed above each pair, colour-coded green/red - same visual language as drawTrendChart/
+// drawSingleSeriesChart (gridlines, month ticks) but two side-by-side bars per column instead of one
+// stacked or single bar. `getA`/`getB`/`getDelta` are accessor functions (rather than fixed keys) so
+// this one renderer covers both the Overall (combined Rand, values live at the series item's top
+// level - totalSiteRand etc.) and each utility's own Rand/consumption charts (values nested under
+// site/municipal/recovery) - generalised 2026-08-08 when the single combined chart was split into
+// one chart per utility, per Rand AND consumption, per the client's request.
+function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, getB, getDelta, hasData, formatValue = moneyShort, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
   const COLOR_A = [0.11, 0.16, 0.34]; // Tenant Billing - matches the Electricity navy used everywhere else
   const COLOR_B = [0.39, 0.45, 0.55]; // Municipal Statement - neutral slate, reads as "external/reference"
   const COLOR_POS = [0.05, 0.5, 0.2], COLOR_NEG = [0.75, 0.15, 0.15];
 
-  const values = series.flatMap((s) => [s.totalSiteRand, s.totalMunicipalRand]).filter((v) => v != null);
+  const values = series.flatMap((s) => (hasData(s) ? [getA(s), getB(s)] : [])).filter((v) => v != null);
   const maxVal = Math.max(1, ...values);
   const chartBottom = y - height;
   const n = series.length || 1;
@@ -674,7 +678,7 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series }) {
   const barWidth = Math.min(16, colWidth * 0.28);
   const gap = 5;
 
-  const legendItems = [['Tenant Billing', COLOR_A], ['Municipal Statement', COLOR_B]];
+  const legendItems = [[legendA, COLOR_A], [legendB, COLOR_B]];
   let lx = x + width - 210;
   const ly = y + 16;
   for (const [label, color] of legendItems) {
@@ -690,27 +694,28 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series }) {
     const v = (maxVal * t) / ticks;
     const ty = chartBottom + (height * t) / ticks;
     doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
-    const label = moneyShort(v);
+    const label = formatValue(v);
     doc.text(x - 6 - textWidth(label, { size: 6 }), ty - 3, label, { size: 6 });
   }
 
   series.forEach((s, i) => {
     const colCenter = x + i * colWidth + colWidth / 2;
-    if (s.site == null || s.municipal == null) {
+    if (!hasData(s)) {
       doc.text(colCenter - textWidth('no data', { size: 6 }) / 2, chartBottom + 4, 'no data', { size: 6 });
       doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
       return;
     }
-    const aH = (s.totalSiteRand / maxVal) * height;
-    const bH = (s.totalMunicipalRand / maxVal) * height;
+    const aVal = getA(s) || 0, bVal = getB(s) || 0;
+    const aH = (aVal / maxVal) * height;
+    const bH = (bVal / maxVal) * height;
     const aX = colCenter - gap / 2 - barWidth;
     const bX = colCenter + gap / 2;
     doc.rect(aX, chartBottom, barWidth, aH, { fill: COLOR_A });
     doc.rect(bX, chartBottom, barWidth, bH, { fill: COLOR_B });
 
-    const recovery = s.totalRecoveryRand;
-    const recColor = recovery >= 0 ? COLOR_POS : COLOR_NEG;
-    const recLabel = `${recovery >= 0 ? '+' : ''}${moneyShort(recovery)}`;
+    const delta = getDelta(s) || 0;
+    const recColor = delta >= 0 ? COLOR_POS : COLOR_NEG;
+    const recLabel = `${delta >= 0 ? '+' : ''}${formatValue(delta)}`;
     const topH = Math.max(aH, bH);
     // doc.text() has no colour param (every other label in this app is plain black) - push the
     // coloured text op directly, same "rg" fill-colour operator doc.rect()'s fill uses, since Tj
@@ -725,6 +730,42 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series }) {
   });
 
   doc.line(x, chartBottom, x + width, chartBottom, 0.75);
+}
+
+const hasBothSidesPdf = (s) => s.site != null && s.municipal != null;
+
+// Draws the Overall (combined Electricity+Water+Sewer Rand) chart, same figure this page always
+// showed before the per-utility charts below were added.
+function drawOverallChart(doc, { x, y, width, height, series }) {
+  drawGroupedComparisonChart(doc, {
+    x, y, width, height, series,
+    getA: (s) => s.totalSiteRand, getB: (s) => s.totalMunicipalRand, getDelta: (s) => s.totalRecoveryRand,
+    hasData: hasBothSidesPdf, formatValue: moneyShort,
+  });
+}
+
+// One utility's Rand chart + consumption chart, stacked with their own mini-heading each - same
+// "one chart, own axis, own heading, stacked" layout drawTripleTrendCharts/drawConsumptionTrendCharts
+// already use for the billing slip's own trend page, reused here for visual consistency between the
+// two documents.
+function drawUtilityCharts(doc, { x, y, width, series, randKey, qtyKey, qtyLabel }) {
+  const chartHeight = 130;
+  let cy = y;
+  doc.text(x, cy, 'Rand (Excl VAT): Tenant vs Municipal', { size: 9.5, bold: true }); cy -= 18;
+  drawGroupedComparisonChart(doc, {
+    x: x + 46, y: cy, width: width - 46, height: chartHeight, series,
+    getA: (s) => s.site && s.site[randKey], getB: (s) => s.municipal && s.municipal[randKey], getDelta: (s) => s.recovery && s.recovery[randKey],
+    hasData: hasBothSidesPdf, formatValue: moneyShort,
+  });
+  cy -= chartHeight + 14 + 26;
+  doc.text(x, cy, `Consumption (${qtyLabel}): Tenant vs Municipal`, { size: 9.5, bold: true }); cy -= 18;
+  drawGroupedComparisonChart(doc, {
+    x: x + 46, y: cy, width: width - 46, height: chartHeight, series,
+    getA: (s) => s.site && s.site[qtyKey], getB: (s) => s.municipal && s.municipal[qtyKey], getDelta: (s) => s.recovery && s.recovery[qtyKey],
+    hasData: hasBothSidesPdf, formatValue: (v) => qtyShort(v, qtyLabel),
+  });
+  cy -= chartHeight + 14 + 26;
+  return cy;
 }
 
 // One Tenant/Municipal/Recovery table (Rand + Qty) for one utility, `rows` newest-first.
@@ -825,42 +866,70 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
 // the title is threaded into both page headers so a printed section is self-identifying on its own
 // (a client flipping through a stack of hard copies from the meeting can tell Industrial Park's
 // pages from Mini Park's without the cover page in hand).
-function drawRecoverySection(doc, { propertyName, section, left, right }) {
-  const rows = section.rows || [];
+// Shared page header (logo, property name, subtitle, section title if any, rule) for every page in
+// a Recovery section - factored out 2026-08-08 so the Overall page and each utility's own page
+// (below) all get an identical header instead of copy-pasting it 4x.
+function drawRecoveryPageHeader(doc, { propertyName, section, left, right, subtitle }) {
   let y = PAGE_H - 50;
-
   doc.image(right - 90, PAGE_H - 32 - 90 * (LOGO.height / LOGO.width), 90, 90 * (LOGO.height / LOGO.width), 'Logo');
   const logoH = 90 * (LOGO.height / LOGO.width);
-
   doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
-  doc.text(left, y, 'Recovery - Tenant Billing vs Municipal Statement', { size: 10 }); y -= 6;
+  doc.text(left, y, subtitle, { size: 10 }); y -= 6;
   if (section.title) { doc.text(left, y, section.title, { size: 10, bold: true }); y -= 14; }
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 16;
+  return y;
+}
+
+// Draws a section's Overall page (combined Electricity+Water+Sewer Rand chart), then one page per
+// utility (its own Rand chart + its own consumption chart, then the existing Tenant/Municipal/
+// Recovery table underneath) - split out 2026-08-08 from the old "one overview chart + one detail
+// page with all 3 tables" layout, per the client's request to see each utility's own comparison, not
+// just the combined total. `section.title` is null for a single-section property (Wingfield, every
+// flat_site property) - omitting it reproduces this function's pre-split output on each page;
+// City Deep's 3 grouped sections (see properties.js's recoveryMultiSection flag) get the section
+// title threaded into every page's header so a printed section is self-identifying on its own.
+function drawRecoverySection(doc, { propertyName, section, left, right }) {
+  const rows = section.rows || [];
+  const rowsDesc = [...rows].reverse();
+
+  // Page 1: Overall.
+  let y = drawRecoveryPageHeader(doc, { propertyName, section, left, right, subtitle: 'Recovery - Overall (Electricity + Water + Sewer)' });
   doc.text(left, y, 'Property Rates, Refuse and Sundry are excluded from every figure below - real municipal-only', { size: 7.5 });
   y -= 10;
-  doc.text(left, y, 'costs, but never billed through to the client (see flat_site_recovery.js).', { size: 7.5 });
+  doc.text(left, y, 'costs, but never billed through to the client.', { size: 7.5 });
   y -= 26;
-
   if (rows.length) {
-    drawGroupedComparisonChart(doc, { x: left + 46, y, width: right - left - 46, height: 220, series: rows });
+    drawOverallChart(doc, { x: left + 46, y, width: right - left - 46, height: 220, series: rows });
   } else {
     doc.text(left, y - 20, 'No overlapping billing/municipal data yet.', { size: 9 });
   }
 
-  doc.newPage();
-  let ty = PAGE_H - 50;
-  doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
-  doc.text(left, ty, (section.title ? `${section.title} - ` : '') + 'Recovery Detail (newest first)', { size: 11, bold: true }); ty -= 8;
-  doc.line(left, ty, right, ty); ty -= 24;
+  // One page per utility: Rand chart + consumption chart, then that utility's detail table.
+  const utilities = [
+    { label: 'Electricity', randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', qtyDp: 0, periodField: 'elec' },
+    { label: 'Water', randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' },
+    { label: 'Sewer', randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' },
+  ];
 
-  const rowsDesc = [...rows].reverse();
-  ty = drawRecoveryTable(doc, { title: 'Electricity', rows: rowsDesc, left, right, y: ty, randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', qtyDp: 0, periodField: 'elec' });
-  if (ty > 120) { ty -= 22; } else { doc.newPage(); ty = PAGE_H - 50; }
-  ty = drawRecoveryTable(doc, { title: 'Water', rows: rowsDesc, left, right, y: ty, randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' });
-  if (ty > 120) { ty -= 22; } else { doc.newPage(); ty = PAGE_H - 50; }
-  ty = drawRecoveryTable(doc, { title: 'Sewer', rows: rowsDesc, left, right, y: ty, randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', qtyDp: 2, periodField: 'water' });
-  return ty;
+  let lastTy = y;
+  for (const u of utilities) {
+    doc.newPage();
+    let ty = drawRecoveryPageHeader(doc, { propertyName, section, left, right, subtitle: `Recovery - ${u.label}` });
+    if (rows.length) {
+      ty = drawUtilityCharts(doc, { x: left, y: ty, width: right - left, series: rows, randKey: u.randKey, qtyKey: u.qtyKey, qtyLabel: u.qtyLabel });
+      ty -= 6;
+    } else {
+      doc.text(left, ty - 20, 'No overlapping billing/municipal data yet.', { size: 9 });
+      ty -= 40;
+    }
+    // The two charts above can run close to the bottom margin on a property with many months of
+    // history - start the detail table fresh on the next page rather than cramming it in below.
+    if (ty < 160) { doc.newPage(); ty = PAGE_H - 50; }
+    ty = drawRecoveryTable(doc, { title: `${u.label} (newest first)`, rows: rowsDesc, left, right, y: ty, randKey: u.randKey, qtyKey: u.qtyKey, qtyLabel: u.qtyLabel, qtyDp: u.qtyDp, periodField: u.periodField });
+    lastTy = ty;
+  }
+  return lastTy;
 }
 
 // `data.sections` is always an array of { title, rows } (see server.js's

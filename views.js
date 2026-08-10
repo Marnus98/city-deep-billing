@@ -1132,11 +1132,26 @@ function recoveryQtyCell(v, dp = 2) {
   return `<span class="${cls} font-medium">${sign}${fmtNum(v, dp)}</span>`;
 }
 
-function recoveryChart(rows) {
-  const maxVal = Math.max(1, ...rows.flatMap((r) => [r.totalSiteRand, r.totalMunicipalRand]).filter((v) => v != null));
-  const chartHeight = 180;
+function shortQty(n, unit) {
+  const v = Number(n || 0);
+  const neg = v < 0;
+  const abs = Math.abs(v);
+  const s = abs >= 1000 ? `${(abs / 1000).toFixed(abs >= 100000 ? 0 : 1)}k` : abs.toFixed(abs >= 10 ? 0 : 1);
+  return (neg ? '-' : '') + s + ' ' + unit;
+}
+
+// Generic grouped two-bar-per-month chart (series A vs series B, e.g. Tenant vs Municipal), with the
+// delta (A - B) printed above each pair, colour-coded green/red. `getA`/`getB`/`getDelta` are
+// accessor functions rather than fixed keys so this one renderer covers both the Overall (combined
+// Rand, values live at the row's top level - totalSiteRand etc.) and each utility's own Rand/
+// consumption charts below (values nested under row.site/row.municipal/row.recovery) - added
+// 2026-08-08 when the single combined chart was split into one chart per utility, per Rand AND
+// consumption, per the client's request for a fuller Recovery picture.
+function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
+  const maxVal = Math.max(1, ...rows.flatMap((r) => (hasData(r) ? [getA(r), getB(r)] : [])).filter((v) => v != null));
+  const chartHeight = 160;
   const columns = rows.map((r) => {
-    if (!r.site || !r.municipal) {
+    if (!hasData(r)) {
       return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:64px">
         <div class="text-xs text-slate-400 mb-1" style="height:${chartHeight}px" >
           <div class="flex items-end justify-center h-full">no data</div>
@@ -1144,40 +1159,68 @@ function recoveryChart(rows) {
         <div class="text-xs text-slate-500 mt-2">${shortMonthLabel(r.label)}</div>
       </div>`;
     }
-    const siteH = Math.max(1, Math.round((r.totalSiteRand / maxVal) * chartHeight));
-    const muniH = Math.max(1, Math.round((r.totalMunicipalRand / maxVal) * chartHeight));
-    const recovery = r.totalRecoveryRand;
-    const recoveryCls = recovery >= 0 ? 'text-green-600' : 'text-red-600';
-    const sign = recovery >= 0 ? '+' : '';
+    const aVal = getA(r) || 0, bVal = getB(r) || 0;
+    const aH = Math.max(1, Math.round((aVal / maxVal) * chartHeight));
+    const bH = Math.max(1, Math.round((bVal / maxVal) * chartHeight));
+    const delta = getDelta(r) || 0;
+    const deltaCls = delta >= 0 ? 'text-green-600' : 'text-red-600';
+    const sign = delta >= 0 ? '+' : '';
     return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:64px">
-      <div class="text-[11px] font-semibold ${recoveryCls} mb-1">${sign}${shortMoney(recovery)}</div>
+      <div class="text-[11px] font-semibold ${deltaCls} mb-1">${sign}${formatValue(delta)}</div>
       <div class="flex items-end gap-1.5" style="height:${chartHeight}px">
         <div class="flex flex-col items-center justify-end h-full">
-          <div class="text-[9px] text-slate-500 mb-0.5">${shortMoney(r.totalSiteRand)}</div>
-          <div class="rounded-t-sm" style="width:18px;height:${siteH}px;background:#1c2957"></div>
+          <div class="text-[9px] text-slate-500 mb-0.5">${formatValue(aVal)}</div>
+          <div class="rounded-t-sm" style="width:18px;height:${aH}px;background:#1c2957"></div>
         </div>
         <div class="flex flex-col items-center justify-end h-full">
-          <div class="text-[9px] text-slate-500 mb-0.5">${shortMoney(r.totalMunicipalRand)}</div>
-          <div class="rounded-t-sm" style="width:18px;height:${muniH}px;background:#64748b"></div>
+          <div class="text-[9px] text-slate-500 mb-0.5">${formatValue(bVal)}</div>
+          <div class="rounded-t-sm" style="width:18px;height:${bH}px;background:#64748b"></div>
         </div>
       </div>
       <div class="text-xs text-slate-500 mt-2">${shortMonthLabel(r.label)}</div>
     </div>`;
   }).join('');
   return `
-  <div class="bg-white rounded-lg border p-4 mb-6">
-    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-      <div class="font-semibold">Monthly Total: Tenant Billing vs Municipal Statement</div>
-      <div class="flex items-center gap-4 text-xs text-slate-500">
-        <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#1c2957"></span>Tenant Billing</span>
-        <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#64748b"></span>Municipal Statement</span>
-        <span class="text-slate-400">&middot;</span>
-        <span class="text-green-600 font-medium">Green</span>&nbsp;= over-recovery,
-        <span class="text-red-600 font-medium">Red</span>&nbsp;= under-recovery
-      </div>
-    </div>
-    <div class="flex items-end gap-2 border-b pb-1 overflow-x-auto">${columns}</div>
+  <div class="flex items-center justify-end flex-wrap gap-4 text-xs text-slate-500 mb-3">
+    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#1c2957"></span>${esc(legendA)}</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#64748b"></span>${esc(legendB)}</span>
+    <span class="text-slate-400">&middot;</span>
+    <span class="text-green-600 font-medium">Green</span>&nbsp;= over-recovery,
+    <span class="text-red-600 font-medium">Red</span>&nbsp;= under-recovery
+  </div>
+  <div class="flex items-end gap-2 border-b pb-1 overflow-x-auto">${columns}</div>`;
+}
+
+function chartCard(titleText, chartHtml) {
+  return `
+  <div class="bg-white rounded-lg border p-4 mb-4">
+    <div class="font-semibold mb-3">${esc(titleText)}</div>
+    ${chartHtml}
   </div>`;
+}
+
+const hasBothSides = (r) => r.site != null && r.municipal != null;
+
+function overallChart(rows) {
+  return chartCard('Monthly Total: Tenant Billing vs Municipal Statement (Electricity + Water + Sewer)', barChart(rows, {
+    getA: (r) => r.totalSiteRand, getB: (r) => r.totalMunicipalRand, getDelta: (r) => r.totalRecoveryRand,
+    hasData: hasBothSides, formatValue: shortMoney,
+  }));
+}
+
+// One utility's Rand chart + consumption chart, stacked (same "one chart, own axis, own heading"
+// pattern pdf.js's drawTripleTrendCharts/drawConsumptionTrendCharts already use for the billing
+// slip's own trend page, reused here for consistency between the two documents).
+function utilityCharts(rows, { randKey, qtyKey, qtyLabel }) {
+  const randChart = chartCard('Rand (Excl VAT): Tenant vs Municipal', barChart(rows, {
+    getA: (r) => r.site && r.site[randKey], getB: (r) => r.municipal && r.municipal[randKey], getDelta: (r) => r.recovery && r.recovery[randKey],
+    hasData: hasBothSides, formatValue: shortMoney,
+  }));
+  const qtyChart = chartCard(`Consumption (${qtyLabel}): Tenant vs Municipal`, barChart(rows, {
+    getA: (r) => r.site && r.site[qtyKey], getB: (r) => r.municipal && r.municipal[qtyKey], getDelta: (r) => r.recovery && r.recovery[qtyKey],
+    hasData: hasBothSides, formatValue: (v) => shortQty(v, qtyLabel),
+  }));
+  return randChart + qtyChart;
 }
 
 // Compact "Ours: ... / Municipal: ..." two-line period readout for one Recovery table row - printed
@@ -1250,14 +1293,34 @@ function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qty
 // property (nothing rendered above the chart, identical to this page's pre-multi-section markup),
 // or a heading like "Industrial Park (Industrial A & B accounts)" for one of City Deep's 3 grouped
 // sections - see properties.js's recoveryMultiSection flag and city-deep/recovery_groups.js.
+// One section's full Recovery layout: an "Overall" chart (combined Electricity+Water+Sewer Rand,
+// same figure as before this was split up), then one block per utility - its own Rand chart, its
+// own consumption chart, then the existing Tenant/Municipal/Recovery table underneath (unchanged) -
+// added 2026-08-08 per the client's request to see each utility's own comparison, not just the
+// combined total. `title` is null for a single-section property (nothing rendered above "Overall"),
+// or a heading like "Industrial Park (Industrial A & B accounts)" for one of City Deep's 3 grouped
+// sections - see properties.js's recoveryMultiSection flag and city-deep/recovery_groups.js.
 function recoverySectionBlock({ title, rows }) {
+  if (!rows.length) {
+    return `
+    ${title ? `<h2 class="text-lg font-semibold mt-6 mb-3 first:mt-0">${esc(title)}</h2>` : ''}
+    <div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No overlapping billing/municipal data yet.</div>`;
+  }
   const rowsDesc = [...rows].reverse();
+  const utilities = [
+    { label: 'Electricity', badgeClass: '', randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', periodField: 'elec' },
+    { label: 'Water', badgeClass: 'bg-green-50', randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', periodField: 'water' },
+    { label: 'Sewer', badgeClass: 'bg-green-50', randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', periodField: 'water' },
+  ];
   return `
-  ${title ? `<h2 class="text-lg font-semibold mt-6 mb-3 first:mt-0">${esc(title)}</h2>` : ''}
-  ${rows.length ? recoveryChart(rows) : '<div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No overlapping billing/municipal data yet.</div>'}
-  ${recoveryTable('Electricity', '', rowsDesc, { randKey: 'elecRand', qtyKey: 'elecKwh', qtyLabel: 'kWh', periodField: 'elec' })}
-  ${recoveryTable('Water', 'bg-green-50', rowsDesc, { randKey: 'waterRand', qtyKey: 'waterKl', qtyLabel: 'kL', periodField: 'water' })}
-  ${recoveryTable('Sewer', 'bg-green-50', rowsDesc, { randKey: 'sewerRand', qtyKey: 'sewerKl', qtyLabel: 'kL', periodField: 'water' })}
+  ${title ? `<h2 class="text-xl font-bold mt-8 mb-3 first:mt-0">${esc(title)}</h2>` : ''}
+  <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-2 first:mt-0">Overall</h3>
+  ${overallChart(rows)}
+  ${utilities.map((u) => `
+  <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-6">${esc(u.label)}</h3>
+  ${utilityCharts(rows, u)}
+  ${recoveryTable(u.label, u.badgeClass, rowsDesc, u)}
+  `).join('')}
   `;
 }
 
@@ -1270,7 +1333,7 @@ function recoveryPage({ user, sections, propertyName }) {
   <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
     <div>
       <h1 class="text-2xl font-bold">Recovery</h1>
-      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)} - tenant billing vs the real municipal statement, month by month. Property Rates, Refuse and Sundry are excluded on both sides (never billed through to the client) - see flat_site_recovery.js / tenant_recovery.js.</p>
+      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)} - tenant billing vs the real municipal statement, month by month. Property Rates, Refuse and Sundry are excluded on both sides (never billed through to the client).</p>
     </div>
     <a href="/recovery-pdf" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download PDF</a>
   </div>
