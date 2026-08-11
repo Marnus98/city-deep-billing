@@ -1357,6 +1357,42 @@ function meterAccuracyPanel(rows, { qtyKey, qtyLabel, qtyDp = 2, periodField = '
   </div>`;
 }
 
+// Solar plant owner cost panel (City Deep's Industrial Park and Mini Park sections only - see
+// city-deep/solar_cost.js) - added 2026-08-11. HolmStone already bills tenants for solar-sourced
+// electricity as part of their normal charge, but the property still has to pay the solar plant
+// owner (Capital Propfund) for that same energy - a real cost the Overall Recovery figure above
+// this panel is already net of (see tenant_recovery.js's buildRecoveryRowsForTenants), but which
+// would otherwise be invisible - this panel exists purely to show the client WHY the number is
+// lower, not to compute anything itself. Only rendered when at least one row actually carries a
+// `solarCost` (i.e. this section was given a solar-cost lookup at all - Rittle's is always 0 so it
+// never renders there); a month within that range with no invoice yet still shows R0, flagged, so a
+// genuine gap is visible rather than silently hidden.
+function solarCostPanel(rowsDesc) {
+  // Only show this panel where at least one month has an actual invoiced amount - sections with no
+  // solar installation (e.g. Rittle) resolve solarCost to a constant 0 for every row, which would
+  // otherwise render an all-"no invoice yet" panel implying solar cost is merely pending there.
+  if (!rowsDesc.some((r) => r.solarCost > 0)) return '';
+  const trs = rowsDesc.map((r) => {
+    if (r.solarCost == null) return '';
+    const noInvoice = r.solarCost === 0;
+    return `<tr class="border-t">
+      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td>
+      <td class="px-3 py-1.5 text-sm text-right ${noInvoice ? 'text-slate-400' : 'text-red-600 font-medium'}">${noInvoice ? 'no invoice yet' : '-' + money(r.solarCost)}</td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold text-sm">Solar Cost (paid to the solar plant owner)</div>
+    <p class="px-4 pt-2 text-xs text-slate-500">Tenants are already billed for solar-sourced electricity as part of their normal charge, but the property separately pays the solar plant owner for that same energy each month - this cost is deducted from the Overall Recovery total above (not shown separately anywhere else on this page).</p>
+    <table class="w-full mt-2">
+      <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+        <th class="px-3 py-1.5">Month</th><th class="px-3 py-1.5 text-right">Solar Cost (Excl VAT)</th>
+      </tr></thead>
+      <tbody>${trs}</tbody>
+    </table>
+  </div>`;
+}
+
 // One section's chart + 3 tables (Electricity/Water/Sewer) - `title` is null for a single-section
 // property (nothing rendered above the chart, identical to this page's pre-multi-section markup),
 // or a heading like "Industrial Park (Industrial A & B accounts)" for one of City Deep's 3 grouped
@@ -1384,6 +1420,7 @@ function recoverySectionBlock({ title, rows }) {
   ${title ? `<h2 class="text-xl font-bold mt-8 mb-3 first:mt-0">${esc(title)}</h2>` : ''}
   <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-2 first:mt-0">Overall</h3>
   ${overallChart(rows)}
+  ${solarCostPanel(rowsDesc)}
   ${utilities.map((u) => `
   <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-6">${esc(u.label)}</h3>
   ${utilityCharts(rows, u)}

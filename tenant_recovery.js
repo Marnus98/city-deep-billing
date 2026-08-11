@@ -228,7 +228,17 @@ function buildRecoveryRows(db, siteName, { limit = 12 } = {}) {
 // tenant-name list (siteSideForTenants) instead of a single sites.name match - the municipal side
 // still resolves via `siteNameForMunicipal` against SITE_MAP exactly as before. See
 // city-deep/recovery_groups.js for why City Deep needs this instead of plain buildRecoveryRows.
-function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantNames, { limit = 12 } = {}) {
+//
+// `solarCostForLabel` (optional) - a (periodLabel) => Rand function, see city-deep/solar_cost.js -
+// added 2026-08-11 for City Deep's Industrial Park and Mini Park sections: the solar plant owner
+// (Capital Propfund) invoices the property separately for the solar energy tenants already got
+// billed for as part of their normal electricity charge, so that cost needs to come OFF the
+// recovery total, not just off electricity - if it only reduced row.recovery.elecRand it would
+// distort the electricity meter-accuracy comparison, which is about municipal billing accuracy, not
+// this separate real cost. When a row has one, `row.solarCost` is always present (0 if nothing was
+// invoiced that month) and totalRecoveryRand is net of it; when omitted entirely (every property
+// except City Deep), row.solarCost is undefined and nothing here changes from before.
+function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantNames, { limit = 12, solarCostForLabel } = {}) {
   const periods = all(db, 'SELECT * FROM billing_periods ORDER BY start_date').slice(-limit);
   return periods.map((p) => {
     const site = tenantNames.length ? siteSideForTenants(db, tenantNames, p.id) : null;
@@ -242,7 +252,12 @@ function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantNames, { li
       };
       row.totalSiteRand = site.elecRand + site.waterRand + site.sewerRand;
       row.totalMunicipalRand = municipal.elecRand + municipal.waterRand + municipal.sewerRand;
-      row.totalRecoveryRand = row.totalSiteRand - row.totalMunicipalRand;
+      if (solarCostForLabel) {
+        row.solarCost = solarCostForLabel(p.label) || 0;
+        row.totalRecoveryRand = row.totalSiteRand - row.totalMunicipalRand - row.solarCost;
+      } else {
+        row.totalRecoveryRand = row.totalSiteRand - row.totalMunicipalRand;
+      }
     }
     return row;
   });

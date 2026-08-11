@@ -977,6 +977,41 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
   return y;
 }
 
+// Solar plant owner cost panel - PDF mirror of views.js's solarCostPanel, City Deep's Industrial
+// Park and Mini Park sections only (see city-deep/solar_cost.js). Purely informational - the Overall
+// Recovery total above it is already net of this cost (see tenant_recovery.js's
+// buildRecoveryRowsForTenants) - this just shows the client why. Only called when at least one row
+// carries a `solarCost` at all (Rittle's is always 0, so this never gets called there - see the
+// caller's own `some()` guard).
+function drawSolarCostPanel(doc, { rows, left, right, y }) {
+  doc.text(left, y, 'Solar Cost (paid to the solar plant owner)', { size: 9.5, bold: true }); y -= 12;
+  doc.text(left, y, 'Tenants are already billed for solar-sourced electricity as part of their normal charge, but the', { size: 7 }); y -= 9;
+  doc.text(left, y, 'property separately pays the solar plant owner for that same energy - this is deducted from the', { size: 7 }); y -= 9;
+  doc.text(left, y, 'Overall Recovery total above, not shown separately anywhere else in this document.', { size: 7 }); y -= 14;
+
+  const widths = [1500, 3560];
+  const edges = [left + 62 + widths[0], right];
+  doc.text(left, y, 'Month', { bold: true, size: 7.5 });
+  doc.text(edges[1] - textWidth('Solar Cost (Excl VAT)', { bold: true, size: 7.5 }), y, 'Solar Cost (Excl VAT)', { bold: true, size: 7.5 });
+  y -= 4; doc.line(left, y, right, y); y -= 11;
+  for (const r of rows) {
+    if (r.solarCost == null) continue;
+    if (y < 90) { doc.newPage(); y = PAGE_H - 50; }
+    doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
+    if (r.solarCost === 0) {
+      const str = 'no invoice yet';
+      doc.text(right - textWidth(str, { size: 7.5 }), y, str, { size: 7.5 });
+    } else {
+      const str = `-${money(r.solarCost)}`;
+      const w = textWidth(str, { size: 7.5, bold: true });
+      doc.currentOps.push(`0.75 0.15 0.15 rg BT /F2 7.5 Tf ${(right - w).toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
+      doc.currentOps.push('0 0 0 rg');
+    }
+    y -= 13;
+  }
+  return y - 8;
+}
+
 // Draws one section's overview page (chart) + detail page(s) (Electricity/Water/Sewer tables).
 // `section.title` is null for a single-section property (Wingfield, every flat_site property) -
 // omitting it reproduces this function's pre-multi-section output exactly. For City Deep's 3
@@ -1019,6 +1054,14 @@ function drawRecoverySection(doc, { propertyName, section, left, right }) {
   y -= 26;
   if (rows.length) {
     drawOverallChart(doc, { x: left + 46, y, width: right - left - 46, height: 220, series: rows });
+    y -= 220;
+    // Only show this panel where at least one month has an actual invoiced amount - see the matching
+    // comment in views.js's solarCostPanel for why solarCost > 0 (not != null) is the right guard.
+    if (rows.some((r) => r.solarCost > 0)) {
+      y -= 26;
+      if (y < 160) { doc.newPage(); y = PAGE_H - 50; }
+      y = drawSolarCostPanel(doc, { rows: rowsDesc, left, right, y });
+    }
   } else {
     doc.text(left, y - 20, 'No overlapping billing/municipal data yet.', { size: 9 });
   }

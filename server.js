@@ -18,6 +18,7 @@ const calcFlatSite = require('./calc_flat_site');
 const flatSiteRecovery = require('./flat_site_recovery');
 const tenantRecovery = require('./tenant_recovery');
 const cityDeepRecoveryGroups = require('./city-deep/recovery_groups');
+const solarCost = require('./city-deep/solar_cost');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -71,6 +72,9 @@ for (const prop of properties) {
 // seed_wingfield_municipal.js).
 require('./city-deep/seed_municipal').run('city-deep.db');
 require('./wingfield/seed_wingfield_municipal').run('wingfield.db');
+// The solar plant owner's own monthly invoices to the property (Industrial Park + Mini Park only -
+// see city-deep/solar_cost.js) - own de-dup key (sub_site + period_label), always safe to re-run.
+require('./city-deep/solar_cost').run('city-deep.db');
 // 8 Field Street's historical electricity months (Jul 2025 - Jun 2026) - own de-dup key (label),
 // always safe to re-run; see field-street/import_history.js for why it never touches water/sewer.
 require('./field-street/import_history').run('field-street.db');
@@ -818,8 +822,11 @@ function currentPropRecoverySections(user) {
     const db = currentDb();
     return cityDeepRecoveryGroups.SECTIONS.map((sec) => ({
       title: sec.title,
+      // Industrial Park and Mini Park each get a solar-cost deduction (see city-deep/solar_cost.js);
+      // Rittle's own solarCostForSection resolves to an always-0 function, so this is harmless there.
       rows: tenantRecovery.buildRecoveryRowsForTenants(
-        db, sec.siteNameForMunicipal, cityDeepRecoveryGroups.tenantNamesForSection(db, sec.key), { limit: 12 },
+        db, sec.siteNameForMunicipal, cityDeepRecoveryGroups.tenantNamesForSection(db, sec.key),
+        { limit: 12, solarCostForLabel: solarCost.solarCostForSection(db, sec.key) },
       ),
     }));
   }
