@@ -454,8 +454,12 @@ function drawLineItemsTable(doc, items, left, right, y) {
 // buildBillingSlipPdf: a breakdown table on page 1, a trailing trend chart on page 2 reusing the
 // exact same drawTrendChart the tenant bill uses, just fed the municipal Electricity/Water/
 // Sanitation totals instead of tenant-billed ones.
-function buildMunicipalStatementPdf(data) {
-  const doc = new PDFDoc();
+// Draws just the summary/total content of one tenant-model municipal account statement (header,
+// account/statement/tariff details, Electricity/Water/Sanitation/Refuse/Sundry category table,
+// TOTAL CHARGES) - no trend-chart page. Factored out of buildMunicipalStatementPdf 2026-08-11, same
+// reasoning as drawSiteBillingSummaryPage above: lets buildMunicipalStatementsCombinedPdf print
+// every account's every month in one file without dragging along each statement's own trend page.
+function drawMunicipalStatementSummaryPage(doc, data) {
   const left = 42, right = PAGE_W - 42;
   let y = PAGE_H - 50;
   const propertyName = (data.propertyName || 'CITY DEEP INDUSTRIAL PARK').toUpperCase();
@@ -519,6 +523,14 @@ function buildMunicipalStatementPdf(data) {
     y -= 14;
   }
   doc.text(left, 30, `Generated: ${data.generatedAt}. This is a reformatted summary of the ${municipalityName} statement, not a replacement invoice.`, { size: 7 });
+}
+
+function buildMunicipalStatementPdf(data) {
+  const doc = new PDFDoc();
+  const left = 42, right = PAGE_W - 42;
+  const propertyName = (data.propertyName || 'CITY DEEP INDUSTRIAL PARK').toUpperCase();
+
+  drawMunicipalStatementSummaryPage(doc, data);
 
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
     doc.newPage();
@@ -530,6 +542,21 @@ function buildMunicipalStatementPdf(data) {
     doc.text(left, 30, `Trailing ${data.monthlyTrend.length}-statement view, ending ${data.statementFor}. Figures exclude VAT - Sanitation shown separately from Water.`, { size: 7 });
   }
 
+  return doc.build();
+}
+
+// One page per statement, summary-only (no trend page) - combined "print every account's every
+// month at once" document, mirroring buildSiteBillingSlipsCombinedPdf above but for tenant-model
+// municipal statements (City Deep, Wingfield - see server.js's /municipal-pdf-all). `entries` is
+// expected grouped by account then chronological within each account (see the route for exactly
+// how they're ordered) so a printed stack reads as one account's full history, then the next.
+function buildMunicipalStatementsCombinedPdf(entries) {
+  const doc = new PDFDoc();
+  entries.forEach((data, i) => {
+    if (i > 0) doc.newPage();
+    drawMunicipalStatementSummaryPage(doc, data);
+  });
+  if (!entries.length) drawMunicipalStatementSummaryPage(doc, { accountLabel: '-', statementFor: '-', totalExclVat: 0, totalVat: 0, grandTotalInclVat: 0, generatedAt: new Date().toISOString() });
   return doc.build();
 }
 
@@ -569,13 +596,20 @@ function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
   return { y, xCost };
 }
 
-function buildSiteBillingSlipPdf(data) {
-  const doc = new PDFDoc();
+// Draws just the summary/total content of a flat_site billing slip or municipal account statement
+// (header, optional Municipal Charges bucket, Electrical, Water & Sanitation, Sub Total/VAT/TOTAL
+// PAYABLE) - no trend-chart pages. Factored out of buildSiteBillingSlipPdf 2026-08-11 so a combined
+// "print every month's summary in one file" PDF (see buildSiteBillingSlipsCombinedPdf below) can
+// reuse the exact same page-1 layout without dragging along each slip's own trend pages, which
+// would otherwise turn a 12-month combined print into a 30+ page document. Assumes the caller has
+// already registered the Logo image on `doc` (buildSiteBillingSlipPdf does this once per document;
+// the combined builder does it once up front too, since PDFDoc's registerImage is a document-level,
+// not page-level, operation).
+function drawSiteBillingSummaryPage(doc, data) {
   const left = 42, right = PAGE_W - 42;
   let y = PAGE_H - 50;
   const propertyName = (data.propertyName || '8 FIELD STREET').toUpperCase();
 
-  doc.registerImage('Logo', LOGO);
   const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
   doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
 
@@ -631,6 +665,15 @@ function buildSiteBillingSlipPdf(data) {
   const totalStr = money(data.calc.total);
   doc.text(right - 220, y, 'TOTAL PAYABLE', { bold: true, size: 12 });
   doc.text(right - textWidth(totalStr, { size: 12, bold: true }), y, totalStr, { bold: true, size: 12 }); y -= 20;
+}
+
+function buildSiteBillingSlipPdf(data) {
+  const doc = new PDFDoc();
+  const left = 42, right = PAGE_W - 42;
+  const propertyName = (data.propertyName || '8 FIELD STREET').toUpperCase();
+
+  doc.registerImage('Logo', LOGO);
+  drawSiteBillingSummaryPage(doc, data);
 
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
     doc.newPage();
@@ -648,6 +691,24 @@ function buildSiteBillingSlipPdf(data) {
     drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend, maxOverrides: data.axisMaxOverrides && data.axisMaxOverrides.consumption });
   }
 
+  return doc.build();
+}
+
+// One page per entry, summary-only (no trend-chart pages) - the "print every month at once instead
+// of downloading each one separately" combined document, added 2026-08-11. Used for BOTH flat_site
+// billing slips and flat_site municipal account statements (see server.js's /site-billing-pdf-all
+// and /municipal-billing-pdf-all) since both already share buildSiteBillingSlipPdf's single-page
+// layout - only the `subtitle` on each entry's data object differs. `entries` is expected oldest-
+// first (chronological) so a printed/bound stack reads in natural order; an empty array still
+// produces a valid (blank) PDF rather than throwing, since PDFDoc always needs at least one page.
+function buildSiteBillingSlipsCombinedPdf(entries) {
+  const doc = new PDFDoc();
+  doc.registerImage('Logo', LOGO);
+  entries.forEach((data, i) => {
+    if (i > 0) doc.newPage();
+    drawSiteBillingSummaryPage(doc, data);
+  });
+  if (!entries.length) drawSiteBillingSummaryPage(doc, { slip: { start_date: '-', end_date: '-', label: '-', status: '-' }, calc: { elecItems: [], elecTotal: 0, waterItems: [], waterTotal: 0, subtotal: 0, vatAmount: 0, vatRate: 0, total: 0 }, subtitle: 'No statements found' });
   return doc.build();
 }
 
@@ -1015,4 +1076,7 @@ function buildRecoveryPdf(data) {
   return doc.build();
 }
 
-module.exports = { PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, money };
+module.exports = {
+  PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, money,
+  buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf,
+};

@@ -786,24 +786,27 @@ function municipalAccountsPage({ user, accounts, account, statements, statement,
   const body = `
   <div class="flex items-center justify-between mb-1 flex-wrap gap-3">
     <h1 class="text-2xl font-bold">Municipality Accounts</h1>
-    <form method="get" action="/municipal-accounts" class="flex items-center gap-2 flex-wrap">
-      <label class="text-sm text-slate-500">Account:</label>
-      <select name="accountId" onchange="this.form.submit()" class="border rounded px-3 py-2 text-sm">
-        ${accounts.map((a) => `<option value="${a.id}" ${!isCombined && account && a.id === account.id ? 'selected' : ''}>${esc(a.label)} (${esc(a.account_number)})</option>`).join('')}
-        <option value="all" ${isCombined ? 'selected' : ''}>All Accounts (Combined)</option>
-      </select>
-      <label class="text-sm text-slate-500">Statement:</label>
-      ${isCombined ? `
-      <select name="statementFor" class="border rounded px-3 py-2 text-sm">
-        ${(statementLabels || []).map((l) => `<option value="${esc(l.statement_for)}" ${selectedStatementFor === l.statement_for ? 'selected' : ''}>${esc(l.statement_for)}</option>`).join('')}
-      </select>` : `
-      <select name="statementId" class="border rounded px-3 py-2 text-sm">
-        ${statements.map((s) => `<option value="${s.id}" ${statement && s.id === statement.id ? 'selected' : ''}>${esc(s.statement_for)} (${esc(s.statement_date)})</option>`).join('')}
-      </select>`}
-      <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
-    </form>
+    <div class="flex items-center gap-3 flex-wrap">
+      <form method="get" action="/municipal-accounts" class="flex items-center gap-2 flex-wrap">
+        <label class="text-sm text-slate-500">Account:</label>
+        <select name="accountId" onchange="this.form.submit()" class="border rounded px-3 py-2 text-sm">
+          ${accounts.map((a) => `<option value="${a.id}" ${!isCombined && account && a.id === account.id ? 'selected' : ''}>${esc(a.label)} (${esc(a.account_number)})</option>`).join('')}
+          <option value="all" ${isCombined ? 'selected' : ''}>All Accounts (Combined)</option>
+        </select>
+        <label class="text-sm text-slate-500">Statement:</label>
+        ${isCombined ? `
+        <select name="statementFor" class="border rounded px-3 py-2 text-sm">
+          ${(statementLabels || []).map((l) => `<option value="${esc(l.statement_for)}" ${selectedStatementFor === l.statement_for ? 'selected' : ''}>${esc(l.statement_for)}</option>`).join('')}
+        </select>` : `
+        <select name="statementId" class="border rounded px-3 py-2 text-sm">
+          ${statements.map((s) => `<option value="${s.id}" ${statement && s.id === statement.id ? 'selected' : ''}>${esc(s.statement_for)} (${esc(s.statement_date)})</option>`).join('')}
+        </select>`}
+        <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
+      </form>
+      <a href="/municipal-pdf-all" class="border border-slate-300 text-slate-700 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50 whitespace-nowrap">Print All (PDF)</a>
+    </div>
   </div>
-  <p class="text-sm text-slate-500 mb-4">Municipal bulk-supply statements for this property, billed directly by the local municipality, separate from tenant billing. Note: the municipality's own billing periods don't line up with this app's billing periods, and a statement's own label can run about a month ahead of the reading period it actually covers. "All Accounts (Combined)" sums every account for a chosen statement month and compares it against our total billing across every tenant, every site.</p>
+  <p class="text-sm text-slate-500 mb-4">Municipal bulk-supply statements for this property, billed directly by the local municipality, separate from tenant billing. Note: the municipality's own billing periods don't line up with this app's billing periods, and a statement's own label can run about a month ahead of the reading period it actually covers. "All Accounts (Combined)" sums every account for a chosen statement month and compares it against our total billing across every tenant, every site. "Print All (PDF)" downloads one combined PDF with every account's every statement summary - no trend charts, ready to print in one go.</p>
   ${breakdownHtml}
   ${comparisonHtml}
   ${!isCombined && statements.length ? `
@@ -895,10 +898,14 @@ function auditLogPage({ user, entries }) {
 
 function siteBillingListPage({ user, rows, basePath = '/site-billing', pageTitle = 'Billing Slips', newLabel = '+ New billing slip', emptyLabel = '"+ New billing slip"' }) {
   const body = `
-  <div class="flex justify-between items-baseline mb-4">
+  <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
     <h1 class="text-2xl font-bold">${esc(pageTitle)}</h1>
-    <a href="${basePath}/new" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">${esc(newLabel)}</a>
+    <div class="flex items-center gap-2">
+      ${rows.length ? `<a href="${basePath}-pdf-all" class="border border-slate-300 text-slate-700 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50">Print All (PDF)</a>` : ''}
+      <a href="${basePath}/new" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">${esc(newLabel)}</a>
+    </div>
   </div>
+  <p class="text-sm text-slate-500 -mt-2 mb-4">${rows.length ? '"Print All (PDF)" downloads one combined PDF with every month\'s summary page below - no trend charts, ready to print in one go.' : ''}</p>
   <div class="bg-white rounded-lg border overflow-hidden">
     <table class="w-full text-sm">
       <thead><tr class="text-left border-b bg-slate-50">

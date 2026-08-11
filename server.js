@@ -8,7 +8,7 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
-const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf } = require('./pdf');
+const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
@@ -771,6 +771,28 @@ route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
   res.end(pdfBuf);
 });
 
+// One combined PDF with every month's Billing Slip summary page (no trend-chart pages) - added
+// 2026-08-11 so the client can print every month at once instead of downloading each one
+// separately and using a PDF viewer's custom page-range print. Oldest-first, same convention as
+// every trend chart in this app, so a printed/bound stack reads in natural chronological order.
+route('GET', '/site-billing-pdf-all', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slips = all('SELECT * FROM site_billing_slips ORDER BY start_date ASC');
+  const propertyName = currentPropertyName(user);
+  const entries = slips.map((slip) => {
+    const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
+    const items = getTariffItems(slip.tariff_id);
+    const readings = getSlipReadings(slip.id);
+    const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
+    return { propertyName, slip, tariff, calc, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') };
+  });
+  const pdfBuf = buildSiteBillingSlipsCombinedPdf(entries);
+  audit(user.userId, 'pdf_download', 'site_billing_slip', null, null, null, null, `combined:${entries.length} slips`);
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-billing-slips-all.pdf"` });
+  res.end(pdfBuf);
+});
+
 // ---------------- recovery: tenant billing vs municipal statement ----------------
 // Only meaningful for a property with both its own client billing AND a real municipal statement
 // to compare against. Two independent backing implementations share this one pair of routes -
@@ -1038,6 +1060,26 @@ route('GET', '/municipal-billing-pdf/:id', async (req, res, params) => {
   res.end(pdfBuf);
 });
 
+// Combined PDF - every month's Municipal Account Statement summary page in one file (flat_site
+// properties). Same reasoning/convention as /site-billing-pdf-all above.
+route('GET', '/municipal-billing-pdf-all', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const slips = all('SELECT * FROM municipal_statement_slips ORDER BY start_date ASC');
+  const propertyName = currentPropertyName(user);
+  const entries = slips.map((slip) => {
+    const tariff = get('SELECT * FROM municipal_tariffs WHERE id=?', [slip.tariff_id]);
+    const items = getMunicipalTariffItems(slip.tariff_id);
+    const readings = getMunicipalStatementReadings(slip.id);
+    const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
+    return { propertyName, slip, tariff, calc, subtitle: 'Municipal Account Statement', generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') };
+  });
+  const pdfBuf = buildSiteBillingSlipsCombinedPdf(entries);
+  audit(user.userId, 'pdf_download', 'municipal_statement_slip', null, null, null, null, `combined:${entries.length} statements`);
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-municipal-all.pdf"` });
+  res.end(pdfBuf);
+});
+
 route('GET', '/billing', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
   const tenants = all('SELECT * FROM tenants ORDER BY name');
@@ -1195,6 +1237,31 @@ route('GET', '/municipal-pdf', async (req, res, params, query) => {
   const pdfBuf = buildMunicipalStatementPdf(data);
   audit(user.userId, 'pdf_download', 'municipal_statement', statement.id, null, null, null, null);
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="municipal-${account.label.replace(/\s+/g, '-')}-${statement.statement_for.replace(/\s+/g, '-')}.pdf"` });
+  res.end(pdfBuf);
+});
+
+// Combined PDF - every municipal account's every statement, one summary page each, no trend pages -
+// tenant-model equivalent of /municipal-billing-pdf-all above (City Deep, Wingfield). Grouped by
+// account (in the same order the account dropdown on /municipal-accounts uses - label ASC), then
+// chronological within each account, so a printed stack reads as one account's full history before
+// moving to the next - added 2026-08-11 so the client can print every account/month at once instead
+// of stepping through the account+statement dropdowns one combination at a time.
+route('GET', '/municipal-pdf-all', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const accounts = all('SELECT * FROM municipal_accounts ORDER BY label');
+  const propertyName = currentPropertyName(user);
+  const municipalityName = currentMunicipalityName(user);
+  const entries = [];
+  for (const account of accounts) {
+    const statements = all('SELECT * FROM municipal_statements WHERE municipal_account_id=? ORDER BY statement_date ASC', [account.id]);
+    for (const statement of statements) {
+      entries.push(municipalPdfData(statement, account.label, account.account_number, account.address, null, null, propertyName, municipalityName));
+    }
+  }
+  const pdfBuf = buildMunicipalStatementsCombinedPdf(entries);
+  audit(user.userId, 'pdf_download', 'municipal_statement', null, null, null, null, `combined:${entries.length} statements, all accounts`);
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-municipal-all.pdf"` });
   res.end(pdfBuf);
 });
 
