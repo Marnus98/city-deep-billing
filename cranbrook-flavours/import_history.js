@@ -9,7 +9,27 @@
 // Correction factors: per the client's instruction, reusing the same 4 factor constants already
 // applied to 8 Field Street "for now".
 //
-// Water/Sewer: not billed through this app for this site yet (rate 0, unused).
+// Water/Sewer, Jul-Dec 2025: not billed through this app for this site yet (rate 0, unused) - no
+// source workbook has been provided for these 6 months.
+//
+// Water/Sewer, Jan-Jul 2026 - added 2026-08-20 from 7 client-provided workbooks ("Cranbrook
+// Flavours - Tunney Slips <Month> 2026.xlsx"), which surfaced two real corrections against what had
+// been seeded here before (both confirmed with the client 2026-08-20, all 7 months already
+// "finalised" in the app at the time):
+//   - Water was billed every one of these 7 months (49.11 R/kL Jan-Jun, 54.51 R/kL Jul, matching the
+//     same tariff-year rate change seen on every other Ekurhuleni site in this app) - simply never
+//     wired into this site's own historical import before now.
+//   - Sewer wasn't billed at all Jan-May 2026 (rate 0 on the client's own statements those months,
+//     same as it's always been in this app), but genuinely starts being billed from June 2026
+//     onward (18.91 R/kL Jun, 22.07 R/kL Jul) - not a correction to a past assumption, a real
+//     mid-year change on the account.
+//   - June 2026 also turned out to have a completely different electricity rate card than every
+//     other Jul 2025 - Jun 2026 month (lower Fixed Charge/Network Access/Network Demand/TOU energy
+//     rates all round) - the historical import had been charging June at the same rate as every
+//     other month in that run, which the client's own June workbook shows is wrong. See RATES_JAN_MAY26
+//     and RATES_JUN26 below for the 2 new tariff versions this required (Jan-May26 needed its own
+//     version purely for the water rate turning on; June needed one for the electricity rate change
+//     too) - Jul 2025 - Dec 2025 (tariff v1, RATES_A) is untouched, since no workbook covers it.
 //
 // Safe to re-run on every boot - see flat_site_seed_helpers.js.
 const { open, migrate } = require('../db');
@@ -67,6 +87,70 @@ function main(dbFile = 'cranbrook-flavours.db') {
     if (slipId) created++;
   }
   if (created) console.log(`Cranbrook Flavours history import: ${created} month(s) added (Jul 2025 - Jul 2026).`);
+
+  // Jan-May 2026: water turns on this tariff-year (49.11 R/kL), sewer stays at 0 (matches the
+  // client's own 7 workbooks) - genuinely different from RATES_A's water=0/sewer=0, so these 5
+  // months need their own tariff version rather than sharing tariff v1 with Jul-Dec 2025 (which no
+  // workbook covers yet, so it's left as-is). Electricity rates are otherwise identical to RATES_A.
+  const RATES_JAN_MAY26 = { ...RATES_A, water: 49.11, sewer: 0 };
+  const janMayTariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-01-01', shape: EKURHULENI_E_TOU, rates: RATES_JAN_MAY26, factors: FACTORS,
+    notes: 'Same electricity rates as RATES_A (Jul 2025 - Jun 2026) - only water turns on this '
+      + 'version (49.11 R/kL), confirmed against the client-provided "Cranbrook Flavours - Tunney '
+      + 'Slips <Month> 2026.xlsx" workbooks for Jan-May 2026. Sewer stays R0 (not billed).',
+  });
+  const janMayReadings = { '2026-01': 163, '2026-02': 232, '2026-03': 210, '2026-04': 312, '2026-05': 203 };
+  for (const [label, kl] of Object.entries(janMayReadings)) {
+    const slip = db.prepare('SELECT id FROM site_billing_slips WHERE label=?').get(label);
+    if (slip) {
+      db.prepare('UPDATE site_billing_slips SET tariff_id=? WHERE id=?').run(janMayTariffId, slip.id);
+      db.prepare('INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,NULL) '
+        + 'ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading').run(slip.id, 'water', kl);
+      db.prepare('INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,NULL) '
+        + 'ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading').run(slip.id, 'sewer', kl);
+    }
+  }
+
+  // June 2026: the client's own June workbook shows a genuinely different electricity rate card
+  // from every other Jul 2025 - Jun 2026 month (lower Fixed Charge/Network Access/Network Demand/TOU
+  // energy rates all round) - the historical import above had been charging June at RATES_A, which
+  // this replaces. Sewer also starts being billed this month (18.91 R/kL) alongside water (49.11
+  // R/kL, same rate as Jan-May). Readings (kVA/kWh) are unchanged from what MONTHS already seeded
+  // above - only the rates and the water/sewer readings need correcting.
+  const RATES_JUN26 = {
+    fixed_charge: 5207.09, network_access: 105.9466, network_demand: 146.09,
+    peak_high: 10.486, peak_low: 3.415, standard_high: 3.036, standard_low: 2.231,
+    offpeak_high: 1.848, offpeak_low: 1.693, water: 49.11, sewer: 18.91,
+  };
+  const junTariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-06-01', shape: EKURHULENI_E_TOU, rates: RATES_JUN26, factors: FACTORS,
+    notes: 'Actual rates from the client-provided "Cranbrook Flavours - Tunney Slips June 2026 - '
+      + 'V2.xlsx" workbook - a genuinely different, lower rate card than every other Jul 2025 - Jun '
+      + '2026 month, plus sewer billing starting this month (18.91 R/kL).',
+  });
+  const junSlip = db.prepare("SELECT id FROM site_billing_slips WHERE label='2026-06'").get();
+  if (junSlip) {
+    db.prepare('UPDATE site_billing_slips SET tariff_id=? WHERE id=?').run(junTariffId, junSlip.id);
+    db.prepare('INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,NULL) '
+      + 'ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading').run(junSlip.id, 'water', 306);
+    db.prepare('INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,NULL) '
+      + 'ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading').run(junSlip.id, 'sewer', 306);
+  }
+
+  // July 2026: already its own dedicated tariff version (RATES_B, tariff_id unique to this slip, not
+  // shared with any other month) - just needs its water/sewer *rates* filled in (54.51/22.07,
+  // matching the same tariff-year rate change seen elsewhere in this app) and its water/sewer
+  // reading set, from the client-provided "Cranbrook Flavours - Tunney Slips July 2026 - V2.xlsx".
+  const julSlip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-07'").get();
+  if (julSlip) {
+    const julRate = db.prepare('UPDATE site_tariff_items SET rate=? WHERE tariff_id=? AND item_key=?');
+    julRate.run(54.51, julSlip.tariff_id, 'water');
+    julRate.run(22.07, julSlip.tariff_id, 'sewer');
+    db.prepare('INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,NULL) '
+      + 'ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading').run(julSlip.id, 'water', 211);
+    db.prepare('INSERT INTO site_slip_readings (slip_id, item_key, reading, comment) VALUES (?,?,?,NULL) '
+      + 'ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading').run(julSlip.id, 'sewer', 211);
+  }
 
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via
