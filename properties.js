@@ -98,4 +98,17 @@ module.exports = [
     // flat_site_recovery.js) applies here too.
     hasMunicipalStatements: true,
   },
+  {
+    slug: 'adh-machine-tool',
+    // Full tenant name, as it appears on the client's own workbook - confirmed with the client
+    // 2026-08-20 that the full name should be shown, not a shortened "ADH Machine Tool".
+    name: '55 Loper Ave - ADH Machine Tool South Africa (PTY) Ltd',
+    dbFile: 'adh-machine-tool.db',
+    seedFile: './adh-machine-tool/seed',
+    billingModel: 'flat_site',
+    // No municipal_import.js yet - the client will upload the real municipal account statement
+    // "once received" each month, same as every other flat_site property's own bill. Add
+    // hasMunicipalStatements: true (and a municipal_import.js/its own tariff shape in
+    // flat_site_tariff_shapes.js) once the first one arrives, following field-street/'s pattern.
+  },
 ];

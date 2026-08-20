@@ -613,7 +613,13 @@ function drawSiteBillingSummaryPage(doc, data) {
   const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
   doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
 
-  doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
+  // Long property/tenant names (e.g. "55 Loper Ave - ADH Machine Tool South Africa (PTY) Ltd") can
+  // run wider than the space left of the logo at the default size - shrink down to fit rather than
+  // let the title run under the logo.
+  const titleMaxWidth = right - logoW - 12 - left;
+  let titleSize = 16;
+  while (titleSize > 10 && textWidth(propertyName, { size: titleSize, bold: true }) > titleMaxWidth) titleSize -= 1;
+  doc.text(left, y, propertyName, { size: titleSize, bold: true }); y -= 14;
   doc.text(left, y, data.subtitle || 'Utility Billing Slip', { size: 10 });
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 18;

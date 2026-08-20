@@ -262,8 +262,45 @@ const EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK = [
   ...WATER_SEWER_ITEMS,
 ];
 
+// Ekurhuleni Tariff B (<=150A) - 55 Loper Ave - ADH Machine Tool South Africa (PTY) Ltd. A simpler
+// account than the other Ekurhuleni Industrial shapes above: no Peak/Standard/Off-Peak TOU split at
+// all, just one "Energy Consumption" reading per High/Low demand season (same convention as
+// EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27's collapsed total_energy rows, factorType: null to
+// match), and a single "Capacity Charge" standing in for what other Ekurhuleni shapes split into
+// separate Network Access + Demand Charge lines.
+//
+// Water/Sewer here is genuinely 4 lines, not the usual WATER_SEWER_ITEMS 2 - this account's own
+// statement bills a "Common Area" surcharge (a small flat R0.542/kL) alongside the main Water/Sewer
+// Consumption line, on both utilities, so it gets its own line-item set below instead of reusing the
+// shared template.
+//
+// NOTE on the client's own July 2026 workbook ("55 Loper - ADH Machine Tool - July 2026.xlsx"): its
+// Billing Slip tab's Rate and Reading columns are correct (they match this Tariffs tab exactly), but
+// several of its own Cost cells don't equal Rate x Reading - they look like a copy-paste formula
+// error pulling the wrong cell (Capacity Charge's cost implies a reading of 240A against the 80A
+// shown; the two Common Area lines' costs imply they multiplied 0.542 by that utility's own
+// consumption *rate* instead of the actual kL reading; Water/Sewer Consumption's costs imply the
+// *previous* tariff year's rate was used instead of the 2026/27 rate shown). Confirmed with the
+// client 2026-08-20: keep the workbook's own bottom-line Sub Total (R8,822.48) rather than the
+// Rate x Reading total those formula errors would otherwise produce (R4,195.59) - see
+// adh-machine-tool/seed.js for how each affected line's *reading* (never the rate here, which stays
+// the correct 2026/27 figure for future months) is back-solved to reproduce that exact cost, one
+// slip at a time, so this one month's formula glitch doesn't propagate into this tariff version's
+// rate for every future month.
+const EKURHULENI_TARIFF_B = [
+  { key: 'basic_charge', label: 'Basic Charge', unit: 'R/A', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'energy_high', label: 'Energy Consumption - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'energy_low', label: 'Energy Consumption - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/A', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'water', label: 'Water Consumption', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+  { key: 'water_common_area', label: 'Common Area (Water)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+  { key: 'sewer', label: 'Sewer Consumption', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+  { key: 'sewer_common_area', label: 'Common Area (Sewer)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
+  EKURHULENI_TARIFF_B,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
 };
