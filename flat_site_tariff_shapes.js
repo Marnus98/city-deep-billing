@@ -276,17 +276,31 @@ const EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK = [
 //
 // NOTE on the client's own July 2026 workbook ("55 Loper - ADH Machine Tool - July 2026.xlsx"): its
 // Billing Slip tab's Rate and Reading columns are correct (they match this Tariffs tab exactly), but
-// several of its own Cost cells don't equal Rate x Reading - they look like a copy-paste formula
-// error pulling the wrong cell (Capacity Charge's cost implies a reading of 240A against the 80A
-// shown; the two Common Area lines' costs imply they multiplied 0.542 by that utility's own
-// consumption *rate* instead of the actual kL reading; Water/Sewer Consumption's costs imply the
-// *previous* tariff year's rate was used instead of the 2026/27 rate shown). Confirmed with the
-// client 2026-08-20: keep the workbook's own bottom-line Sub Total (R8,822.48) rather than the
-// Rate x Reading total those formula errors would otherwise produce (R4,195.59) - see
-// adh-machine-tool/seed.js for how each affected line's *reading* (never the rate here, which stays
-// the correct 2026/27 figure for future months) is back-solved to reproduce that exact cost, one
-// slip at a time, so this one month's formula glitch doesn't propagate into this tariff version's
-// rate for every future month.
+// several of its own Cost cells don't equal Rate x Reading. Confirmed with the client 2026-08-20:
+// keep the workbook's own bottom-line Sub Total (R8,822.48) rather than the Rate x Reading total
+// those cells would otherwise produce (R4,195.59) - see adh-machine-tool/seed.js for how each
+// affected line's *reading* (never the rate here, which stays the correct 2026/27 figure for future
+// months) is back-solved to reproduce that exact cost, one slip at a time, so this one month's
+// discrepancy doesn't propagate into this tariff version's rate for every future month.
+//
+// Update 2026-08-20, having now seen the same "Ekurhuleni Tariff B" workbook for 4 more Loper Ave
+// tenants (Zelvio Global, Interoll, RCL Group Services, Colorobbia - all clearly cloned from one
+// shared template): the same two discrepancies appear in all 5, always by the exact same ratio -
+// this is a template quirk, not 5 independent one-off mistakes:
+//   - Capacity Charge's Cost cell always implies a reading of exactly 3x the Reading column shown
+//     (80->240, 100->300, 150->450 across the 5 workbooks, no exceptions) - almost certainly a
+//     genuine 3-phase billing convention (single-phase-equivalent Amp reading x 3 phases) rather
+//     than a formula error, even though the sheet doesn't show that multiplication anywhere.
+//   - Water/Sewer Consumption's Cost cells always compute off the *previous* tariff year's rate
+//     (49.11/18.91) instead of the 2026/27 rate shown in the Rate column (54.51/22.07) - this one
+//     has no plausible legitimate explanation and does look like a genuine template bug, replicated
+//     across every site that was cloned from it.
+//   - Where a "Common Area" line exists (ADH, Zelvio - not Interoll/RCL/Colorobbia, whose statements
+//     don't bill one at all), its Cost cell always implies its own rate was multiplied by that
+//     utility's *current-year rate* instead of the actual kL reading - see EKURHULENI_TARIFF_B_SIMPLE
+//     below for the 3 sites that don't have this line at all.
+// Every site's own seed.js still back-solves each affected slip's reading to preserve that
+// workbook's own bottom-line total, per the same 2026-08-20 client decision.
 const EKURHULENI_TARIFF_B = [
   { key: 'basic_charge', label: 'Basic Charge', unit: 'R/A', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
   { key: 'energy_high', label: 'Energy Consumption - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
@@ -298,9 +312,22 @@ const EKURHULENI_TARIFF_B = [
   { key: 'sewer_common_area', label: 'Common Area (Sewer)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
 ];
 
+// Ekurhuleni Tariff B (<=150A) - Interoll, RCL Group Services, Colorobbia (all at 55/63/65/122 Loper
+// Ave, same "Loper Ave" tenant template as EKURHULENI_TARIFF_B above and Zelvio Global, which uses
+// that shape unchanged). Identical electricity line items to EKURHULENI_TARIFF_B, but these 3
+// tenants' own statements don't bill a "Common Area" surcharge at all, so Water/Sewer here is just
+// the standard 2-line WATER_SEWER_ITEMS instead of EKURHULENI_TARIFF_B's 4.
+const EKURHULENI_TARIFF_B_SIMPLE = [
+  { key: 'basic_charge', label: 'Basic Charge', unit: 'R/A', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'energy_high', label: 'Energy Consumption - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'energy_low', label: 'Energy Consumption - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/A', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity' },
+  ...WATER_SEWER_ITEMS,
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
-  EKURHULENI_TARIFF_B,
+  EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
 };

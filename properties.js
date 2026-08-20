@@ -111,4 +111,36 @@ module.exports = [
     // hasMunicipalStatements: true (and a municipal_import.js/its own tariff shape in
     // flat_site_tariff_shapes.js) once the first one arrives, following field-street/'s pattern.
   },
+  // The following 4 - added 2026-08-20 alongside ADH Machine Tool above, all loose-standing sites on
+  // the same "Loper Ave" tenant billing template (Ekurhuleni Tariff B, <=150A) - see
+  // flat_site_tariff_shapes.js's EKURHULENI_TARIFF_B/EKURHULENI_TARIFF_B_SIMPLE header comments for
+  // the shared-template formula quirks found across all 5. None has a municipal_import.js yet either.
+  {
+    slug: 'zelvio-global',
+    name: '55 Loper Ave - Zelvio Global', // exactly as given on the client's own workbook - no legal suffix was provided for this one
+    dbFile: 'zelvio-global.db',
+    seedFile: './zelvio-global/seed',
+    billingModel: 'flat_site',
+  },
+  {
+    slug: 'interoll',
+    name: '63 Loper Ave - Interoll',
+    dbFile: 'interoll.db',
+    seedFile: './interoll/seed',
+    billingModel: 'flat_site',
+  },
+  {
+    slug: 'rcl-group',
+    name: '65 Loper Ave - RCL GROUP SERVICES (PTY) LTD',
+    dbFile: 'rcl-group.db',
+    seedFile: './rcl-group/seed',
+    billingModel: 'flat_site',
+  },
+  {
+    slug: 'colorobbia',
+    name: '122 Loper - Colorobbia', // exactly as given on the client's own workbook (not "122 Loper Ave")
+    dbFile: 'colorobbia.db',
+    seedFile: './colorobbia/seed',
+    billingModel: 'flat_site',
+  },
 ];
