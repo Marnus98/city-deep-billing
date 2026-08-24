@@ -155,6 +155,18 @@ function money(n) {
 // Compact currency formatting for chart axis ticks/labels - no decimals, but with the "R" prefix
 // so each electricity/water/sanitation graph reads unambiguously as Rand on its own, without
 // requiring the reader to cross-reference the "Rand" axis caption.
+// Plain (non-Rand) number formatting for meter reading tables - same manual-comma approach as
+// money() above and for the same reason (locale thousands separators can render as a stray glyph
+// in the PDF's base-14 WinAnsi fonts).
+function numFmt(n, dp = 2) {
+  const v = Number(n || 0);
+  const neg = v < 0;
+  const fixed = Math.abs(v).toFixed(dp);
+  const [intPart, decPart] = fixed.split('.');
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${neg ? '-' : ''}${withCommas}${decPart ? `.${decPart}` : ''}`;
+}
+
 function moneyShort(n) {
   const v = Math.round(Number(n || 0));
   const neg = v < 0;
@@ -369,28 +381,34 @@ function buildBillingSlipPdf(data) {
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9); // clear the logo before the header divider
   doc.line(left, y, right, y); y -= 18;
 
+  // Header block trimmed to the fields tenants actually need on the slip itself (2026-08-24 -
+  // Account No / VAT No / Due Date removed at the client's request since these aren't meaningful
+  // to the tenant here, "Invoice No" renamed to "Billing Reference" since it isn't a VAT invoice).
   doc.text(left, y, 'Tenant:', { bold: true }); doc.text(left + 90, y, data.tenantName);
-  doc.text(right - 180, y, 'Invoice No:', { bold: true }); doc.text(right - 100, y, data.invoiceNumber); y -= 15;
+  doc.text(right - 180, y, 'Billing Reference:', { bold: true }); doc.text(right - 92, y, data.invoiceNumber); y -= 15;
   doc.text(left, y, 'Unit / Site:', { bold: true }); doc.text(left + 90, y, data.unit || '-');
-  doc.text(right - 180, y, 'Billing Month:', { bold: true }); doc.text(right - 100, y, data.periodLabel); y -= 15;
+  doc.text(right - 180, y, 'Billing Month:', { bold: true }); doc.text(right - 92, y, data.periodLabel); y -= 15;
   const tenantDays = daysBetween(data.startDate, data.endDate);
   const tenantReadingPeriodStr = `${data.startDate} to ${data.endDate}${tenantDays != null && tenantDays > LONG_PERIOD_DAYS ? ` (${tenantDays} days)` : ''}`;
-  doc.text(left, y, 'Account No:', { bold: true }); doc.text(left + 90, y, data.accountNumber || '-');
-  doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, tenantReadingPeriodStr); y -= 15;
-  doc.text(left, y, 'VAT No:', { bold: true }); doc.text(left + 90, y, data.vatNumber || '-');
-  doc.text(right - 180, y, 'Due Date:', { bold: true }); doc.text(right - 100, y, data.dueDate || '-'); y -= 20;
+  doc.text(left, y, 'Reading Period:', { bold: true }); doc.text(left + 90, y, tenantReadingPeriodStr); y -= 20;
 
   doc.line(left, y, right, y); y -= 18;
 
   // Electricity block
   doc.text(left, y, 'ELECTRICITY', { size: 12, bold: true }); y -= 16;
   doc.text(left, y, `Consumption: ${data.elecConsumption} kWh`, { size: 9 }); y -= 14;
+  // Per-meter Serial/Start/End/Consumption table - added 2026-08-24 (see drawMeterReadingsTable)
+  // so tenants can match the slip to their physical meter's own reading, not just a bare serial.
+  y = drawMeterReadingsTable(doc, data.elecMeters, left, right, y);
+  y -= 4;
   y = drawLineItemsTable(doc, data.elecLineItems, left, right, y);
   y -= 6;
 
   // Water block
   doc.text(left, y, 'WATER & SANITATION', { size: 12, bold: true }); y -= 16;
   doc.text(left, y, `Consumption: ${data.waterConsumption} m3`, { size: 9 }); y -= 14;
+  y = drawMeterReadingsTable(doc, data.waterMeters, left, right, y);
+  y -= 4;
   y = drawLineItemsTable(doc, data.waterLineItems, left, right, y);
   y -= 10;
 
@@ -429,6 +447,33 @@ function buildBillingSlipPdf(data) {
   }
 
   return doc.build();
+}
+
+// Per-meter Serial/Start/End/Consumption table - same shape as the on-screen billDetailPage's
+// "Meter readings" table (views.js's lineTable()), added to the PDF 2026-08-24 so tenants can
+// verify their own meter's start/end readings against the slip, not just see a bare serial number.
+function drawMeterReadingsTable(doc, meters, left, right, y) {
+  if (!meters || !meters.length) return y;
+  const colStart = left + 200, colEnd = left + 300, colCons = right;
+  doc.text(left, y, 'Serial', { bold: true, size: 8 });
+  doc.text(colStart, y, 'Start', { bold: true, size: 8 });
+  doc.text(colEnd, y, 'End', { bold: true, size: 8 });
+  doc.text(colCons - textWidth('Consumption', { bold: true, size: 8 }), y, 'Consumption', { bold: true, size: 8 });
+  y -= 3;
+  doc.line(left, y, right, y);
+  y -= 10;
+  for (const m of meters) {
+    const scale = m.unit_scale || 1;
+    const hasReadings = m.start_reading != null && m.end_reading != null;
+    const cons = hasReadings ? (m.end_reading - m.start_reading) * scale : null;
+    const consStr = cons != null ? numFmt(cons) : '-';
+    doc.text(left, y, m.serial, { size: 8 });
+    doc.text(colStart, y, hasReadings ? numFmt(m.start_reading) : '-', { size: 8 });
+    doc.text(colEnd, y, hasReadings ? numFmt(m.end_reading) : '-', { size: 8 });
+    doc.text(colCons - textWidth(consStr, { size: 8 }), y, consStr, { size: 8 });
+    y -= 11;
+  }
+  return y - 5;
 }
 
 function drawLineItemsTable(doc, items, left, right, y) {

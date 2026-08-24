@@ -1,16 +1,18 @@
-// seed.js - imports the parsed March/April workbook JSON (produced by extract.py) into the
-// SQLite database, computing bills with calc.js as it goes, and storing the workbook's own
-// totals in excel_reference for the reconciliation report.
+// city-deep/seed.js - imports the parsed monthly workbook JSON (produced by extract.py, one file
+// per month under city-deep/imports/) into the SQLite database, computing bills with calc.js as
+// it goes, and storing the workbook's own totals in excel_reference for the reconciliation report.
 //
 // This is City Deep's property-specific seed script (see properties.js). `db` is opened lazily
 // inside main(dbFile) rather than at module load time, because the multi-property platform now
-// requires('./seed') without necessarily wanting City Deep's database opened - only run(dbFile)
-// (or `node seed.js`, which defaults to City Deep's own file) actually opens anything.
+// requires('./city-deep/seed') without necessarily wanting City Deep's database opened - only
+// run(dbFile) (or `node city-deep/seed.js`, which defaults to City Deep's own file) actually opens
+// anything. Shared platform code (db.js, calc.js, shared_seed_users.js) lives one level up at the
+// repo root, hence the '../' requires below.
 const fs = require('fs');
 const path = require('path');
-const { open, migrate } = require('./db');
-const calc = require('./calc');
-const { seedUsers: seedUsersShared } = require('./shared_seed_users');
+const { open, migrate } = require('../db');
+const calc = require('../calc');
+const { seedUsers: seedUsersShared } = require('../shared_seed_users');
 
 let db;
 
@@ -97,6 +99,64 @@ const TENANT_NAME_ALIASES = {
   'Unit 3 Bitzer Kuhlmaschinenbau SA (PTY)LTD': 'Unit 3 Bitzer Kuhlmaschinenba U SA (PTY)LTD',
 };
 function canonicalTenantName(name) { return TENANT_NAME_ALIASES[name] || name; }
+
+// Client-requested display renames for the Industrial Park section (2026-08-24), giving each
+// tenant its correct registered company name plus a proper unit number instead of the informal
+// name that came off the source workbook tabs. This is intentionally a SEPARATE map from
+// TENANT_NAME_ALIASES above: TENANT_NAME_ALIASES is a create/lookup key used *before* a tenant
+// row exists (so two entries that alias to the same value get merged into one row), whereas two
+// of these renames deliberately point at the SAME new company name for two different, separately
+// metered units (AGRANA Fruit's Unit 2B and Unit 2C) - folding those into TENANT_NAME_ALIASES
+// would collapse them into a single tenant record and silently merge their meters/bills on the
+// next fresh reseed. So this map is applied as a post-creation UPDATE instead, keyed by each
+// tenant's own original workbook name, after every tenant row for the month already exists.
+const TENANT_DISPLAY_OVERRIDES = {
+  'Kimmo (PTY) LTD - Industrial Park': { name: 'Kimmo (Pty) Ltd', unit: 'Unit 1' },
+  'AGRANA Fruit - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2B' },
+  'AGRANA Fruit Warehouse/Office - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2C' },
+  'Lesco - Industrial Park': { name: 'Lesco Manufacturing (Pty) Ltd', unit: 'Unit 2A' },
+  'Unit 3 HUDACO Trading - Industrial Park': { name: 'Hudaco Trading (Pty) Ltd', unit: 'Unit 3' },
+  'Unit 4A JC Bakery (PTY) LTD - Industrial Park': { name: 'JC Bakeries (Pty) Ltd', unit: 'Unit 4A' },
+  'Unit 4B JC Bakery (PTY) LTD - Industrial Park': { name: 'JC Bakeries (Pty) Ltd', unit: 'Unit 4B' },
+  'Unit 5A Skillcraft Agencies - Industrial Park': { name: 'Skillcraft Agencies (Pty) Ltd', unit: 'Unit 5A' },
+  'Unit 5B Skillcraft Agencies - Industrial Park': { name: 'Skillcraft Agencies (Pty) Ltd', unit: 'Unit 5B' },
+  'Unit 6A&B TERAOKA SA- Industrial Park': { name: 'Teraoka Sa (Pty) Ltd', unit: 'Unit 6A&B' },
+  'Unit 6C TERAOKA SA- Industrial Park': { name: 'Teraoka Sa (Pty) Ltd', unit: 'Unit 6C' },
+  'Unit 4 ATC SA Wireless Infrastructure (PTY) LTD': { name: 'ATC SA Wireless Infrastructure (Pty) Ltd', unit: 'Unit 6' },
+
+  // Mini Park + Rittle section renames (2026-08-24), same client request extended to the rest of
+  // City Deep. Two notes from the client's own mapping table that affect how this is applied:
+  //  - There are two distinct DB tenants that both source-workbook-named themselves
+  //    "Shop 3 Unit 9 SANSKAR Trading" in the client's table (a copy/paste artefact in their
+  //    sheet) - disambiguated here using each DB tenant's OWN embedded unit number: the tenant
+  //    whose real name says "Unit 3" is Unit 3, the one whose real name says "Unit 9" is Unit 9.
+  //    Both correct to "Sanskar Trading CC".
+  //  - Two Mini Park units (4 and 5, Americandy and this section's separate Agrana entity - not
+  //    to be confused with the two Industrial Park Agrana units above) are noted as being taken
+  //    over by a new tenant "Twinpouch" from 1 Aug 2026. Since tenant name isn't period-specific
+  //    in this schema, renaming Americandy/Agrana here would incorrectly relabel their pre-Aug-26
+  //    history too - so this only corrects their legal names for the tenancy as it stood, and
+  //    Twinpouch itself is deliberately NOT added here (no workbook data exists for them yet -
+  //    add it as a new tenant via getOrCreateTenant when the first Twinpouch month is imported).
+  //    Same reasoning applies to the Sanskar Unit 9 -> Uber Nutrition handover noted for 1 Sep 26.
+  'Unit 1 Network Dynamics (PTY)LTD': { name: 'Network Dynamics (Pty) Ltd', unit: 'Unit 1' },
+  'Shop 10 Unit 2 Express Chef Sauces': { name: 'Express Chef Sauces (Pty) Ltd', unit: 'Unit 2 (Shop 10)' },
+  'Unit 3 SANSKAR Trading': { name: 'Sanskar Trading CC', unit: 'Unit 3' },
+  'Unit 4 Americandy Manufacturers (PTY)LTD': { name: 'Americandy Manufacturers (Pty) Ltd', unit: 'Unit 4' },
+  'Unit 5 AGRANA': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 5' },
+  'Shop 6 Unit 6 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 6' },
+  'Shop 5 Unit 7 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 7' },
+  'Shop 4 Unit 8 Citrashine': { name: 'Citrashine (Pty) Ltd', unit: 'Unit 8 (Shop 4)' },
+  'Shop 3 Unit 9 SANSKAR Trading': { name: 'Sanskar Trading CC', unit: 'Unit 9' },
+  'Unit 10 Berzack Brothers (PYY) Ltd': { name: 'Berzack Brothers (Pty) Ltd', unit: 'Unit 10' },
+  'Unit 11 Surplus Grain Traders CC': { name: 'Surplus Grain Traders CC', unit: 'Unit 11' },
+  'Shop 2 Growers Connect - Mini Park': { name: 'Growers Connect (Pty) Ltd', unit: 'Shop 2' },
+};
+function applyTenantDisplayOverrides() {
+  for (const [oldName, { name, unit }] of Object.entries(TENANT_DISPLAY_OVERRIDES)) {
+    run('UPDATE tenants SET name=?, unit=? WHERE name=?', [name, unit, oldName]);
+  }
+}
 
 // ---------- Tenants / Meters / Assignments ----------
 function getOrCreateTenant(name, siteName) {
@@ -363,7 +423,7 @@ function main(dbFile = 'city-deep.db') {
   db = open(dbFile);
   migrate(db);
   const months = MONTH_FILES
-    .map((f) => JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8')))
+    .map((f) => JSON.parse(fs.readFileSync(path.join(__dirname, 'imports', f), 'utf8')))
     .sort((a, b) => a.period.start.localeCompare(b.period.start));
   // Each seedUsers()/seedMonth() call is many small INSERT/UPDATE statements; run the whole
   // import as one transaction instead of auto-committing every statement individually - orders
@@ -373,6 +433,7 @@ function main(dbFile = 'city-deep.db') {
   try {
     seedUsers();
     for (const monthData of months) seedMonth(monthData);
+    applyTenantDisplayOverrides();
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');

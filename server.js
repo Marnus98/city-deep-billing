@@ -1135,20 +1135,22 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
   const period = get('SELECT * FROM billing_periods WHERE id=?', [bill.billing_period_id]);
   const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' ORDER BY id", [bill.id]);
   const waterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water' ORDER BY id", [bill.id]);
-  // Same meter-serial lookup the on-screen billing-slip page uses (billDetailPage's elecMeters/
-  // waterMeters), added to the PDF 2026-08-24 so tenants can match the slip to their physical
-  // meter without querying it.
-  const elecMeterSerials = all(`SELECT DISTINCT m.serial FROM bill_line_items bli
-    JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='electricity'`, [bill.id]).map(r => r.serial);
-  const waterMeterSerials = all(`SELECT DISTINCT m.serial FROM bill_line_items bli
-    JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='water'`, [bill.id]).map(r => r.serial);
+  // Same meter-readings lookup the on-screen billing-slip page uses (billDetailPage's elecMeters/
+  // waterMeters query, just above in this file) - added to the PDF 2026-08-24 so tenants can see
+  // their own meter's start/end reading on the slip itself, not just a bare serial number.
+  const elecMetersForPdf = all(`SELECT DISTINCT m.serial, m.unit_scale, mr.start_reading, mr.end_reading FROM bill_line_items bli
+    JOIN meters m ON m.id=bli.meter_id LEFT JOIN meter_readings mr ON mr.meter_id=m.id AND mr.billing_period_id=?
+    WHERE bli.bill_id=? AND bli.utility_type='electricity'`, [period.id, bill.id]);
+  const waterMetersForPdf = all(`SELECT DISTINCT m.serial, mr.start_reading, mr.end_reading FROM bill_line_items bli
+    JOIN meters m ON m.id=bli.meter_id LEFT JOIN meter_readings mr ON mr.meter_id=m.id AND mr.billing_period_id=?
+    WHERE bli.bill_id=? AND bli.utility_type='water'`, [period.id, bill.id]);
   const monthlyTrend = monthlyTrendForTenant(tenant.id, period.start_date);
   const pdfBuf = buildBillingSlipPdf({
     tenantName: tenant.name, invoiceNumber: bill.invoice_number, unit: tenant.unit,
     periodLabel: period.label, accountNumber: tenant.account_number, startDate: period.start_date,
     endDate: period.end_date, dueDate: period.due_date, vatNumber: tenant.vat_number,
     elecConsumption: bill.electricity_consumption_kwh.toFixed(2), waterConsumption: bill.water_consumption_m3.toFixed(2),
-    elecLineItems: elecItems, waterLineItems: waterItems, elecMeterSerials, waterMeterSerials,
+    elecLineItems: elecItems, waterLineItems: waterItems, elecMeters: elecMetersForPdf, waterMeters: waterMetersForPdf,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
     status: bill.status, generatedAt: bill.generated_at, monthlyTrend, propertyName: currentPropertyName(user),
   });
