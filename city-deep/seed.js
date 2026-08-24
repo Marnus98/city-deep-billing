@@ -123,6 +123,34 @@ const TENANT_DISPLAY_OVERRIDES = {
   'Unit 6A&B TERAOKA SA- Industrial Park': { name: 'Teraoka Sa (Pty) Ltd', unit: 'Unit 6A&B' },
   'Unit 6C TERAOKA SA- Industrial Park': { name: 'Teraoka Sa (Pty) Ltd', unit: 'Unit 6C' },
   'Unit 4 ATC SA Wireless Infrastructure (PTY) LTD': { name: 'ATC SA Wireless Infrastructure (Pty) Ltd', unit: 'Unit 6' },
+
+  // Mini Park + Rittle section renames (2026-08-24), same client request extended to the rest of
+  // City Deep. Two notes from the client's own mapping table that affect how this is applied:
+  //  - There are two distinct DB tenants that both source-workbook-named themselves
+  //    "Shop 3 Unit 9 SANSKAR Trading" in the client's table (a copy/paste artefact in their
+  //    sheet) - disambiguated here using each DB tenant's OWN embedded unit number: the tenant
+  //    whose real name says "Unit 3" is Unit 3, the one whose real name says "Unit 9" is Unit 9.
+  //    Both correct to "Sanskar Trading CC".
+  //  - Two Mini Park units (4 and 5, Americandy and this section's separate Agrana entity - not
+  //    to be confused with the two Industrial Park Agrana units above) are noted as being taken
+  //    over by a new tenant "Twinpouch" from 1 Aug 2026. Since tenant name isn't period-specific
+  //    in this schema, renaming Americandy/Agrana here would incorrectly relabel their pre-Aug-26
+  //    history too - so this only corrects their legal names for the tenancy as it stood, and
+  //    Twinpouch itself is deliberately NOT added here (no workbook data exists for them yet -
+  //    add it as a new tenant via getOrCreateTenant when the first Twinpouch month is imported).
+  //    Same reasoning applies to the Sanskar Unit 9 -> Uber Nutrition handover noted for 1 Sep 26.
+  'Unit 1 Network Dynamics (PTY)LTD': { name: 'Network Dynamics (Pty) Ltd', unit: 'Unit 1' },
+  'Shop 10 Unit 2 Express Chef Sauces': { name: 'Express Chef Sauces (Pty) Ltd', unit: 'Unit 2 (Shop 10)' },
+  'Unit 3 SANSKAR Trading': { name: 'Sanskar Trading CC', unit: 'Unit 3' },
+  'Unit 4 Americandy Manufacturers (PTY)LTD': { name: 'Americandy Manufacturers (Pty) Ltd', unit: 'Unit 4' },
+  'Unit 5 AGRANA': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 5' },
+  'Shop 6 Unit 6 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 6' },
+  'Shop 5 Unit 7 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 7' },
+  'Shop 4 Unit 8 Citrashine': { name: 'Citrashine (Pty) Ltd', unit: 'Unit 8 (Shop 4)' },
+  'Shop 3 Unit 9 SANSKAR Trading': { name: 'Sanskar Trading CC', unit: 'Unit 9' },
+  'Unit 10 Berzack Brothers (PYY) Ltd': { name: 'Berzack Brothers (Pty) Ltd', unit: 'Unit 10' },
+  'Unit 11 Surplus Grain Traders CC': { name: 'Surplus Grain Traders CC', unit: 'Unit 11' },
+  'Shop 2 Growers Connect - Mini Park': { name: 'Growers Connect (Pty) Ltd', unit: 'Shop 2' },
 };
 function applyTenantDisplayOverrides() {
   for (const [oldName, { name, unit }] of Object.entries(TENANT_DISPLAY_OVERRIDES)) {

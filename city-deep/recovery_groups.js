@@ -21,7 +21,9 @@
 // Renamed 2026-08-24 (was 'Unit 4 ATC SA Wireless Infrastructure (PTY) LTD') - keep in sync with
 // city-deep/seed.js's TENANT_DISPLAY_OVERRIDES, since this array matches by exact tenant.name.
 const EXTRA_INDUSTRIAL_TENANTS = ['ATC SA Wireless Infrastructure (Pty) Ltd'];
-const RITTLE_TENANTS = ['Shop 2 Growers Connect - Mini Park'];
+// Renamed 2026-08-24 (was 'Shop 2 Growers Connect - Mini Park') - keep in sync with
+// city-deep/seed.js's TENANT_DISPLAY_OVERRIDES, since this array matches by exact tenant.name.
+const RITTLE_TENANTS = ['Growers Connect (Pty) Ltd'];
 
 // `siteNameForMunicipal` must match municipal_compare.js's SITE_MAP values exactly so
 // tenant_recovery.js's municipalSideFor() resolves the right account(s) automatically.
