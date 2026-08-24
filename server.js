@@ -96,8 +96,8 @@ require('./cranbrook-flavours/import_history').run('cranbrook-flavours.db');
 // missing, no statement provided for it) - own de-dup key (label), separate tables from the above
 // (see db.js), always safe to re-run; see bob-martin/municipal_import.js for extraction notes.
 require('./bob-martin/municipal_import').run('bob-martin.db');
-// AutoZone's actual municipal account statements (Dec 2025, Jan/Mar/Apr/May/Jun 2026 - Feb 2026 and
-// Jul 2026 missing, no statement provided for either) - own de-dup key (label), separate tables from
+// AutoZone's actual municipal account statements (Dec 2025, Jan/Mar/Apr/May/Jun/Jul 2026 - Feb 2026
+// still missing, no statement provided for it) - own de-dup key (label), separate tables from
 // the above (see db.js), always safe to re-run; see autozone/municipal_import.js for the tariff-year
 // change / meter-not-read / INTERIM REVERSAL anomaly notes flagged during extraction.
 require('./autozone/municipal_import').run('autozone.db');
@@ -1135,13 +1135,20 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
   const period = get('SELECT * FROM billing_periods WHERE id=?', [bill.billing_period_id]);
   const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' ORDER BY id", [bill.id]);
   const waterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water' ORDER BY id", [bill.id]);
+  // Same meter-serial lookup the on-screen billing-slip page uses (billDetailPage's elecMeters/
+  // waterMeters), added to the PDF 2026-08-24 so tenants can match the slip to their physical
+  // meter without querying it.
+  const elecMeterSerials = all(`SELECT DISTINCT m.serial FROM bill_line_items bli
+    JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='electricity'`, [bill.id]).map(r => r.serial);
+  const waterMeterSerials = all(`SELECT DISTINCT m.serial FROM bill_line_items bli
+    JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='water'`, [bill.id]).map(r => r.serial);
   const monthlyTrend = monthlyTrendForTenant(tenant.id, period.start_date);
   const pdfBuf = buildBillingSlipPdf({
     tenantName: tenant.name, invoiceNumber: bill.invoice_number, unit: tenant.unit,
     periodLabel: period.label, accountNumber: tenant.account_number, startDate: period.start_date,
     endDate: period.end_date, dueDate: period.due_date, vatNumber: tenant.vat_number,
     elecConsumption: bill.electricity_consumption_kwh.toFixed(2), waterConsumption: bill.water_consumption_m3.toFixed(2),
-    elecLineItems: elecItems, waterLineItems: waterItems,
+    elecLineItems: elecItems, waterLineItems: waterItems, elecMeterSerials, waterMeterSerials,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
     status: bill.status, generatedAt: bill.generated_at, monthlyTrend, propertyName: currentPropertyName(user),
   });

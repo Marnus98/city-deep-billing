@@ -1,9 +1,9 @@
 // autozone/municipal_import.js - imports AutoZone's actual City of Johannesburg municipal account
 // statements (as opposed to import_history.js, which is what HolmStone bills the client - see
 // db.js's municipal_tariffs/municipal_statement_slips for why these live in a separate set of
-// tables, same split as every other property's municipal import). Source: 6 real "TAX INVOICE"
-// statements the client uploaded (Dec 2025, Jan/Mar/Apr/May/Jun 2026 - Feb 2026 and Jul 2026 simply
-// have no statement yet).
+// tables, same split as every other property's municipal import). Source: 7 real "TAX INVOICE"
+// statements the client uploaded (Dec 2025, Jan/Mar/Apr/May/Jun/Jul 2026 - Feb 2026 is the one
+// remaining month with no statement yet).
 //
 // This is a genuinely different municipal format from every Ekurhuleni-based site in this app: City
 // of Johannesburg combines four separately VAT-registered sub-accounts on one statement (City of
@@ -191,6 +191,28 @@ const MONTHS = [
       water: { reading: 3393.999, comment: 'Combined 3,294.176kL + 99.823kL tranches, mid-cycle rate change - see file header note 2' },
       sewer: { reading: 3393.999, comment: 'Combined 3,294.176kL + 99.823kL tranches, mid-cycle rate change - see file header note 2' },
     } },
+  // July 2026 - added 2026-08-20, fills the one remaining gap in this batch (Feb 2026 still has no
+  // statement). Back to a clean single reading period/rate throughout (no mid-cycle blend like
+  // May/June above) - same 2026/2027 rate card June 2026 introduced (Property Rates R117,733.76,
+  // demand R461.28/kVA, Service Charge R4,629.64, Demand Management Levy R413.84, PIKITUP levy
+  // R1,112.00), all four energy registers reading normally again (unlike June's zero-consumption
+  // anomaly). Reactive energy is free this cycle (R0.0000/kVArh), same as most months in this batch.
+  { label: '2026-07', startDate: '2026-07-02', endDate: '2026-07-31', waterStartDate: '2026-07-02', waterEndDate: '2026-07-28',
+    rates: {
+      property_rates: 117733.76,
+      peak_high: 0, peak_low: 7.6624, standard_high: 0, standard_low: 2.9256, offpeak_high: 0, offpeak_low: 2.0044,
+      surcharge_tou: 0, reactive_energy: 0,
+      network_surcharge: 7072.74 / 117879, demand_charge: 94239.50 / 204.300, service_charge: 4629.64,
+      water: 207302.52 / 2676, demand_management_levy: 413.84, sewer: 156974.16 / 2676,
+      refuse: 1112.00, sundry_surcharge: 7285.53 + 10974.97,
+    },
+    readings: {
+      peak_low: 27386.000, standard_low: 63670.000, offpeak_low: 26823.000,
+      reactive_energy: 31246.000,
+      network_surcharge: { reading: 117879, comment: 'Total metered kWh (peak+standard+offpeak) this cycle' },
+      demand_charge: { reading: 204.300, comment: 'Demand=204.300' },
+      water: 2676, sewer: 2676,
+    } },
 ];
 
 function main(dbFile = 'autozone.db') {
@@ -207,7 +229,7 @@ function main(dbFile = 'autozone.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`AutoZone municipal account import: ${created} statement(s) added (Dec 2025 - Jun 2026, Feb 2026 and Jul 2026 missing).`);
+  if (created) console.log(`AutoZone municipal account import: ${created} statement(s) added (Dec 2025 - Jul 2026, Feb 2026 missing).`);
   return db;
 }
 

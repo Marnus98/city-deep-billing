@@ -100,6 +100,36 @@ const TENANT_NAME_ALIASES = {
 };
 function canonicalTenantName(name) { return TENANT_NAME_ALIASES[name] || name; }
 
+// Client-requested display renames for the Industrial Park section (2026-08-24), giving each
+// tenant its correct registered company name plus a proper unit number instead of the informal
+// name that came off the source workbook tabs. This is intentionally a SEPARATE map from
+// TENANT_NAME_ALIASES above: TENANT_NAME_ALIASES is a create/lookup key used *before* a tenant
+// row exists (so two entries that alias to the same value get merged into one row), whereas two
+// of these renames deliberately point at the SAME new company name for two different, separately
+// metered units (AGRANA Fruit's Unit 2B and Unit 2C) - folding those into TENANT_NAME_ALIASES
+// would collapse them into a single tenant record and silently merge their meters/bills on the
+// next fresh reseed. So this map is applied as a post-creation UPDATE instead, keyed by each
+// tenant's own original workbook name, after every tenant row for the month already exists.
+const TENANT_DISPLAY_OVERRIDES = {
+  'Kimmo (PTY) LTD - Industrial Park': { name: 'Kimmo (Pty) Ltd', unit: 'Unit 1' },
+  'AGRANA Fruit - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2B' },
+  'AGRANA Fruit Warehouse/Office - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2C' },
+  'Lesco - Industrial Park': { name: 'Lesco Manufacturing (Pty) Ltd', unit: 'Unit 2A' },
+  'Unit 3 HUDACO Trading - Industrial Park': { name: 'Hudaco Trading (Pty) Ltd', unit: 'Unit 3' },
+  'Unit 4A JC Bakery (PTY) LTD - Industrial Park': { name: 'JC Bakeries (Pty) Ltd', unit: 'Unit 4A' },
+  'Unit 4B JC Bakery (PTY) LTD - Industrial Park': { name: 'JC Bakeries (Pty) Ltd', unit: 'Unit 4B' },
+  'Unit 5A Skillcraft Agencies - Industrial Park': { name: 'Skillcraft Agencies (Pty) Ltd', unit: 'Unit 5A' },
+  'Unit 5B Skillcraft Agencies - Industrial Park': { name: 'Skillcraft Agencies (Pty) Ltd', unit: 'Unit 5B' },
+  'Unit 6A&B TERAOKA SA- Industrial Park': { name: 'Teraoka Sa (Pty) Ltd', unit: 'Unit 6A&B' },
+  'Unit 6C TERAOKA SA- Industrial Park': { name: 'Teraoka Sa (Pty) Ltd', unit: 'Unit 6C' },
+  'Unit 4 ATC SA Wireless Infrastructure (PTY) LTD': { name: 'ATC SA Wireless Infrastructure (Pty) Ltd', unit: 'Unit 6' },
+};
+function applyTenantDisplayOverrides() {
+  for (const [oldName, { name, unit }] of Object.entries(TENANT_DISPLAY_OVERRIDES)) {
+    run('UPDATE tenants SET name=?, unit=? WHERE name=?', [name, unit, oldName]);
+  }
+}
+
 // ---------- Tenants / Meters / Assignments ----------
 function getOrCreateTenant(name, siteName) {
   name = canonicalTenantName(name);
@@ -375,6 +405,7 @@ function main(dbFile = 'city-deep.db') {
   try {
     seedUsers();
     for (const monthData of months) seedMonth(monthData);
+    applyTenantDisplayOverrides();
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');

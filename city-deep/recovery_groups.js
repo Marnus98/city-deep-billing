@@ -18,7 +18,9 @@
 // Moving either tenant's site_id to match the image would silently change its real bill (turn the
 // Y-charge on/off), which is a genuine billing bug, not a cosmetic fix - so the override lives only
 // here, read-only, used solely to build the Recovery comparison rows.
-const EXTRA_INDUSTRIAL_TENANTS = ['Unit 4 ATC SA Wireless Infrastructure (PTY) LTD'];
+// Renamed 2026-08-24 (was 'Unit 4 ATC SA Wireless Infrastructure (PTY) LTD') - keep in sync with
+// city-deep/seed.js's TENANT_DISPLAY_OVERRIDES, since this array matches by exact tenant.name.
+const EXTRA_INDUSTRIAL_TENANTS = ['ATC SA Wireless Infrastructure (Pty) Ltd'];
 const RITTLE_TENANTS = ['Shop 2 Growers Connect - Mini Park'];
 
 // `siteNameForMunicipal` must match municipal_compare.js's SITE_MAP values exactly so
