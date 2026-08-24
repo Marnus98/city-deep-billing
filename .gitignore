@@ -1,0 +1,11 @@
+# Runtime-only - recreated automatically on boot (see db.js / server.js), never hand-edited.
+data/*.db
+data/*.db-journal
+
+# Meter-reading photos uploaded via the "Capture readings" page (see server.js) - live user
+# data written to the running server's disk, not something to hand-maintain in the repo.
+public/meter-photos/
+
+node_modules/
+.deploy-key/
+.deploy-key/

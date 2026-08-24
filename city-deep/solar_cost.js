@@ -16,15 +16,16 @@
 // and never appears on these invoices, so it's unaffected - see SECTION_SUB_SITES below, used by
 // server.js's currentPropRecoverySections() to decide which sections get a solar deduction at all.
 //
-// Source: 4 monthly Tax Invoices from Capital Propfund (Pty) Ltd (uploaded by the client
-// 2026-08-11) - INV2600 (Feb 2026), INV2657 (Apr 2026), INV2684 (May 2026), INV2735 (Jun 2026).
-// Jan 2026, Mar 2026, and everything before Feb 2026 / after Jun 2026 has no invoice yet - those
-// months simply get a R0 solar deduction (see solarCostForSection's fallback) rather than blocking
-// the whole Recovery page. Each invoice's own period happens to line up with exactly one City Deep
-// billing_period's own majority-consumption-month label (e.g. "1-28.02.2026" -> billing_periods
-// label '2026-02', confirmed against every period's real start/end dates in the DB before wiring
-// this in - see tenant_recovery.js's consumptionMonthLabel for the same convention used elsewhere),
-// so matching by label alone is safe here - no date-overlap logic needed, unlike the municipal side.
+// Source: 5 monthly Tax Invoices from Capital Propfund (Pty) Ltd - INV2600 (Feb 2026), INV2657
+// (Apr 2026), INV2684 (May 2026), INV2735 (Jun 2026) uploaded 2026-08-11, and INV2756 (Jul 2026)
+// uploaded 2026-08-24. Jan 2026, Mar 2026, and everything before Feb 2026 / after Jul 2026 has no
+// invoice yet - those months simply get a R0 solar deduction (see solarCostForSection's fallback)
+// rather than blocking the whole Recovery page. Each invoice's own period happens to line up with
+// exactly one City Deep billing_period's own majority-consumption-month label (e.g. "1-28.02.2026"
+// -> billing_periods label '2026-02', confirmed against every period's real start/end dates in the
+// DB before wiring this in - see tenant_recovery.js's consumptionMonthLabel for the same convention
+// used elsewhere), so matching by label alone is safe here - no date-overlap logic needed, unlike
+// the municipal side.
 const INVOICES = [
   { invoiceNumber: 'INV2600', invoiceDate: '2026-03-18', periodLabel: '2026-02', startDate: '2026-02-01', endDate: '2026-02-28',
     lines: { south: 168096.02, north: 196156.04, mini: 84670.93 } },
@@ -34,6 +35,8 @@ const INVOICES = [
     lines: { south: 130061.13, north: 149344.90, mini: 53604.97 } },
   { invoiceNumber: 'INV2735', invoiceDate: '2026-07-24', periodLabel: '2026-06', startDate: '2026-06-01', endDate: '2026-06-30',
     lines: { south: 157687.13, north: 164401.47, mini: 42082.03 } },
+  { invoiceNumber: 'INV2756', invoiceDate: '2026-08-07', periodLabel: '2026-07', startDate: '2026-07-01', endDate: '2026-07-31',
+    lines: { south: 194781.07, north: 202714.50, mini: 52060.61 } },
 ];
 
 // sub_site is one of 'south'/'north'/'mini' (short internal key, not the full "City Deep South"
