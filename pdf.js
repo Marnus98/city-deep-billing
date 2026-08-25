@@ -1393,15 +1393,19 @@ function buildFlaggingReportPdf(data) {
   const sorted = [...allRows].sort((a, b) => rank[a.level] - rank[b.level]);
   const latestLabel = allRows.length ? allRows[0].stats.latest.label : '';
 
+  // No Comment column here (removed 2026-08-25 per client feedback - a one-line truncated reason
+  // "looks kak" squeezed into a table cell); the full reason text is its own paragraph under each
+  // entity's own chart/table entry further down the page instead. Site/Account gets the width the
+  // Comment column used to have, since it's the one column here that can genuinely run long
+  // (municipal account titles, tenant names).
   y = drawFlagTable(doc, {
     title: `Exception Summary${latestLabel ? ` - ${latestLabel}` : ''}`,
     left, right, y, propertyName,
     cols: [
-      { label: 'Site / Account', width: 158, get: (r) => r.title },
+      { label: 'Site / Account', width: right - left - 148, get: (r) => r.title },
       { label: 'Utility', width: 55, get: (r) => r.utility[0].toUpperCase() + r.utility.slice(1) },
       { label: 'Flag', width: 45, dot: (r) => FLAG_COLOR[r.level] },
       { label: 'Variance', width: 48, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
-      { label: 'Comment', width: right - left - 306, get: (r) => r.reasons[0] || '' },
     ],
     rows: sorted,
   });

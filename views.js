@@ -1723,6 +1723,9 @@ function flagTable(heading, labelHeading, rows, opts = {}) {
 // report to RPI": every evaluated row (latest month only, since that's what stats.latest already
 // is), red first. Includes green rows too, matching the spec's own worked example (which lists a
 // 🟢 row alongside the 🔴/🟠 ones) so RPI sees the full picture at a glance, not just the exceptions.
+// No Comment column here (removed 2026-08-25 per client feedback - a one-line truncated reason
+// squeezed into a table cell "looks kak"); the full reason text lives as its own paragraph under
+// each entity's own chart/table entry further down the page instead, where there's room for it.
 function exceptionSummaryTable(allRows) {
   const rank = { red: 0, amber: 1, green: 2 };
   const sorted = [...allRows].sort((a, b) => rank[a.level] - rank[b.level]);
@@ -1734,7 +1737,7 @@ function exceptionSummaryTable(allRows) {
     <table class="w-full text-sm">
       <thead><tr class="text-left border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
         <th class="px-3 py-2">Site / Account</th><th class="px-3 py-2">Utility</th><th class="px-3 py-2">Flag</th>
-        <th class="px-3 py-2 text-right">Variance</th><th class="px-3 py-2">Comment</th>
+        <th class="px-3 py-2 text-right">Variance</th>
       </tr></thead>
       <tbody>
       ${sorted.map((r) => `<tr class="border-b last:border-0">
@@ -1742,7 +1745,6 @@ function exceptionSummaryTable(allRows) {
         <td class="px-3 py-2 capitalize">${esc(r.utility)}</td>
         <td class="px-3 py-2">${flagBadge(r.level)}</td>
         <td class="px-3 py-2 text-right">${pctStr(r.pctVsBaseline)}</td>
-        <td class="px-3 py-2 text-xs text-slate-600">${esc(r.reasons[0] || '')}</td>
       </tr>`).join('')}
       </tbody>
     </table>

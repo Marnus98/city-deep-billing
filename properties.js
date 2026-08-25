@@ -44,6 +44,12 @@ module.exports = [
     // wingfield/flagging_data.js and flat_site_flagging_data.js for the other two billingModels'
     // own data layers, and server.js's currentPropFlagRows for how the right one gets picked.
     hasFlagging: true,
+    // Chart-based Flagging layout (see views.js's chartSection/trendChartCard, pdf.js's
+    // drawFlagChartCard) - monthly consumption bars with a shaded average/amber/red band, a real
+    // Y-axis, and a short description, instead of the dense flagDetailRows table. Piloted on
+    // AutoZone only, then rolled out to every property including all of a tenant-model property's
+    // own flagged tenants (2026-08-25, confirmed by the client).
+    flaggingChartLayout: true,
   },
   {
     slug: 'wingfield',
@@ -60,6 +66,7 @@ module.exports = [
     // See wingfield/flagging_data.js - single municipal account + whole-site "section" + every
     // tenant, same rollout as City Deep (2026-08-25).
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'field-street',
@@ -72,6 +79,7 @@ module.exports = [
     // flat_site_recovery.js) applies here.
     hasMunicipalStatements: true,
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'bob-martin',
@@ -81,6 +89,7 @@ module.exports = [
     billingModel: 'flat_site',
     hasMunicipalStatements: true,
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'loper-road',
@@ -90,6 +99,7 @@ module.exports = [
     billingModel: 'flat_site',
     hasMunicipalStatements: true,
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'autozone',
@@ -99,12 +109,9 @@ module.exports = [
     billingModel: 'flat_site',
     hasMunicipalStatements: true,
     hasFlagging: true,
-    // Chart-based Flagging layout prototype (see views.js's chartSection/trendChartCard) - monthly
-    // consumption bars with a shaded average/amber/red band and a short description, instead of the
-    // dense flagDetailRows table - client feedback 2026-08-25 that the table is hard to scan.
-    // Piloting on AutoZone only; remove this flag (and the branch in views.js's flaggingPage) once
-    // approved and rolled out everywhere, same "one property first" pattern the Flagging tab itself
-    // shipped with.
+    // Chart-based Flagging layout (see views.js's chartSection/trendChartCard) - piloted here first
+    // (client feedback 2026-08-25 that the old flagDetailRows table was hard to scan), then rolled
+    // out to every property once approved - see the other properties below for the same flag.
     flaggingChartLayout: true,
   },
   {
@@ -118,6 +125,7 @@ module.exports = [
     // flat_site_recovery.js) applies here too.
     hasMunicipalStatements: true,
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'adh-machine-tool',
@@ -134,6 +142,7 @@ module.exports = [
     // Flagging still works with hasMunicipalStatements unset - flat_site_flagging_data.js just
     // shows the client-billing side only (Municipal Accounts table stays empty) until then.
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   // The following 4 - added 2026-08-20 alongside ADH Machine Tool above, all loose-standing sites on
   // the same "Loper Ave" tenant billing template (Ekurhuleni Tariff B, <=150A) - see
@@ -146,6 +155,7 @@ module.exports = [
     seedFile: './zelvio-global/seed',
     billingModel: 'flat_site',
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'interoll',
@@ -154,6 +164,7 @@ module.exports = [
     seedFile: './interoll/seed',
     billingModel: 'flat_site',
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'rcl-group',
@@ -162,6 +173,7 @@ module.exports = [
     seedFile: './rcl-group/seed',
     billingModel: 'flat_site',
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
   {
     slug: 'colorobbia',
@@ -170,5 +182,6 @@ module.exports = [
     seedFile: './colorobbia/seed',
     billingModel: 'flat_site',
     hasFlagging: true,
+    flaggingChartLayout: true,
   },
 ];
