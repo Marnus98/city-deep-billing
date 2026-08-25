@@ -89,6 +89,30 @@ function tenantSeriesInSection(db, sectionKey, utility) {
   return byTenant;
 }
 
+// Every tenant's own monthly series, one utility, ascending by billing_period.start_date - unlike
+// tenantSeriesInSection above (scoped to one Recovery section, keyed by name, used only for the
+// passive contributing-tenants drill-down), this covers every tenant property-wide and is keyed by
+// tenant.id so a future rename (see seed.js's TENANT_DISPLAY_OVERRIDES) doesn't orphan its review
+// history the way a name-keyed lookup would. Feeds buildAllFlagRows' tenantRows below, which runs
+// each one through the full flagging.js classifier - a real flag per tenant, not just a raw variance
+// number - specifically so a tenant's consumption jump/drop vs last month gets its own green/amber/
+// red rather than only surfacing as context under an already-flagged section (client request
+// 2026-08-25: "flag if a tenant consumption is much more/less than the previous month").
+function allTenantSeries(db, utility) {
+  const tenants = all(db, 'SELECT * FROM tenants ORDER BY name');
+  const periods = all(db, 'SELECT * FROM billing_periods ORDER BY start_date');
+  const col = utility === 'water' ? 'water_consumption_m3' : 'electricity_consumption_kwh';
+  return tenants.map((t) => {
+    const series = periods.map((p) => {
+      const row = get(db, `SELECT ${col} AS consumption FROM bills WHERE tenant_id=? AND billing_period_id=?`, [t.id, p.id]);
+      if (!row) return null;
+      const billingDays = municipalCompare.daysBetween(p.start_date, p.end_date) || 0;
+      return { label: p.label, consumption: row.consumption || 0, billingDays };
+    }).filter((r) => r && r.billingDays > 0);
+    return { tenantId: t.id, tenantName: t.name, unit: t.unit, series };
+  }).filter((t) => t.series.length);
+}
+
 // The 4 real COJ accounts at City Deep, in display order - separate from recovery_groups.js's 3
 // Recovery sections (Industrial A/B are one Recovery section but two physical accounts here).
 const MUNICIPAL_ACCOUNTS = [
@@ -153,10 +177,24 @@ function buildAllFlagRows(db, settings) {
       sectionRows.push({ entityType: 'site_section', entityKey: sec.key, title: sec.title, utility, ...result, annotation, contributingTenants });
     }
   }
-  return { municipalRows, sectionRows };
+  // Every tenant, property-wide, both utilities - a real flag per tenant (not just the passive
+  // contributing-tenants drill-down above), specifically covering month-vs-previous-month per the
+  // client's own framing (flagging.js's classify() already checks pctVsPrevious against
+  // mom_amber_pct/mom_red_pct alongside the baseline check - no engine change needed, just surfacing
+  // it here as a first-class row). entityType 'tenant' matches db.js's flag_annotations CHECK.
+  const tenantRows = [];
+  for (const utility of ['electricity', 'water']) {
+    for (const t of allTenantSeries(db, utility)) {
+      const result = flagging.evaluate(t.series, settings, utility);
+      const annotation = getAnnotation(db, 'tenant', String(t.tenantId), utility, result.stats.latest.label);
+      const title = t.unit ? `${t.tenantName} (${t.unit})` : t.tenantName;
+      tenantRows.push({ entityType: 'tenant', entityKey: String(t.tenantId), title, utility, ...result, annotation });
+    }
+  }
+  return { municipalRows, sectionRows, tenantRows };
 }
 
 module.exports = {
-  statementForToLabel, municipalAccountSeries, siteSectionSeries, tenantSeriesInSection, MUNICIPAL_ACCOUNTS,
+  statementForToLabel, municipalAccountSeries, siteSectionSeries, tenantSeriesInSection, allTenantSeries, MUNICIPAL_ACCOUNTS,
   getAnnotation, buildContributingTenants, buildAllFlagRows,
 };

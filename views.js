@@ -1456,12 +1456,13 @@ function recoveryPage({ user, sections, propertyName }) {
 // Internal review tool only (see flagging.js/city-deep/flagging_data.js) - the badge/emoji styling
 // here is purely presentational and intentionally doesn't require() the flagging engine module,
 // keeping the view layer's only dependency on it the plain row objects server.js already built.
-const FLAG_BADGE_CLASS = { green: 'bg-green-100 text-green-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700' };
 const FLAG_EMOJI = { green: '\u{1F7E2}', amber: '\u{1F7E0}', red: '\u{1F534}' };
 const FLAG_STATUSES = ['Open', 'Under Review', 'Explained', 'Municipality Query Required', 'Corrected', 'Closed'];
 
+// Dot only (no Green/Amber/Red text label) per client request 2026-08-25 - the coloured emoji
+// carries the meaning on its own; title="" keeps the level available on hover/screen readers.
 function flagBadge(level) {
-  return `<span class="badge ${FLAG_BADGE_CLASS[level] || 'bg-slate-100 text-slate-600'}">${FLAG_EMOJI[level] || ''} ${esc(level.toUpperCase())}</span>`;
+  return `<span title="${esc(level)}">${FLAG_EMOJI[level] || ''}</span>`;
 }
 function pctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`; }
 
@@ -1545,14 +1546,23 @@ function flagDetailRows(row) {
   </tr>`;
 }
 
-function flagTable(heading, rows) {
-  if (!rows.length) return `<h2 class="text-lg font-semibold mb-2 mt-6">${esc(heading)}</h2><div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No data yet.</div>`;
+// `labelHeading` names the first column ("Account"/"Section"/"Tenant") explicitly rather than
+// inferring it from `heading`, so this same table drawer works for the Tenants table too.
+// `opts.hiddenCount`, when set (Tenants table only - see flaggingPage below), notes how many green
+// rows are omitted so the table stays a scannable exceptions list instead of 50+ rows long.
+function flagTable(heading, labelHeading, rows, opts = {}) {
+  const note = opts.hiddenCount ? `<p class="text-xs text-slate-400 mb-2">${opts.hiddenCount} within normal range not shown.</p>` : '';
+  if (!rows.length) {
+    const empty = opts.hiddenCount != null ? 'No exceptions this month.' : 'No data yet.';
+    return `<h2 class="text-lg font-semibold mb-2 mt-6">${esc(heading)}</h2>${note}<div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">${empty}</div>`;
+  }
   return `
   <h2 class="text-lg font-semibold mb-2 mt-6">${esc(heading)}</h2>
+  ${note}
   <div class="bg-white rounded-lg border overflow-x-auto mb-6">
     <table class="w-full text-sm">
       <thead><tr class="text-left border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-        <th class="px-3 py-2">${heading === 'Municipal Accounts' ? 'Account' : 'Section'}</th><th class="px-3 py-2">Utility</th>
+        <th class="px-3 py-2">${esc(labelHeading)}</th><th class="px-3 py-2">Utility</th>
         <th class="px-3 py-2">Billing Period</th><th class="px-3 py-2 text-right">Days</th>
         <th class="px-3 py-2 text-right">Consumption</th><th class="px-3 py-2 text-right">Avg Daily</th>
         <th class="px-3 py-2 text-right">Historical Avg Daily</th><th class="px-3 py-2 text-right">Variance</th>
@@ -1593,8 +1603,11 @@ function exceptionSummaryTable(allRows) {
   </div>`;
 }
 
-function flaggingPage({ user, propertyName, municipalRows, sectionRows }) {
-  const allRows = [...municipalRows, ...sectionRows];
+function flaggingPage({ user, propertyName, municipalRows, sectionRows, tenantRows = [] }) {
+  // Tenants: only surface amber/red in both the summary and their own table - showing every green
+  // tenant every month (25+ tenants x 2 utilities) would bury the actual exceptions.
+  const flaggedTenantRows = tenantRows.filter((r) => r.level !== 'green');
+  const allRows = [...municipalRows, ...sectionRows, ...flaggedTenantRows];
   const body = `
   <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
     <div>
@@ -1607,8 +1620,9 @@ function flaggingPage({ user, propertyName, municipalRows, sectionRows }) {
     </div>
   </div>
   ${exceptionSummaryTable(allRows)}
-  ${flagTable('Municipal Accounts', municipalRows)}
-  ${flagTable('Site Sections (Our Billing)', sectionRows)}
+  ${flagTable('Municipal Accounts', 'Account', municipalRows)}
+  ${flagTable('Site Sections (Our Billing)', 'Section', sectionRows)}
+  ${flagTable('Tenants', 'Tenant', flaggedTenantRows, { hiddenCount: tenantRows.length - flaggedTenantRows.length })}
   `;
   return layout({ title: 'Flagging', user, active: '/flagging', body });
 }

@@ -1176,7 +1176,10 @@ function buildRecoveryPdf(data) {
 // be pasted straight into the Utility Management report to RPI) plus the two detail tables (spec
 // section 6). No per-row comment/status or tenant drill-down here - those are on-screen-only review
 // tools, not something that belongs in a static monthly PDF snapshot.
-const FLAG_LEVEL_LABEL = { green: 'GREEN', amber: 'AMBER', red: 'RED' };
+// Dot only in the Flag column (no GREEN/AMBER/RED text) per client request 2026-08-25, matching
+// views.js's on-screen flagBadge() - roughly Tailwind's green-600/amber-600/red-600 in 0-1 RGB,
+// since rect()'s fill takes the same [r,g,b] triple line()/rect() already use elsewhere in this file.
+const FLAG_COLOR = { green: [0.086, 0.639, 0.290], amber: [0.851, 0.467, 0.024], red: [0.863, 0.149, 0.149] };
 
 function flagPctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`; }
 
@@ -1225,6 +1228,16 @@ function drawFlagTable(doc, { title, cols, rows, left, right, y, propertyName })
       headerRow();
     }
     cols.forEach((c, i) => {
+      // Flag columns (see FLAG_COLOR above) draw a small filled square instead of text - same
+      // "dots only, no label" treatment as views.js's on-screen flagBadge().
+      if (c.dot) {
+        const color = c.dot(row) || [0.6, 0.6, 0.6];
+        doc.rect(colX[i] + (c.width - 7) / 2, y - 1, 7, 7, { fill: color });
+        // rect()'s fill colour is a persistent graphics-state param (not scoped to the shape) - reset
+        // to black immediately so it doesn't bleed into the next column's text() draw this row.
+        doc.currentOps.push('0 0 0 rg');
+        return;
+      }
       const raw = String(c.get(row));
       const val = fitCell(raw, c.width - CELL_PAD, { size: 7.5 });
       const tx = c.align === 'right' ? colX[i] + c.width - CELL_PAD - textWidth(val, { size: 7.5 }) : colX[i];
@@ -1249,7 +1262,10 @@ function buildFlaggingReportPdf(data) {
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 20;
 
-  const allRows = [...(data.municipalRows || []), ...(data.sectionRows || [])];
+  // Tenants: only amber/red make the PDF (same as views.js's flaggingPage) - every tenant every
+  // month would swamp a report meant to be pasted straight into the RPI summary.
+  const flaggedTenantRows = (data.tenantRows || []).filter((r) => r.level !== 'green');
+  const allRows = [...(data.municipalRows || []), ...(data.sectionRows || []), ...flaggedTenantRows];
   const rank = { red: 0, amber: 1, green: 2 };
   const sorted = [...allRows].sort((a, b) => rank[a.level] - rank[b.level]);
   const latestLabel = allRows.length ? allRows[0].stats.latest.label : '';
@@ -1260,7 +1276,7 @@ function buildFlaggingReportPdf(data) {
     cols: [
       { label: 'Site / Account', width: 158, get: (r) => r.title },
       { label: 'Utility', width: 55, get: (r) => r.utility[0].toUpperCase() + r.utility.slice(1) },
-      { label: 'Flag', width: 45, get: (r) => FLAG_LEVEL_LABEL[r.level] },
+      { label: 'Flag', width: 45, dot: (r) => FLAG_COLOR[r.level] },
       { label: 'Variance', width: 48, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
       { label: 'Comment', width: right - left - 306, get: (r) => r.reasons[0] || '' },
     ],
@@ -1277,7 +1293,7 @@ function buildFlaggingReportPdf(data) {
     { label: 'Avg Daily', width: 52, align: 'right', get: (r) => money2(r.stats.latest.avgDaily) },
     { label: 'Hist. Avg Daily', width: 58, align: 'right', get: (r) => r.stats.baselineAvgDaily != null ? money2(r.stats.baselineAvgDaily) : '-' },
     { label: 'Variance', width: 42, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
-    { label: 'Flag', width: 33, get: (r) => FLAG_LEVEL_LABEL[r.level] },
+    { label: 'Flag', width: 33, dot: (r) => FLAG_COLOR[r.level] },
   ];
 
   y = drawFlagTable(doc, {
@@ -1288,6 +1304,11 @@ function buildFlaggingReportPdf(data) {
   y = drawFlagTable(doc, {
     title: 'Site Sections (Our Billing)', left, right, y, propertyName,
     cols: detailCols('Section'), rows: data.sectionRows || [],
+  });
+  y -= 10;
+  y = drawFlagTable(doc, {
+    title: 'Tenants (exceptions only)', left, right, y, propertyName,
+    cols: detailCols('Tenant'), rows: flaggedTenantRows,
   });
 
   doc.text(left, 30, `Generated ${data.generatedAt || ''}`, { size: 7 });
