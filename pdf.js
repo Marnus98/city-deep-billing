@@ -77,9 +77,15 @@ class PDFDoc {
     }
     return this;
   }
-  line(x1, y1, x2, y2, width = 0.75, { color } = {}) {
-    const colorOp = color ? `${color[0]} ${color[1]} ${color[2]} RG ` : '';
-    this.currentOps.push(`${colorOp}${width} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
+  // `color` and `dash` (a [on, off] array, e.g. [3,3]) always emit an explicit reset when omitted
+  // (solid black) rather than leaving whatever the previous line() call last set - stroke colour/
+  // dash are persistent graphics-state params like rect()'s fill colour (see rect() below and its
+  // callers' own "reset to black" comments), so a colored/dashed gridline drawn earlier in the same
+  // chart would otherwise silently bleed into the next plain axis line with no color of its own.
+  line(x1, y1, x2, y2, width = 0.75, { color, dash } = {}) {
+    const colorOp = color ? `${color[0]} ${color[1]} ${color[2]} RG ` : '0 0 0 RG ';
+    const dashOp = dash ? `[${dash.join(' ')}] 0 d ` : '[] 0 d ';
+    this.currentOps.push(`${colorOp}${dashOp}${width} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
     return this;
   }
   rect(x, y, w, h, { fill } = {}) {
@@ -1248,6 +1254,123 @@ function drawFlagTable(doc, { title, cols, rows, left, right, y, propertyName })
   return y - 10;
 }
 
+// Greedy word-wrap using the same textWidth() metrics every fitCell()/column layout in this file
+// already relies on - returns an array of lines, each guaranteed to fit within maxWidth. Used for
+// the plain-English description under each Flagging chart card (drawFlagChartCard below); nothing
+// else in this file currently needs multi-line wrapped text (every other block of prose is either
+// short enough to fit one line or gets truncated via fitCell instead).
+function wrapText(str, maxWidth, opts) {
+  const words = String(str || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+  for (const w of words) {
+    const trial = current ? `${current} ${w}` : w;
+    if (textWidth(trial, opts) <= maxWidth || !current) { current = trial; } else { lines.push(current); current = w; }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+// Chart-layout Flagging PDF (see properties.js's flaggingChartLayout, views.js's matching on-screen
+// bandedTrendChart/trendChartCard - built together 2026-08-25 after client feedback that the plain
+// table was "hard to read" and asking specifically for "a proper graph with axis"). Same visual
+// language as drawSingleSeriesChart above (Y-axis gridlines + tick labels, bottom axis line, month
+// labels) - reusing that established, already-shipped chart convention rather than inventing a new
+// one - plus a shaded "expected range" band (from the same baselineMonthlyAvg/amber_pct/red_pct
+// numbers driving the row's own dot colour, so nothing here is a re-approximation) and the latest
+// bar coloured to match its classification. Returns the y position after the chart (NOT including
+// the month-label row, which is drawn just below the axis - callers should leave ~26pt after `y -
+// height` for it, matching drawSingleSeriesChart's own convention).
+function drawBandedSeriesChart(doc, { x, y, width, height, series, unit, baselineMonthlyAvg, amberPct, redPct, level }) {
+  const recent = (series || []).slice(-12);
+  const chartBottom = y - height;
+  const n = recent.length || 1;
+  const colWidth = width / n;
+  const barWidth = Math.min(26, colWidth * 0.55);
+  const values = recent.map((s) => s.consumption);
+  const hasBand = baselineMonthlyAvg != null && baselineMonthlyAvg > 0;
+  const upperRed = hasBand ? baselineMonthlyAvg * (1 + redPct / 100) : null;
+  const upperAmber = hasBand ? baselineMonthlyAvg * (1 + amberPct / 100) : null;
+  const lowerAmber = hasBand ? Math.max(0, baselineMonthlyAvg * (1 - amberPct / 100)) : null;
+  const lowerRed = hasBand ? Math.max(0, baselineMonthlyAvg * (1 - redPct / 100)) : null;
+  const maxVal = Math.max(1, ...values, upperRed || 0) * 1.08;
+  const yOf = (v) => chartBottom + (v / maxVal) * height;
+
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const v = (maxVal * t) / ticks;
+    const ty = chartBottom + (height * t) / ticks;
+    doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
+    const label = qtyShort(v, unit);
+    doc.text(x - 6 - textWidth(label, { size: 6 }), ty - 3, label, { size: 6 });
+  }
+
+  // Amber band drawn first (full lowerRed..upperRed span), green band drawn on top covering the
+  // middle - matches views.js's bandedConsumptionChart layering (see that function's own comment).
+  if (hasBand) {
+    doc.rect(x, yOf(lowerRed), width, yOf(upperRed) - yOf(lowerRed), { fill: [0.996, 0.937, 0.812] });
+    doc.currentOps.push('0 0 0 rg');
+    doc.rect(x, yOf(lowerAmber), width, yOf(upperAmber) - yOf(lowerAmber), { fill: [0.863, 0.945, 0.863] });
+    doc.currentOps.push('0 0 0 rg');
+    doc.line(x, yOf(baselineMonthlyAvg), x + width, yOf(baselineMonthlyAvg), 0.6, { color: [0.4, 0.4, 0.4], dash: [3, 3] });
+  }
+
+  recent.forEach((s, i) => {
+    const colX = x + i * colWidth + (colWidth - barWidth) / 2;
+    const val = s.consumption;
+    const h = Math.max(0.5, (val / maxVal) * height);
+    const isLatest = i === recent.length - 1;
+    const color = isLatest ? (FLAG_COLOR[level] || [0.11, 0.16, 0.34]) : [0.58, 0.64, 0.72];
+    doc.rect(colX, chartBottom, barWidth, h, { fill: color });
+    doc.currentOps.push('0 0 0 rg');
+    if (isLatest) {
+      const label = qtyShort(val, unit);
+      doc.text(colX + barWidth / 2 - textWidth(label, { size: 6, bold: true }) / 2, chartBottom + h + 4, label, { size: 6, bold: true });
+    }
+    doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 12, shortMonthLabel(s.label), { size: 6 });
+  });
+
+  doc.line(x, chartBottom, x + width, chartBottom, 0.75);
+  return chartBottom;
+}
+
+// One entity+utility's full chart card for the PDF - title + dot + variance, the banded chart
+// (Y-axis reserves 34pt on the left, matching drawSingleSeriesChart's own axis-label convention),
+// and the same 1-2 sentence description views.js's trendChartCard shows on-screen. Pages
+// automatically when it wouldn't fit above the bottom margin. Returns the y position after the card.
+function drawFlagChartCard(doc, { row, settings, left, right, y, propertyName }) {
+  const chartHeight = 92;
+  const cardHeight = 20 + chartHeight + 26 + 24; // title + chart + month-labels + ~2 description lines
+  if (y - cardHeight < 50) {
+    doc.newPage();
+    doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true });
+    y = PAGE_H - 74;
+  }
+  const titleOpts = { size: 10.5, bold: true };
+  doc.text(left, y, row.title, titleOpts);
+  // Plain ASCII separator, not a middle-dot - the hand-rolled PDF writer only reliably renders
+  // base-14 WinAnsi glyphs it's been explicitly tested with (see fitCell's own "..." vs "…" note
+  // above); a middle dot rendered as a stray accent-like glyph here during verification.
+  const utilLabel = `  - ${row.utility[0].toUpperCase()}${row.utility.slice(1)}`;
+  doc.text(left + textWidth(row.title, titleOpts), y, utilLabel, { size: 9 });
+  doc.rect(right - 96, y - 6, 7, 7, { fill: FLAG_COLOR[row.level] || [0.6, 0.6, 0.6] });
+  doc.currentOps.push('0 0 0 rg');
+  doc.text(right - 84, y - 5, `${flagPctStr(row.pctVsBaseline)} vs average`, { size: 8 });
+  y -= 20;
+
+  const chartX = left + 34;
+  drawBandedSeriesChart(doc, {
+    x: chartX, y, width: right - chartX, height: chartHeight, series: row.series,
+    unit: row.utility === 'water' ? 'kL' : 'kWh',
+    baselineMonthlyAvg: row.stats.baselineMonthlyAvg, amberPct: settings.amber_pct, redPct: settings.red_pct, level: row.level,
+  });
+  y -= chartHeight + 24;
+
+  const lines = wrapText(row.reasons.slice(0, 2).join(' '), right - left, { size: 7.5 });
+  for (const line of lines) { doc.text(left, y, line, { size: 7.5 }); y -= 10; }
+  return y - 8;
+}
+
 function buildFlaggingReportPdf(data) {
   const doc = new PDFDoc();
   const left = 42, right = PAGE_W - 42;
@@ -1284,36 +1407,52 @@ function buildFlaggingReportPdf(data) {
   });
   y -= 10;
 
-  const detailCols = (labelCol) => [
-    { label: labelCol, width: 154, get: (r) => r.title },
-    { label: 'Utility', width: 46, get: (r) => r.utility[0].toUpperCase() + r.utility.slice(1) },
-    { label: 'Period', width: 42, get: (r) => r.stats.latest.label },
-    { label: 'Days', width: 26, align: 'right', get: (r) => r.stats.latest.billingDays },
-    { label: 'Consumption', width: 58, align: 'right', get: (r) => money2(r.stats.latest.consumption) },
-    { label: 'Avg Daily', width: 52, align: 'right', get: (r) => money2(r.stats.latest.avgDaily) },
-    { label: 'Hist. Avg Daily', width: 58, align: 'right', get: (r) => r.stats.baselineAvgDaily != null ? money2(r.stats.baselineAvgDaily) : '-' },
-    { label: 'Variance', width: 42, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
-    { label: 'Flag', width: 33, dot: (r) => FLAG_COLOR[r.level] },
-  ];
+  if (data.useCharts) {
+    // Chart layout (prototype, AutoZone only for now - see properties.js's flaggingChartLayout,
+    // views.js's matching on-screen trendChartCard) - one drawFlagChartCard per entity+utility
+    // instead of the dense detail tables, per client feedback 2026-08-25 ("a proper graph with
+    // axis" - see drawBandedSeriesChart's own header comment).
+    const chartSection = (title, rows) => {
+      if (!rows.length) return;
+      if (y < 130) { doc.newPage(); doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true }); y = PAGE_H - 74; }
+      doc.text(left, y, title, { size: 11, bold: true }); y -= 16;
+      for (const row of rows) y = drawFlagChartCard(doc, { row, settings: data.settings || {}, left, right, y, propertyName });
+    };
+    chartSection('Municipal Accounts', data.municipalRows || []);
+    chartSection('Site Sections (Our Billing)', data.sectionRows || []);
+    chartSection('Tenants (exceptions only)', flaggedTenantRows);
+  } else {
+    const detailCols = (labelCol) => [
+      { label: labelCol, width: 154, get: (r) => r.title },
+      { label: 'Utility', width: 46, get: (r) => r.utility[0].toUpperCase() + r.utility.slice(1) },
+      { label: 'Period', width: 42, get: (r) => r.stats.latest.label },
+      { label: 'Days', width: 26, align: 'right', get: (r) => r.stats.latest.billingDays },
+      { label: 'Consumption', width: 58, align: 'right', get: (r) => money2(r.stats.latest.consumption) },
+      { label: 'Avg Daily', width: 52, align: 'right', get: (r) => money2(r.stats.latest.avgDaily) },
+      { label: 'Hist. Avg Daily', width: 58, align: 'right', get: (r) => r.stats.baselineAvgDaily != null ? money2(r.stats.baselineAvgDaily) : '-' },
+      { label: 'Variance', width: 42, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
+      { label: 'Flag', width: 33, dot: (r) => FLAG_COLOR[r.level] },
+    ];
 
-  y = drawFlagTable(doc, {
-    title: 'Municipal Accounts', left, right, y, propertyName,
-    cols: detailCols('Account'), rows: data.municipalRows || [],
-  });
-  y -= 10;
-  y = drawFlagTable(doc, {
-    title: 'Site Sections (Our Billing)', left, right, y, propertyName,
-    cols: detailCols('Section'), rows: data.sectionRows || [],
-  });
-  // Skip the table entirely for a property with no tenants at all (every flat_site property - see
-  // flat_site_flagging_data.js, which always returns tenantRows: []) rather than printing an empty
-  // "Tenants (exceptions only)" header with nothing under it.
-  if ((data.tenantRows || []).length) {
+    y = drawFlagTable(doc, {
+      title: 'Municipal Accounts', left, right, y, propertyName,
+      cols: detailCols('Account'), rows: data.municipalRows || [],
+    });
     y -= 10;
     y = drawFlagTable(doc, {
-      title: 'Tenants (exceptions only)', left, right, y, propertyName,
-      cols: detailCols('Tenant'), rows: flaggedTenantRows,
+      title: 'Site Sections (Our Billing)', left, right, y, propertyName,
+      cols: detailCols('Section'), rows: data.sectionRows || [],
     });
+    // Skip the table entirely for a property with no tenants at all (every flat_site property - see
+    // flat_site_flagging_data.js, which always returns tenantRows: []) rather than printing an empty
+    // "Tenants (exceptions only)" header with nothing under it.
+    if ((data.tenantRows || []).length) {
+      y -= 10;
+      y = drawFlagTable(doc, {
+        title: 'Tenants (exceptions only)', left, right, y, propertyName,
+        cols: detailCols('Tenant'), rows: flaggedTenantRows,
+      });
+    }
   }
 
   doc.text(left, 30, `Generated ${data.generatedAt || ''}`, { size: 7 });

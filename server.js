@@ -901,7 +901,9 @@ route('GET', '/flagging-pdf', async (req, res) => {
   const data = currentPropFlagRows(user);
   if (!data) return redirect(res, '/dashboard');
   const propertyName = currentPropertyName(user);
-  const pdfBuf = buildFlaggingReportPdf({ propertyName, ...data, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  const useCharts = !!(currentProp && currentProp.flaggingChartLayout);
+  const pdfBuf = buildFlaggingReportPdf({ propertyName, useCharts, ...data, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
   audit(user.userId, 'pdf_download', 'flagging_report', null, null, null, null, null);
   const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-flagging-exceptions.pdf"` });

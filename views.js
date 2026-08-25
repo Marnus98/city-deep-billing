@@ -1475,12 +1475,14 @@ function pctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.to
 // with a monthly consumption bar chart, a shaded "expected range" band, and a 1-2 sentence
 // description underneath, instead of a table of numbers. Client feedback 2026-08-25: the table
 // layout works but is hard to scan at a glance ("perhaps graphs like in the Billing slips... with
-// bands for the average and lower/upper band... with a short description below"). Piloting on
-// AutoZone only first (properties.js's flaggingChartLayout flag - see server.js's /flagging route)
-// before deciding whether to replace the table layout everywhere. Reuses the same hand-rolled
-// flexbox-bar-chart technique as barChart() above (Recovery page) rather than introducing an SVG/
-// canvas/charting library, for the same "zero client-side dependency" reasons the rest of this app
-// is built the way it is.
+// bands for the average and lower/upper band... with a short description below"). Rendered as one
+// inline <svg> per card (not the flexbox/div band-overlay this started as) after further client
+// feedback the same day - "This is super unclear... I would need a proper graph with axis to
+// visualise this" - so it now has real Y-axis gridlines and tick-value labels, mirroring pdf.js's
+// drawBandedSeriesChart (same band math, same gridline/tick-label/dashed-average-line/coloured-
+// latest-bar convention) so the on-screen page and the downloaded PDF read as the same chart.
+// Piloting on AutoZone only first (properties.js's flaggingChartLayout flag - see server.js's
+// /flagging route) before deciding whether to replace the table layout everywhere.
 //
 // The band is built from `baselineMonthlyAvg` (flagging.js's computeSeriesStats - the exact figure
 // classify()'s own materiality gate uses) at the current amber_pct/red_pct thresholds, so a bar that
@@ -1488,16 +1490,30 @@ function pctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.to
 // nothing here recomputes or approximates the classification.
 const CHART_BAR_COLOR = { green: '#16a34a', amber: '#d97706', red: '#dc2626' };
 
+function svgTickLabel(v, unit) {
+  return `${Math.round(v).toLocaleString('en-US')} ${unit}`;
+}
+
 // `months` is `row.series` (ascending {label, consumption, billingDays}), trimmed to the trailing
 // 12. Bars are raw monthly consumption (not average-daily) to match the Billing Slip trend charts'
 // own convention and stay intuitive for a property manager - only the band math underneath uses the
-// per-day-normalised baseline, same as the table view.
+// per-day-normalised baseline, same as the table view. Fixed viewBox scaled to 100% width via CSS
+// so the chart stays crisp and responsive without a charting library dependency.
 function bandedConsumptionChart(months, { baselineMonthlyAvg, amberPct, redPct, level, unit }) {
   const recent = (months || []).slice(-12);
-  const chartHeight = 170;
   if (!recent.length) {
-    return `<div class="flex items-center justify-center text-xs text-slate-400" style="height:${chartHeight}px">No billing history yet.</div>`;
+    return `<div class="flex items-center justify-center text-xs text-slate-400" style="height:170px">No billing history yet.</div>`;
   }
+  const svgW = 760;
+  const leftMargin = 74;
+  const rightMargin = 10;
+  const topPad = 22;
+  const chartHeight = 150;
+  const bottomPad = 34;
+  const svgH = topPad + chartHeight + bottomPad;
+  const chartBottom = topPad + chartHeight;
+  const plotWidth = svgW - leftMargin - rightMargin;
+
   const values = recent.map((r) => r.consumption);
   const hasBand = baselineMonthlyAvg != null && baselineMonthlyAvg > 0;
   const upperRed = hasBand ? baselineMonthlyAvg * (1 + redPct / 100) : null;
@@ -1505,34 +1521,60 @@ function bandedConsumptionChart(months, { baselineMonthlyAvg, amberPct, redPct, 
   const lowerAmber = hasBand ? Math.max(0, baselineMonthlyAvg * (1 - amberPct / 100)) : null;
   const lowerRed = hasBand ? Math.max(0, baselineMonthlyAvg * (1 - redPct / 100)) : null;
   const maxVal = Math.max(1, ...values, upperRed || 0) * 1.08;
-  const topOf = (v) => chartHeight - Math.round((v / maxVal) * chartHeight);
+  // SVG y grows downward (unlike pdf.js's page-space yOf, which grows upward) - higher value maps
+  // to a smaller y, i.e. further up the chart.
+  const yOf = (v) => chartBottom - (v / maxVal) * chartHeight;
+
+  const ticks = 4;
+  let gridSvg = '';
+  for (let t = 0; t <= ticks; t++) {
+    const v = (maxVal * t) / ticks;
+    const ty = chartBottom - (chartHeight * t) / ticks;
+    gridSvg += `<line x1="${leftMargin}" y1="${ty.toFixed(1)}" x2="${leftMargin + plotWidth}" y2="${ty.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>`;
+    gridSvg += `<text x="${leftMargin - 8}" y="${(ty + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#64748b">${esc(svgTickLabel(v, unit))}</text>`;
+  }
 
   // Amber band drawn first (wider, lower opacity), green band drawn on top of it covering the
   // middle - so what's left showing amber-tinted is exactly the "outside normal, not yet red" zone,
-  // and anything above/below both bands (unshaded, white) reads as the red zone at a glance.
-  const bandLayer = hasBand ? `
-    <div class="absolute inset-x-0 z-0" style="top:${topOf(upperRed)}px; height:${topOf(lowerRed) - topOf(upperRed)}px; background:rgba(217,119,6,0.10)"></div>
-    <div class="absolute inset-x-0 z-0" style="top:${topOf(upperAmber)}px; height:${topOf(lowerAmber) - topOf(upperAmber)}px; background:rgba(22,163,74,0.14)"></div>
-    <div class="absolute inset-x-0 z-0 border-t border-dashed border-slate-400" style="top:${topOf(baselineMonthlyAvg)}px" title="6-month average"></div>
-  ` : '';
+  // and anything above/below both bands (unshaded, white) reads as the red zone at a glance. Same
+  // technique as the original div version, just as SVG rects now.
+  let bandSvg = '';
+  if (hasBand) {
+    const redTop = yOf(upperRed), redBottom = yOf(lowerRed);
+    const amberTop = yOf(upperAmber), amberBottom = yOf(lowerAmber);
+    bandSvg = `
+      <rect x="${leftMargin}" y="${redTop.toFixed(1)}" width="${plotWidth}" height="${(redBottom - redTop).toFixed(1)}" fill="#d97706" fill-opacity="0.10"/>
+      <rect x="${leftMargin}" y="${amberTop.toFixed(1)}" width="${plotWidth}" height="${(amberBottom - amberTop).toFixed(1)}" fill="#16a34a" fill-opacity="0.14"/>
+      <line x1="${leftMargin}" y1="${yOf(baselineMonthlyAvg).toFixed(1)}" x2="${leftMargin + plotWidth}" y2="${yOf(baselineMonthlyAvg).toFixed(1)}" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>
+    `;
+  }
 
-  const latestLabel = recent[recent.length - 1].label;
-  const columns = recent.map((r) => {
+  const n = recent.length;
+  const colWidth = plotWidth / n;
+  const barWidth = Math.min(26, colWidth * 0.6);
+  const latestLabel = recent[n - 1].label;
+  let barsSvg = '';
+  recent.forEach((r, i) => {
     const isLatest = r.label === latestLabel;
-    const h = Math.max(2, Math.round((r.consumption / maxVal) * chartHeight));
+    const barX = leftMargin + i * colWidth + (colWidth - barWidth) / 2;
+    const barTop = yOf(r.consumption);
+    const barH = Math.max(1, chartBottom - barTop);
     const color = isLatest ? (CHART_BAR_COLOR[level] || '#1c2957') : '#94a3b8';
-    return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:24px">
-      <div class="text-[9px] text-slate-500 mb-0.5 whitespace-nowrap">${shortQty(r.consumption, unit)}</div>
-      <div class="rounded-t-sm" style="width:16px;height:${h}px;background:${color}"></div>
-      <div class="text-[9px] text-slate-400 mt-1 whitespace-nowrap">${shortMonthLabel(r.label)}</div>
-    </div>`;
-  }).join('');
+    barsSvg += `<rect x="${barX.toFixed(1)}" y="${barTop.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH.toFixed(1)}" rx="2" fill="${color}"/>`;
+    if (isLatest) {
+      barsSvg += `<text x="${(barX + barWidth / 2).toFixed(1)}" y="${(barTop - 6).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="600" fill="#1e293b">${esc(shortQty(r.consumption, unit))}</text>`;
+    }
+    barsSvg += `<text x="${(leftMargin + i * colWidth + colWidth / 2).toFixed(1)}" y="${(chartBottom + 15).toFixed(1)}" text-anchor="middle" font-size="9" fill="#94a3b8">${esc(shortMonthLabel(r.label).toUpperCase())}</text>`;
+  });
 
-  return `
-  <div class="relative" style="height:${chartHeight}px">
-    ${bandLayer}
-    <div class="relative z-10 flex items-end gap-1 h-full">${columns}</div>
-  </div>`;
+  const axisSvg = `<line x1="${leftMargin}" y1="${chartBottom}" x2="${leftMargin + plotWidth}" y2="${chartBottom}" stroke="#334155" stroke-width="1"/>`;
+
+  return `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" height="${svgH}" style="display:block;font-family:inherit" role="img" aria-label="Monthly ${esc(unit)} consumption chart">
+    ${gridSvg}
+    ${bandSvg}
+    ${barsSvg}
+    ${axisSvg}
+  </svg>`;
 }
 
 // One entity+utility's full card: title, dot + variance, chart, plain-English description, and the
