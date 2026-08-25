@@ -889,7 +889,11 @@ route('GET', '/flagging', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
   const data = currentPropFlagRows(user);
   if (!data) return redirect(res, '/dashboard');
-  send(res, 200, views.flaggingPage({ user, propertyName: currentPropertyName(user), ...data }));
+  // Chart-based layout prototype (see properties.js's flaggingChartLayout, views.js's chartSection) -
+  // piloting on AutoZone only until reviewed.
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  const useCharts = !!(currentProp && currentProp.flaggingChartLayout);
+  send(res, 200, views.flaggingPage({ user, propertyName: currentPropertyName(user), useCharts, ...data }));
 });
 
 route('GET', '/flagging-pdf', async (req, res) => {

@@ -60,7 +60,10 @@ function buildAllFlagRows(db, settings, propertyName, hasMunicipalStatements) {
       if (!series.length) continue;
       const result = flagging.evaluate(series, settings, utility);
       const annotation = getAnnotation(db, 'municipal_account', 'municipal', utility, result.stats.latest.label);
-      municipalRows.push({ entityType: 'municipal_account', entityKey: 'municipal', title: `${propertyName} (Municipal)`, utility, ...result, annotation });
+      // `series` carried through on the row (not just fed into evaluate() above) so a chart-based
+      // view (see views.js's trendChartCard) can plot the full monthly history, not just the single
+      // latest-vs-baseline figure classify() itself returns.
+      municipalRows.push({ entityType: 'municipal_account', entityKey: 'municipal', title: `${propertyName} (Municipal)`, utility, series, ...result, annotation });
     }
   }
 
@@ -70,7 +73,7 @@ function buildAllFlagRows(db, settings, propertyName, hasMunicipalStatements) {
     if (!series.length) continue;
     const result = flagging.evaluate(series, settings, utility);
     const annotation = getAnnotation(db, 'site_section', 'site', utility, result.stats.latest.label);
-    sectionRows.push({ entityType: 'site_section', entityKey: 'site', title: `${propertyName} (Client Billing)`, utility, ...result, annotation, contributingTenants: null });
+    sectionRows.push({ entityType: 'site_section', entityKey: 'site', title: `${propertyName} (Client Billing)`, utility, series, ...result, annotation, contributingTenants: null });
   }
 
   return { municipalRows, sectionRows, tenantRows: [] };

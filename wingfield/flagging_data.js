@@ -37,7 +37,7 @@ function buildAllFlagRows(db, settings, propertyName) {
     if (!series.length) continue;
     const result = flagging.evaluate(series, settings, utility);
     const annotation = tenantModel.getAnnotation(db, 'municipal_account', MUNICIPAL_ACCOUNT.label, utility, result.stats.latest.label);
-    municipalRows.push({ entityType: 'municipal_account', entityKey: MUNICIPAL_ACCOUNT.label, title: MUNICIPAL_ACCOUNT.title, utility, ...result, annotation });
+    municipalRows.push({ entityType: 'municipal_account', entityKey: MUNICIPAL_ACCOUNT.label, title: MUNICIPAL_ACCOUNT.title, utility, series, ...result, annotation });
   }
 
   const sectionRows = [];
@@ -46,7 +46,7 @@ function buildAllFlagRows(db, settings, propertyName) {
     if (!series.length) continue;
     const result = flagging.evaluate(series, settings, utility);
     const annotation = tenantModel.getAnnotation(db, 'site_section', 'whole_site', utility, result.stats.latest.label);
-    sectionRows.push({ entityType: 'site_section', entityKey: 'whole_site', title: propertyName, utility, ...result, annotation, contributingTenants: null });
+    sectionRows.push({ entityType: 'site_section', entityKey: 'whole_site', title: propertyName, utility, series, ...result, annotation, contributingTenants: null });
   }
 
   const tenantRows = [];
@@ -55,7 +55,7 @@ function buildAllFlagRows(db, settings, propertyName) {
       const result = flagging.evaluate(t.series, settings, utility);
       const annotation = tenantModel.getAnnotation(db, 'tenant', String(t.tenantId), utility, result.stats.latest.label);
       const title = t.unit ? `${t.tenantName} (${t.unit})` : t.tenantName;
-      tenantRows.push({ entityType: 'tenant', entityKey: String(t.tenantId), title, utility, ...result, annotation });
+      tenantRows.push({ entityType: 'tenant', entityKey: String(t.tenantId), title, utility, series: t.series, ...result, annotation });
     }
   }
 

@@ -100,7 +100,7 @@ function buildAllFlagRows(db, settings) {
       if (!series.length) continue;
       const result = flagging.evaluate(series, settings, utility);
       const annotation = tenantModel.getAnnotation(db, 'municipal_account', acc.label, utility, result.stats.latest.label);
-      municipalRows.push({ entityType: 'municipal_account', entityKey: acc.label, title: acc.title, utility, ...result, annotation });
+      municipalRows.push({ entityType: 'municipal_account', entityKey: acc.label, title: acc.title, utility, series, ...result, annotation });
     }
   }
   const sectionRows = [];
@@ -111,7 +111,7 @@ function buildAllFlagRows(db, settings) {
       const result = flagging.evaluate(series, settings, utility);
       const annotation = tenantModel.getAnnotation(db, 'site_section', sec.key, utility, result.stats.latest.label);
       const contributingTenants = result.level !== 'green' ? buildContributingTenants(db, sec.key, utility, result.stats.latest.label) : null;
-      sectionRows.push({ entityType: 'site_section', entityKey: sec.key, title: sec.title, utility, ...result, annotation, contributingTenants });
+      sectionRows.push({ entityType: 'site_section', entityKey: sec.key, title: sec.title, utility, series, ...result, annotation, contributingTenants });
     }
   }
   // Every tenant, property-wide, both utilities - a real flag per tenant (not just the passive
@@ -125,7 +125,7 @@ function buildAllFlagRows(db, settings) {
       const result = flagging.evaluate(t.series, settings, utility);
       const annotation = tenantModel.getAnnotation(db, 'tenant', String(t.tenantId), utility, result.stats.latest.label);
       const title = t.unit ? `${t.tenantName} (${t.unit})` : t.tenantName;
-      tenantRows.push({ entityType: 'tenant', entityKey: String(t.tenantId), title, utility, ...result, annotation });
+      tenantRows.push({ entityType: 'tenant', entityKey: String(t.tenantId), title, utility, series: t.series, ...result, annotation });
     }
   }
   return { municipalRows, sectionRows, tenantRows };

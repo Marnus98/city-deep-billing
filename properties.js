@@ -99,6 +99,13 @@ module.exports = [
     billingModel: 'flat_site',
     hasMunicipalStatements: true,
     hasFlagging: true,
+    // Chart-based Flagging layout prototype (see views.js's chartSection/trendChartCard) - monthly
+    // consumption bars with a shaded average/amber/red band and a short description, instead of the
+    // dense flagDetailRows table - client feedback 2026-08-25 that the table is hard to scan.
+    // Piloting on AutoZone only; remove this flag (and the branch in views.js's flaggingPage) once
+    // approved and rolled out everywhere, same "one property first" pattern the Flagging tab itself
+    // shipped with.
+    flaggingChartLayout: true,
   },
   {
     slug: 'cranbrook-flavours',

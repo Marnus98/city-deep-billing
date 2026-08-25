@@ -1470,6 +1470,106 @@ function flagBadge(level) {
 }
 function pctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`; }
 
+// ---------------- flagging: chart-based layout (prototype) ----------------
+// An alternative to the dense flagDetailRows/flagTable rows below - one card per entity+utility
+// with a monthly consumption bar chart, a shaded "expected range" band, and a 1-2 sentence
+// description underneath, instead of a table of numbers. Client feedback 2026-08-25: the table
+// layout works but is hard to scan at a glance ("perhaps graphs like in the Billing slips... with
+// bands for the average and lower/upper band... with a short description below"). Piloting on
+// AutoZone only first (properties.js's flaggingChartLayout flag - see server.js's /flagging route)
+// before deciding whether to replace the table layout everywhere. Reuses the same hand-rolled
+// flexbox-bar-chart technique as barChart() above (Recovery page) rather than introducing an SVG/
+// canvas/charting library, for the same "zero client-side dependency" reasons the rest of this app
+// is built the way it is.
+//
+// The band is built from `baselineMonthlyAvg` (flagging.js's computeSeriesStats - the exact figure
+// classify()'s own materiality gate uses) at the current amber_pct/red_pct thresholds, so a bar that
+// pokes outside the shaded zone is directly explained by the same numbers driving its dot colour -
+// nothing here recomputes or approximates the classification.
+const CHART_BAR_COLOR = { green: '#16a34a', amber: '#d97706', red: '#dc2626' };
+
+// `months` is `row.series` (ascending {label, consumption, billingDays}), trimmed to the trailing
+// 12. Bars are raw monthly consumption (not average-daily) to match the Billing Slip trend charts'
+// own convention and stay intuitive for a property manager - only the band math underneath uses the
+// per-day-normalised baseline, same as the table view.
+function bandedConsumptionChart(months, { baselineMonthlyAvg, amberPct, redPct, level, unit }) {
+  const recent = (months || []).slice(-12);
+  const chartHeight = 170;
+  if (!recent.length) {
+    return `<div class="flex items-center justify-center text-xs text-slate-400" style="height:${chartHeight}px">No billing history yet.</div>`;
+  }
+  const values = recent.map((r) => r.consumption);
+  const hasBand = baselineMonthlyAvg != null && baselineMonthlyAvg > 0;
+  const upperRed = hasBand ? baselineMonthlyAvg * (1 + redPct / 100) : null;
+  const upperAmber = hasBand ? baselineMonthlyAvg * (1 + amberPct / 100) : null;
+  const lowerAmber = hasBand ? Math.max(0, baselineMonthlyAvg * (1 - amberPct / 100)) : null;
+  const lowerRed = hasBand ? Math.max(0, baselineMonthlyAvg * (1 - redPct / 100)) : null;
+  const maxVal = Math.max(1, ...values, upperRed || 0) * 1.08;
+  const topOf = (v) => chartHeight - Math.round((v / maxVal) * chartHeight);
+
+  // Amber band drawn first (wider, lower opacity), green band drawn on top of it covering the
+  // middle - so what's left showing amber-tinted is exactly the "outside normal, not yet red" zone,
+  // and anything above/below both bands (unshaded, white) reads as the red zone at a glance.
+  const bandLayer = hasBand ? `
+    <div class="absolute inset-x-0 z-0" style="top:${topOf(upperRed)}px; height:${topOf(lowerRed) - topOf(upperRed)}px; background:rgba(217,119,6,0.10)"></div>
+    <div class="absolute inset-x-0 z-0" style="top:${topOf(upperAmber)}px; height:${topOf(lowerAmber) - topOf(upperAmber)}px; background:rgba(22,163,74,0.14)"></div>
+    <div class="absolute inset-x-0 z-0 border-t border-dashed border-slate-400" style="top:${topOf(baselineMonthlyAvg)}px" title="6-month average"></div>
+  ` : '';
+
+  const latestLabel = recent[recent.length - 1].label;
+  const columns = recent.map((r) => {
+    const isLatest = r.label === latestLabel;
+    const h = Math.max(2, Math.round((r.consumption / maxVal) * chartHeight));
+    const color = isLatest ? (CHART_BAR_COLOR[level] || '#1c2957') : '#94a3b8';
+    return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:24px">
+      <div class="text-[9px] text-slate-500 mb-0.5 whitespace-nowrap">${shortQty(r.consumption, unit)}</div>
+      <div class="rounded-t-sm" style="width:16px;height:${h}px;background:${color}"></div>
+      <div class="text-[9px] text-slate-400 mt-1 whitespace-nowrap">${shortMonthLabel(r.label)}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="relative" style="height:${chartHeight}px">
+    ${bandLayer}
+    <div class="relative z-10 flex items-end gap-1 h-full">${columns}</div>
+  </div>`;
+}
+
+// One entity+utility's full card: title, dot + variance, chart, plain-English description, and the
+// same review/comment form flagDetailRows tucks under the table row - so switching layouts doesn't
+// lose the ability to leave a HolmStone/RPI comment on a flag.
+function trendChartCard(row, settings) {
+  const unit = row.utility === 'water' ? 'kL' : 'kWh';
+  const chart = bandedConsumptionChart(row.series, {
+    baselineMonthlyAvg: row.stats.baselineMonthlyAvg, amberPct: settings.amber_pct, redPct: settings.red_pct,
+    level: row.level, unit,
+  });
+  const a = row.annotation;
+  const statusNote = a ? `<span class="badge bg-slate-100 text-slate-600 ml-1">${esc(a.status)}</span>` : '';
+  return `
+  <div class="bg-white rounded-lg border p-4 mb-4">
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-1">
+      <div class="font-semibold">${esc(row.title)} <span class="text-slate-400 font-normal">&middot; ${row.utility[0].toUpperCase()}${row.utility.slice(1)}</span></div>
+      <div class="flex items-center gap-2 text-sm">
+        ${flagBadge(row.level)}
+        <span class="text-slate-500">${pctStr(row.pctVsBaseline)} vs average</span>
+        ${statusNote}
+      </div>
+    </div>
+    ${chart}
+    <p class="text-xs text-slate-600 mt-3">${row.reasons.slice(0, 2).map((r) => esc(r)).join(' ')}</p>
+    <details class="mt-2">
+      <summary class="text-xs text-blue-600 cursor-pointer select-none py-1">Review / comment${a ? ` &mdash; currently "${esc(a.status)}"` : ''}</summary>
+      <div class="pb-1">${flagCommentForm(row)}</div>
+    </details>
+  </div>`;
+}
+
+function chartSection(heading, rows, settings) {
+  if (!rows.length) return `<h2 class="text-lg font-semibold mb-2 mt-6">${esc(heading)}</h2><div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No data yet.</div>`;
+  return `<h2 class="text-lg font-semibold mb-2 mt-6">${esc(heading)}</h2>${rows.map((r) => trendChartCard(r, settings)).join('')}`;
+}
+
 // One flagged item's HolmStone/RPI review form (spec section 8) - a plain upsert POST, pre-filled
 // from row.annotation if one already exists (see db.js's flag_annotations). Tucked inside a
 // <details> in flagDetailRows below so the table stays scannable with the form hidden by default.
@@ -1607,11 +1707,22 @@ function exceptionSummaryTable(allRows) {
   </div>`;
 }
 
-function flaggingPage({ user, propertyName, municipalRows, sectionRows, tenantRows = [] }) {
-  // Tenants: only surface amber/red in both the summary and their own table - showing every green
-  // tenant every month (25+ tenants x 2 utilities) would bury the actual exceptions.
+function flaggingPage({ user, propertyName, municipalRows, sectionRows, tenantRows = [], settings, useCharts }) {
+  // Tenants: only surface amber/red in both the summary and their own table/chart section - showing
+  // every green tenant every month (25+ tenants x 2 utilities) would bury the actual exceptions.
   const flaggedTenantRows = tenantRows.filter((r) => r.level !== 'green');
   const allRows = [...municipalRows, ...sectionRows, ...flaggedTenantRows];
+  // Chart layout (prototype, AutoZone only for now - see properties.js's flaggingChartLayout and
+  // chartSection's own header comment above) replaces the two/three dense tables with one card per
+  // entity+utility; the Exception Summary table at the top stays either way since it's already
+  // compact and useful as a quick at-a-glance list before drilling into a chart.
+  const detailSections = useCharts
+    ? `${chartSection('Municipal Accounts', municipalRows, settings)}
+       ${chartSection('Site Sections (Our Billing)', sectionRows, settings)}
+       ${tenantRows.length ? chartSection('Tenants', flaggedTenantRows, settings) : ''}`
+    : `${flagTable('Municipal Accounts', 'Account', municipalRows)}
+       ${flagTable('Site Sections (Our Billing)', 'Section', sectionRows)}
+       ${tenantRows.length ? flagTable('Tenants', 'Tenant', flaggedTenantRows, { hiddenCount: tenantRows.length - flaggedTenantRows.length }) : ''}`;
   const body = `
   <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
     <div>
@@ -1624,9 +1735,7 @@ function flaggingPage({ user, propertyName, municipalRows, sectionRows, tenantRo
     </div>
   </div>
   ${exceptionSummaryTable(allRows)}
-  ${flagTable('Municipal Accounts', 'Account', municipalRows)}
-  ${flagTable('Site Sections (Our Billing)', 'Section', sectionRows)}
-  ${tenantRows.length ? flagTable('Tenants', 'Tenant', flaggedTenantRows, { hiddenCount: tenantRows.length - flaggedTenantRows.length }) : ''}
+  ${detailSections}
   `;
   return layout({ title: 'Flagging', user, active: '/flagging', body });
 }
