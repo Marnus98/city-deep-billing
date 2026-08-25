@@ -418,7 +418,58 @@ function migrate(db) {
     comment TEXT,
     UNIQUE(slip_id, item_key)
   );
+
+  -- Utility consumption exception flagging (see flagging.js) - a reporting/review tool for RPI, not
+  -- part of tenant billing at all (never read by billing.js/calc.js, never shown on a billing slip).
+  -- Created in every property's db (same pattern as municipal_statements above) but the feature is
+  -- only wired into the nav for properties with properties.js's hasFlagging: true - piloting on City
+  -- Deep first (confirmed with the client 2026-08-24) before rolling out to the other 11 properties.
+  --
+  -- The flag LEVEL (green/amber/red) and its reasons are never stored - they're recomputed live on
+  -- every page load from current consumption data and the current thresholds below, so tightening a
+  -- threshold re-evaluates every historical month instantly rather than requiring a backfill. Only
+  -- the human review trail (comments/status) is persisted, keyed by a natural identity (which
+  -- account/section + utility + month) rather than a foreign key into a stored flag row, so a
+  -- comment stays attached to "Industrial Park electricity, July 2026" across threshold changes and
+  -- recomputes.
+  CREATE TABLE IF NOT EXISTS flag_settings (
+    key TEXT PRIMARY KEY,
+    value REAL NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS flag_annotations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL, -- 'municipal_account' | 'site_section' | 'tenant'
+    entity_key TEXT NOT NULL,  -- municipal_accounts.label, or a recovery_groups.js section key, or a tenant id (as text)
+    utility_type TEXT NOT NULL CHECK(utility_type IN ('electricity','water')),
+    period_label TEXT NOT NULL,
+    holmstone_comment TEXT,
+    rpi_comment TEXT,
+    status TEXT NOT NULL DEFAULT 'Open'
+      CHECK(status IN ('Open','Under Review','Explained','Municipality Query Required','Corrected','Closed')),
+    resolution_date TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(entity_type, entity_key, utility_type, period_label)
+  );
   `);
+
+  // Default flagging thresholds (see flagging.js) - only inserted if missing, so an admin's own
+  // edit via the Flagging Settings page always survives a redeploy/reseed rather than being
+  // silently reset back to these defaults. Values match the ranges agreed with the client
+  // 2026-08-24, to be tuned once tested against real history (spec's own closing note).
+  const FLAG_DEFAULTS = {
+    amber_pct: 15,       // >15% (and <=30%) vs baseline -> amber
+    red_pct: 30,          // >30% vs baseline -> red
+    mom_amber_pct: 20,    // >20% vs previous period -> amber
+    mom_red_pct: 40,      // >40% vs previous period -> red
+    stddev_amber: 1.5,
+    stddev_red: 2.5,
+    min_abs_kwh: 500,     // absolute-variance gate (electricity) - see flagging.js's classify()
+    min_abs_kl: 5,        // absolute-variance gate (water)
+    min_abs_pct_of_avg: 5, // the OTHER side of the max(...) in section 5 of the spec
+  };
+  const insertSetting = db.prepare('INSERT OR IGNORE INTO flag_settings (key, value) VALUES (?,?)');
+  for (const [k, v] of Object.entries(FLAG_DEFAULTS)) insertSetting.run(k, v);
 
   // Additive migrations for columns added after the initial schema. node:sqlite's SQLite build
   // doesn't need "IF NOT EXISTS" guards for ADD COLUMN (older SQLite lacks that syntax anyway),

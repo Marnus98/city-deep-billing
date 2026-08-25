@@ -49,6 +49,10 @@ function layout({ title, user, active, body }) {
       // instead of hasMunicipalStatements - see tenant_recovery.js and properties.js's own comments
       // on those two fields (single Wingfield-style section vs City Deep's 3-section grouping).
       ...(currentProp && (currentProp.recoverySiteName || currentProp.recoveryMultiSection) ? [['/recovery', 'Recovery']] : []),
+      // Internal exception-reporting tool for RPI (see flagging.js) - separate from tenant billing,
+      // gated by its own flag rather than reusing hasMunicipalStatements/recoveryMultiSection since
+      // a property can have Recovery without Flagging (piloting on City Deep only for now).
+      ...(currentProp && currentProp.hasFlagging ? [['/flagging', 'Flagging']] : []),
       ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
     ];
   // Property switcher - auto-submits on change (same pattern as the Municipality Accounts page's
@@ -1448,6 +1452,202 @@ function recoveryPage({ user, sections, propertyName }) {
   return layout({ title: 'Recovery', user, active: '/recovery', body });
 }
 
+// ---------------- flagging: utility consumption exception reporting for RPI ----------------
+// Internal review tool only (see flagging.js/city-deep/flagging_data.js) - the badge/emoji styling
+// here is purely presentational and intentionally doesn't require() the flagging engine module,
+// keeping the view layer's only dependency on it the plain row objects server.js already built.
+const FLAG_BADGE_CLASS = { green: 'bg-green-100 text-green-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700' };
+const FLAG_EMOJI = { green: '\u{1F7E2}', amber: '\u{1F7E0}', red: '\u{1F534}' };
+const FLAG_STATUSES = ['Open', 'Under Review', 'Explained', 'Municipality Query Required', 'Corrected', 'Closed'];
+
+function flagBadge(level) {
+  return `<span class="badge ${FLAG_BADGE_CLASS[level] || 'bg-slate-100 text-slate-600'}">${FLAG_EMOJI[level] || ''} ${esc(level.toUpperCase())}</span>`;
+}
+function pctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`; }
+
+// One flagged item's HolmStone/RPI review form (spec section 8) - a plain upsert POST, pre-filled
+// from row.annotation if one already exists (see db.js's flag_annotations). Tucked inside a
+// <details> in flagDetailRows below so the table stays scannable with the form hidden by default.
+function flagCommentForm(row) {
+  const a = row.annotation || {};
+  return `
+  <form method="post" action="/flagging/comment" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mt-2">
+    <input type="hidden" name="entity_type" value="${esc(row.entityType)}"/>
+    <input type="hidden" name="entity_key" value="${esc(row.entityKey)}"/>
+    <input type="hidden" name="utility_type" value="${esc(row.utility)}"/>
+    <input type="hidden" name="period_label" value="${esc(row.stats.latest.label)}"/>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">HolmStone comment</label>
+      <textarea name="holmstone_comment" rows="2" class="w-full border rounded px-2 py-1">${esc(a.holmstone_comment || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">RPI comment</label>
+      <textarea name="rpi_comment" rows="2" class="w-full border rounded px-2 py-1">${esc(a.rpi_comment || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
+      <select name="status" class="w-full border rounded px-2 py-1.5">
+        ${FLAG_STATUSES.map((s) => `<option value="${s}" ${a.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Resolution date</label>
+      <input type="date" name="resolution_date" value="${esc(a.resolution_date || '')}" class="w-full border rounded px-2 py-1.5"/>
+    </div>
+    <div class="md:col-span-2">
+      <button class="bg-slate-900 text-white rounded px-3 py-1.5 text-sm font-medium">Save</button>
+    </div>
+  </form>`;
+}
+
+// One flagged item = 2 <tr>s: the always-visible summary row (spec section 6's table columns), and
+// a collapsed <details> row underneath holding the contributing-tenants drill-down (spec section 7,
+// site sections only, amber/red only) and the comment/status form (spec section 8). Native <details>
+// rather than JS so this works with zero client-side script, consistent with the rest of this app.
+function flagDetailRows(row) {
+  const s = row.stats;
+  const latest = s.latest;
+  const a = row.annotation;
+  const statusBadge = a ? `<span class="badge bg-slate-100 text-slate-600 ml-1">${esc(a.status)}</span>` : '';
+  const tenants = row.contributingTenants;
+  return `
+  <tr class="border-b hover:bg-slate-50 align-top">
+    <td class="px-3 py-2 font-medium">${esc(row.title)}</td>
+    <td class="px-3 py-2 capitalize">${esc(row.utility)}</td>
+    <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${esc(latest.label)}</td>
+    <td class="px-3 py-2 text-right">${latest.billingDays}</td>
+    <td class="px-3 py-2 text-right">${fmtNum(latest.consumption, 0)}</td>
+    <td class="px-3 py-2 text-right">${fmtNum(latest.avgDaily, 1)}</td>
+    <td class="px-3 py-2 text-right">${s.baselineAvgDaily != null ? fmtNum(s.baselineAvgDaily, 1) : '-'}</td>
+    <td class="px-3 py-2 text-right whitespace-nowrap">${pctStr(row.pctVsBaseline)}</td>
+    <td class="px-3 py-2 whitespace-nowrap">${flagBadge(row.level)}${statusBadge}</td>
+    <td class="px-3 py-2 text-xs text-slate-600 max-w-xs">${row.reasons.map((r) => esc(r)).join('<br/>')}</td>
+  </tr>
+  <tr class="border-b bg-slate-50/60">
+    <td colspan="10" class="px-3 py-1.5">
+      <details>
+        <summary class="text-xs text-blue-600 cursor-pointer select-none py-1">Review / comment${a ? ` &mdash; currently "${esc(a.status)}"` : ''}</summary>
+        <div class="pb-3">
+          ${tenants && tenants.length ? `
+          <div class="mt-2 mb-3">
+            <div class="text-xs font-semibold text-slate-500 uppercase mb-1">Possible contributing tenants/meters</div>
+            <table class="text-xs w-full max-w-xl">
+              <thead><tr class="text-left text-slate-400">
+                <th class="py-1">Tenant</th><th class="text-right">Current</th><th class="text-right">Historical Avg</th><th class="text-right">Variance</th>
+              </tr></thead>
+              <tbody>${tenants.map((t) => `<tr class="border-t"><td class="py-1">${esc(t.name)}</td><td class="text-right">${fmtNum(t.latest, 0)}</td><td class="text-right">${fmtNum(t.avg, 0)}</td><td class="text-right">${pctStr(t.variance)}</td></tr>`).join('')}</tbody>
+            </table>
+          </div>` : ''}
+          ${flagCommentForm(row)}
+        </div>
+      </details>
+    </td>
+  </tr>`;
+}
+
+function flagTable(heading, rows) {
+  if (!rows.length) return `<h2 class="text-lg font-semibold mb-2 mt-6">${esc(heading)}</h2><div class="bg-white rounded-lg border p-6 text-slate-400 text-sm mb-6">No data yet.</div>`;
+  return `
+  <h2 class="text-lg font-semibold mb-2 mt-6">${esc(heading)}</h2>
+  <div class="bg-white rounded-lg border overflow-x-auto mb-6">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <th class="px-3 py-2">${heading === 'Municipal Accounts' ? 'Account' : 'Section'}</th><th class="px-3 py-2">Utility</th>
+        <th class="px-3 py-2">Billing Period</th><th class="px-3 py-2 text-right">Days</th>
+        <th class="px-3 py-2 text-right">Consumption</th><th class="px-3 py-2 text-right">Avg Daily</th>
+        <th class="px-3 py-2 text-right">Historical Avg Daily</th><th class="px-3 py-2 text-right">Variance</th>
+        <th class="px-3 py-2">Flag</th><th class="px-3 py-2">Reason</th>
+      </tr></thead>
+      <tbody>${rows.map(flagDetailRows).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+// Spec section 9 - the "simple monthly summary that can be included in the Utility Management
+// report to RPI": every evaluated row (latest month only, since that's what stats.latest already
+// is), red first. Includes green rows too, matching the spec's own worked example (which lists a
+// 🟢 row alongside the 🔴/🟠 ones) so RPI sees the full picture at a glance, not just the exceptions.
+function exceptionSummaryTable(allRows) {
+  const rank = { red: 0, amber: 1, green: 2 };
+  const sorted = [...allRows].sort((a, b) => rank[a.level] - rank[b.level]);
+  const latestLabel = allRows.length ? allRows[0].stats.latest.label : null;
+  if (!sorted.length) return '';
+  return `
+  <div class="bg-white rounded-lg border overflow-hidden mb-6">
+    <div class="px-4 py-3 border-b font-semibold">Utility Consumption Exceptions${latestLabel ? ` &mdash; ${esc(latestLabel)}` : ''}</div>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <th class="px-3 py-2">Site / Account</th><th class="px-3 py-2">Utility</th><th class="px-3 py-2">Flag</th>
+        <th class="px-3 py-2 text-right">Variance</th><th class="px-3 py-2">Comment</th>
+      </tr></thead>
+      <tbody>
+      ${sorted.map((r) => `<tr class="border-b last:border-0">
+        <td class="px-3 py-2">${esc(r.title)}</td>
+        <td class="px-3 py-2 capitalize">${esc(r.utility)}</td>
+        <td class="px-3 py-2">${flagBadge(r.level)}</td>
+        <td class="px-3 py-2 text-right">${pctStr(r.pctVsBaseline)}</td>
+        <td class="px-3 py-2 text-xs text-slate-600">${esc(r.reasons[0] || '')}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function flaggingPage({ user, propertyName, municipalRows, sectionRows }) {
+  const allRows = [...municipalRows, ...sectionRows];
+  const body = `
+  <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="text-2xl font-bold">Flagging</h1>
+      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)} - internal exception reporting for Refinery Property Investments. Review tool only: never alters tenant billing, never appears on a billing slip.</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/flagging/settings" class="bg-white border rounded px-4 py-2 text-sm font-medium">Settings</a>
+      <a href="/flagging-pdf" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download PDF</a>
+    </div>
+  </div>
+  ${exceptionSummaryTable(allRows)}
+  ${flagTable('Municipal Accounts', municipalRows)}
+  ${flagTable('Site Sections (Our Billing)', sectionRows)}
+  `;
+  return layout({ title: 'Flagging', user, active: '/flagging', body });
+}
+
+function flaggingSettingsPage({ user, propertyName, settings }) {
+  const fields = [
+    ['amber_pct', 'Amber threshold - % vs historical baseline', '%'],
+    ['red_pct', 'Red threshold - % vs historical baseline', '%'],
+    ['mom_amber_pct', 'Amber threshold - % vs previous period', '%'],
+    ['mom_red_pct', 'Red threshold - % vs previous period', '%'],
+    ['stddev_amber', 'Amber threshold - std. deviations from mean', ''],
+    ['stddev_red', 'Red threshold - std. deviations from mean', ''],
+    ['min_abs_kwh', 'Minimum absolute variance - electricity', 'kWh'],
+    ['min_abs_kl', 'Minimum absolute variance - water', 'kL'],
+    ['min_abs_pct_of_avg', 'Minimum absolute variance - % of historical avg (whichever is larger)', '%'],
+  ];
+  const body = `
+  <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="text-2xl font-bold">Flagging Settings</h1>
+      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)} - thresholds used by the Flagging tab. Nothing is pre-computed, so a change here re-evaluates every month (past and present) the next time the page loads.</p>
+    </div>
+    <a href="/flagging" class="text-sm text-blue-600 hover:underline">&larr; Back to Flagging</a>
+  </div>
+  <form method="post" action="/flagging/settings" class="bg-white rounded-lg border p-6 max-w-2xl space-y-4">
+    ${fields.map(([key, label, unit]) => `
+    <div class="flex items-center justify-between gap-4">
+      <label class="text-sm">${esc(label)}</label>
+      <div class="flex items-center gap-2">
+        <input type="number" step="0.1" name="${key}" value="${settings[key]}" class="border rounded px-2 py-1 w-28 text-right"/>
+        <span class="text-xs text-slate-400 w-10">${esc(unit)}</span>
+      </div>
+    </div>`).join('')}
+    <div class="pt-2"><button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Save Settings</button></div>
+  </form>
+  `;
+  return layout({ title: 'Flagging Settings', user, active: '/flagging', body });
+}
+
 module.exports = {
   esc, money, fmtNum, layout, loginPage, dashboardPage, tenantsPage, tenantDetailPage,
   metersPage, tariffsPage, billingPeriodsPage, newBillingPeriodPage, readingsCapturePage,
@@ -1456,4 +1656,5 @@ module.exports = {
   reconciliationPage, auditLogPage, statusColor,
   siteBillingListPage, siteBillingFormPage, siteBillingDetailPage,
   recoveryPage,
+  flaggingPage, flaggingSettingsPage,
 };

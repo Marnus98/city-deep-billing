@@ -1170,7 +1170,135 @@ function buildRecoveryPdf(data) {
   return doc.build();
 }
 
+// ---------------- flagging: utility consumption exception report for RPI ----------------
+// Print version of views.js's flaggingPage (see that file's header comment + flagging.js's own
+// header comment for what this feature is/isn't) - the exception summary (spec section 9, meant to
+// be pasted straight into the Utility Management report to RPI) plus the two detail tables (spec
+// section 6). No per-row comment/status or tenant drill-down here - those are on-screen-only review
+// tools, not something that belongs in a static monthly PDF snapshot.
+const FLAG_LEVEL_LABEL = { green: 'GREEN', amber: 'AMBER', red: 'RED' };
+
+function flagPctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`; }
+
+// Shrinks `val` (appending an ellipsis) until it fits within `maxWidth` at the given text options -
+// same "shrink rather than overlap the next column" approach as drawSiteBillingSummaryPage's
+// title-fit logic above, just applied per-cell instead of to one title line. Guards every column in
+// drawFlagTable below against exactly the overlap bug a fixed-width guess would eventually hit (long
+// account/section titles, or a Comment column butting up against Variance with no gap).
+function fitCell(val, maxWidth, opts) {
+  if (textWidth(val, opts) <= maxWidth) return val;
+  // Three ASCII periods, not a single "…" glyph - the hand-rolled PDF writer only supports the
+  // base-14 WinAnsi/Latin-1 range (same reason money()/numFmt() above avoid locale separators), and
+  // U+2026 falls outside it and renders as a stray unrelated glyph.
+  let s = val;
+  while (s.length > 1 && textWidth(`${s}...`, opts) > maxWidth) s = s.slice(0, -1);
+  return `${s}...`;
+}
+
+// Generic small-table drawer shared by every table on this report - `cols` is
+// [{ label, width, align, get(row) }], `y` is the current baseline; pages automatically when a row
+// would run past the bottom margin. Every cell is right-inset by CELL_PAD and shrunk-to-fit via
+// fitCell above, so columns never visually collide regardless of how long a real title/comment is.
+// Returns the y position after the table.
+const CELL_PAD = 6;
+function drawFlagTable(doc, { title, cols, rows, left, right, y, propertyName }) {
+  if (y < 110) { doc.newPage(); doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true }); y = PAGE_H - 74; }
+  if (title) { doc.text(left, y, title, { size: 11, bold: true }); y -= 16; }
+  const colX = [];
+  let x = left;
+  for (const c of cols) { colX.push(x); x += c.width; }
+  const headerRow = () => {
+    cols.forEach((c, i) => {
+      const label = fitCell(c.label, c.width - CELL_PAD, { bold: true, size: 7.5 });
+      const tx = c.align === 'right' ? colX[i] + c.width - CELL_PAD - textWidth(label, { bold: true, size: 7.5 }) : colX[i];
+      doc.text(tx, y, label, { bold: true, size: 7.5 });
+    });
+    y -= 4; doc.line(left, y, right, y); y -= 11;
+  };
+  headerRow();
+  for (const row of rows) {
+    if (y < 60) {
+      doc.newPage();
+      doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true });
+      y = PAGE_H - 74;
+      if (title) { doc.text(left, y, `${title} (continued)`, { size: 11, bold: true }); y -= 16; }
+      headerRow();
+    }
+    cols.forEach((c, i) => {
+      const raw = String(c.get(row));
+      const val = fitCell(raw, c.width - CELL_PAD, { size: 7.5 });
+      const tx = c.align === 'right' ? colX[i] + c.width - CELL_PAD - textWidth(val, { size: 7.5 }) : colX[i];
+      doc.text(tx, y, val, { size: 7.5 });
+    });
+    y -= 12;
+  }
+  return y - 10;
+}
+
+function buildFlaggingReportPdf(data) {
+  const doc = new PDFDoc();
+  const left = 42, right = PAGE_W - 42;
+  const propertyName = (data.propertyName || '').toUpperCase();
+  doc.registerImage('Logo', LOGO);
+  const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
+  doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
+
+  let y = PAGE_H - 50;
+  doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
+  doc.text(left, y, 'Utility Consumption Exceptions - Internal Review for RPI', { size: 10 });
+  y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
+  doc.line(left, y, right, y); y -= 20;
+
+  const allRows = [...(data.municipalRows || []), ...(data.sectionRows || [])];
+  const rank = { red: 0, amber: 1, green: 2 };
+  const sorted = [...allRows].sort((a, b) => rank[a.level] - rank[b.level]);
+  const latestLabel = allRows.length ? allRows[0].stats.latest.label : '';
+
+  y = drawFlagTable(doc, {
+    title: `Exception Summary${latestLabel ? ` - ${latestLabel}` : ''}`,
+    left, right, y, propertyName,
+    cols: [
+      { label: 'Site / Account', width: 158, get: (r) => r.title },
+      { label: 'Utility', width: 55, get: (r) => r.utility[0].toUpperCase() + r.utility.slice(1) },
+      { label: 'Flag', width: 45, get: (r) => FLAG_LEVEL_LABEL[r.level] },
+      { label: 'Variance', width: 48, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
+      { label: 'Comment', width: right - left - 306, get: (r) => r.reasons[0] || '' },
+    ],
+    rows: sorted,
+  });
+  y -= 10;
+
+  const detailCols = (labelCol) => [
+    { label: labelCol, width: 154, get: (r) => r.title },
+    { label: 'Utility', width: 46, get: (r) => r.utility[0].toUpperCase() + r.utility.slice(1) },
+    { label: 'Period', width: 42, get: (r) => r.stats.latest.label },
+    { label: 'Days', width: 26, align: 'right', get: (r) => r.stats.latest.billingDays },
+    { label: 'Consumption', width: 58, align: 'right', get: (r) => money2(r.stats.latest.consumption) },
+    { label: 'Avg Daily', width: 52, align: 'right', get: (r) => money2(r.stats.latest.avgDaily) },
+    { label: 'Hist. Avg Daily', width: 58, align: 'right', get: (r) => r.stats.baselineAvgDaily != null ? money2(r.stats.baselineAvgDaily) : '-' },
+    { label: 'Variance', width: 42, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
+    { label: 'Flag', width: 33, get: (r) => FLAG_LEVEL_LABEL[r.level] },
+  ];
+
+  y = drawFlagTable(doc, {
+    title: 'Municipal Accounts', left, right, y, propertyName,
+    cols: detailCols('Account'), rows: data.municipalRows || [],
+  });
+  y -= 10;
+  y = drawFlagTable(doc, {
+    title: 'Site Sections (Our Billing)', left, right, y, propertyName,
+    cols: detailCols('Section'), rows: data.sectionRows || [],
+  });
+
+  doc.text(left, 30, `Generated ${data.generatedAt || ''}`, { size: 7 });
+  return doc.build();
+}
+
+// Plain (non-Rand) 2dp number formatting, reused from numFmt's convention above just under a
+// shorter name for the table helper's terser column-builder calls.
+function money2(n) { return numFmt(n, n >= 1000 || n <= -1000 ? 0 : 1); }
+
 module.exports = {
   PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, money,
-  buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf,
+  buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf, buildFlaggingReportPdf,
 };

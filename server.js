@@ -8,7 +8,7 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
-const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf } = require('./pdf');
+const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf, buildFlaggingReportPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
@@ -19,6 +19,8 @@ const flatSiteRecovery = require('./flat_site_recovery');
 const tenantRecovery = require('./tenant_recovery');
 const cityDeepRecoveryGroups = require('./city-deep/recovery_groups');
 const solarCost = require('./city-deep/solar_cost');
+const flagging = require('./flagging');
+const cityDeepFlagging = require('./city-deep/flagging_data');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -853,6 +855,84 @@ route('GET', '/recovery-pdf', async (req, res) => {
   const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-recovery.pdf"` });
   res.end(pdfBuf);
+});
+
+// ---------------- flagging: utility consumption exception reporting for RPI ----------------
+// Internal review/reporting tool only (see flagging.js's header comment) - never touches tenant
+// billing. Gated by properties.js's hasFlagging flag, currently only set for City Deep (pilot -
+// confirmed with the client 2026-08-24). city-deep/flagging_data.js is the only property-specific
+// piece; if/when this rolls out to other properties, each gets its own <property>/flagging_data.js
+// with the same buildAllFlagRows(db, settings) shape and this route stops needing a City-Deep-only
+// branch at all.
+function currentPropFlagRows(user) {
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  if (!currentProp || !currentProp.hasFlagging) return null;
+  const db = currentDb();
+  const settings = flagging.getSettings(db);
+  return { settings, ...cityDeepFlagging.buildAllFlagRows(db, settings) };
+}
+
+route('GET', '/flagging', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const data = currentPropFlagRows(user);
+  if (!data) return redirect(res, '/dashboard');
+  send(res, 200, views.flaggingPage({ user, propertyName: currentPropertyName(user), ...data }));
+});
+
+route('GET', '/flagging-pdf', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const data = currentPropFlagRows(user);
+  if (!data) return redirect(res, '/dashboard');
+  const propertyName = currentPropertyName(user);
+  const pdfBuf = buildFlaggingReportPdf({ propertyName, ...data, generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
+  audit(user.userId, 'pdf_download', 'flagging_report', null, null, null, null, null);
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-flagging-exceptions.pdf"` });
+  res.end(pdfBuf);
+});
+
+// Save/update the HolmStone+RPI review trail for one flag (see db.js's flag_annotations) - upsert
+// keyed by the natural (entity_type, entity_key, utility_type, period_label) identity, same pattern
+// every other de-duped import in this app uses, just triggered by a form submit instead of a boot
+// script.
+route('POST', '/flagging/comment', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  if (!currentProp || !currentProp.hasFlagging) return redirect(res, '/dashboard');
+  const body = await readBody(req);
+  const validStatuses = ['Open', 'Under Review', 'Explained', 'Municipality Query Required', 'Corrected', 'Closed'];
+  const status = validStatuses.includes(body.status) ? body.status : 'Open';
+  run(`INSERT INTO flag_annotations (entity_type, entity_key, utility_type, period_label, holmstone_comment, rpi_comment, status, resolution_date)
+    VALUES (?,?,?,?,?,?,?,?)
+    ON CONFLICT(entity_type, entity_key, utility_type, period_label) DO UPDATE SET
+      holmstone_comment=excluded.holmstone_comment, rpi_comment=excluded.rpi_comment,
+      status=excluded.status, resolution_date=excluded.resolution_date, updated_at=datetime('now')`,
+    [body.entity_type, body.entity_key, body.utility_type, body.period_label,
+     body.holmstone_comment || null, body.rpi_comment || null, status, body.resolution_date || null]);
+  audit(user.userId, 'update', 'flag_annotation', null, 'status', null, status, `${body.entity_type}:${body.entity_key}:${body.utility_type}:${body.period_label}`);
+  redirect(res, '/flagging');
+});
+
+route('GET', '/flagging/settings', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  if (!currentProp || !currentProp.hasFlagging) return redirect(res, '/dashboard');
+  const settings = flagging.getSettings(currentDb());
+  send(res, 200, views.flaggingSettingsPage({ user, propertyName: currentPropertyName(user), settings }));
+});
+
+route('POST', '/flagging/settings', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  if (!currentProp || !currentProp.hasFlagging) return redirect(res, '/dashboard');
+  const body = await readBody(req);
+  const updates = {};
+  for (const key of Object.keys(flagging.DEFAULT_SETTINGS)) {
+    if (body[key] != null && body[key] !== '' && Number.isFinite(Number(body[key]))) updates[key] = Number(body[key]);
+  }
+  flagging.updateSettings(currentDb(), updates);
+  audit(user.userId, 'update', 'flag_settings', null, null, null, null, JSON.stringify(updates));
+  redirect(res, '/flagging/settings');
 });
 
 // ---------------- municipal account statements (flat_site properties) ----------------

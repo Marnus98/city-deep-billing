@@ -38,6 +38,12 @@ module.exports = [
     // Distinct from recoverySiteName (Wingfield's single-section flag) - server.js checks this one
     // first.
     recoveryMultiSection: true,
+    // "Flagging" tab (see flagging.js + city-deep/flagging_data.js) - internal exception-reporting
+    // tool for RPI, separate from tenant billing entirely. Piloting on City Deep first (confirmed
+    // with the client 2026-08-24) since it has both municipal accounts and tenant/meter data to
+    // draw on; extend to the other properties once the thresholds have been reviewed against real
+    // history here.
+    hasFlagging: true,
   },
   {
     slug: 'wingfield',
