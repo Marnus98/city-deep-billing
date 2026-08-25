@@ -1305,11 +1305,16 @@ function buildFlaggingReportPdf(data) {
     title: 'Site Sections (Our Billing)', left, right, y, propertyName,
     cols: detailCols('Section'), rows: data.sectionRows || [],
   });
-  y -= 10;
-  y = drawFlagTable(doc, {
-    title: 'Tenants (exceptions only)', left, right, y, propertyName,
-    cols: detailCols('Tenant'), rows: flaggedTenantRows,
-  });
+  // Skip the table entirely for a property with no tenants at all (every flat_site property - see
+  // flat_site_flagging_data.js, which always returns tenantRows: []) rather than printing an empty
+  // "Tenants (exceptions only)" header with nothing under it.
+  if ((data.tenantRows || []).length) {
+    y -= 10;
+    y = drawFlagTable(doc, {
+      title: 'Tenants (exceptions only)', left, right, y, propertyName,
+      cols: detailCols('Tenant'), rows: flaggedTenantRows,
+    });
+  }
 
   doc.text(left, 30, `Generated ${data.generatedAt || ''}`, { size: 7 });
   return doc.build();

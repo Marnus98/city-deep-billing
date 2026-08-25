@@ -1622,7 +1622,7 @@ function flaggingPage({ user, propertyName, municipalRows, sectionRows, tenantRo
   ${exceptionSummaryTable(allRows)}
   ${flagTable('Municipal Accounts', 'Account', municipalRows)}
   ${flagTable('Site Sections (Our Billing)', 'Section', sectionRows)}
-  ${flagTable('Tenants', 'Tenant', flaggedTenantRows, { hiddenCount: tenantRows.length - flaggedTenantRows.length })}
+  ${tenantRows.length ? flagTable('Tenants', 'Tenant', flaggedTenantRows, { hiddenCount: tenantRows.length - flaggedTenantRows.length }) : ''}
   `;
   return layout({ title: 'Flagging', user, active: '/flagging', body });
 }

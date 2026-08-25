@@ -39,10 +39,10 @@ module.exports = [
     // first.
     recoveryMultiSection: true,
     // "Flagging" tab (see flagging.js + city-deep/flagging_data.js) - internal exception-reporting
-    // tool for RPI, separate from tenant billing entirely. Piloting on City Deep first (confirmed
-    // with the client 2026-08-24) since it has both municipal accounts and tenant/meter data to
-    // draw on; extend to the other properties once the thresholds have been reviewed against real
-    // history here.
+    // tool for RPI, separate from tenant billing entirely. Piloted here first (confirmed with the
+    // client 2026-08-24), then rolled out to every property (2026-08-25) once approved - see
+    // wingfield/flagging_data.js and flat_site_flagging_data.js for the other two billingModels'
+    // own data layers, and server.js's currentPropFlagRows for how the right one gets picked.
     hasFlagging: true,
   },
   {
@@ -57,6 +57,9 @@ module.exports = [
     // isn't set up with this yet (its own municipal data spans 4 accounts across 3 sites, more setup
     // than a single flag - can follow the same pattern once wanted).
     recoverySiteName: 'Wingfield Business Park',
+    // See wingfield/flagging_data.js - single municipal account + whole-site "section" + every
+    // tenant, same rollout as City Deep (2026-08-25).
+    hasFlagging: true,
   },
   {
     slug: 'field-street',
@@ -68,6 +71,7 @@ module.exports = [
     // client billing - so the "Recovery" nav tab (tenant billing vs the real municipal bill, see
     // flat_site_recovery.js) applies here.
     hasMunicipalStatements: true,
+    hasFlagging: true,
   },
   {
     slug: 'bob-martin',
@@ -76,6 +80,7 @@ module.exports = [
     seedFile: './bob-martin/import_history',
     billingModel: 'flat_site',
     hasMunicipalStatements: true,
+    hasFlagging: true,
   },
   {
     slug: 'loper-road',
@@ -84,6 +89,7 @@ module.exports = [
     seedFile: './loper-road/import_history',
     billingModel: 'flat_site',
     hasMunicipalStatements: true,
+    hasFlagging: true,
   },
   {
     slug: 'autozone',
@@ -92,6 +98,7 @@ module.exports = [
     seedFile: './autozone/import_history',
     billingModel: 'flat_site',
     hasMunicipalStatements: true,
+    hasFlagging: true,
   },
   {
     slug: 'cranbrook-flavours',
@@ -103,6 +110,7 @@ module.exports = [
     // client billing - so the "Recovery" nav tab (tenant billing vs the real municipal bill, see
     // flat_site_recovery.js) applies here too.
     hasMunicipalStatements: true,
+    hasFlagging: true,
   },
   {
     slug: 'adh-machine-tool',
@@ -116,6 +124,9 @@ module.exports = [
     // "once received" each month, same as every other flat_site property's own bill. Add
     // hasMunicipalStatements: true (and a municipal_import.js/its own tariff shape in
     // flat_site_tariff_shapes.js) once the first one arrives, following field-street/'s pattern.
+    // Flagging still works with hasMunicipalStatements unset - flat_site_flagging_data.js just
+    // shows the client-billing side only (Municipal Accounts table stays empty) until then.
+    hasFlagging: true,
   },
   // The following 4 - added 2026-08-20 alongside ADH Machine Tool above, all loose-standing sites on
   // the same "Loper Ave" tenant billing template (Ekurhuleni Tariff B, <=150A) - see
@@ -127,6 +138,7 @@ module.exports = [
     dbFile: 'zelvio-global.db',
     seedFile: './zelvio-global/seed',
     billingModel: 'flat_site',
+    hasFlagging: true,
   },
   {
     slug: 'interoll',
@@ -134,6 +146,7 @@ module.exports = [
     dbFile: 'interoll.db',
     seedFile: './interoll/seed',
     billingModel: 'flat_site',
+    hasFlagging: true,
   },
   {
     slug: 'rcl-group',
@@ -141,6 +154,7 @@ module.exports = [
     dbFile: 'rcl-group.db',
     seedFile: './rcl-group/seed',
     billingModel: 'flat_site',
+    hasFlagging: true,
   },
   {
     slug: 'colorobbia',
@@ -148,5 +162,6 @@ module.exports = [
     dbFile: 'colorobbia.db',
     seedFile: './colorobbia/seed',
     billingModel: 'flat_site',
+    hasFlagging: true,
   },
 ];

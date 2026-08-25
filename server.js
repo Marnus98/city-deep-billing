@@ -21,6 +21,8 @@ const cityDeepRecoveryGroups = require('./city-deep/recovery_groups');
 const solarCost = require('./city-deep/solar_cost');
 const flagging = require('./flagging');
 const cityDeepFlagging = require('./city-deep/flagging_data');
+const wingfieldFlagging = require('./wingfield/flagging_data');
+const flatSiteFlagging = require('./flat_site_flagging_data');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -859,17 +861,28 @@ route('GET', '/recovery-pdf', async (req, res) => {
 
 // ---------------- flagging: utility consumption exception reporting for RPI ----------------
 // Internal review/reporting tool only (see flagging.js's header comment) - never touches tenant
-// billing. Gated by properties.js's hasFlagging flag, currently only set for City Deep (pilot -
-// confirmed with the client 2026-08-24). city-deep/flagging_data.js is the only property-specific
-// piece; if/when this rolls out to other properties, each gets its own <property>/flagging_data.js
-// with the same buildAllFlagRows(db, settings) shape and this route stops needing a City-Deep-only
-// branch at all.
+// billing. Gated by properties.js's hasFlagging flag - piloted on City Deep alone (confirmed with
+// the client 2026-08-24), then rolled out to every property (2026-08-25). Each billingModel has its
+// own data layer (buildAllFlagRows(db, settings, ...) -> { municipalRows, sectionRows, tenantRows },
+// same shape from all three so views.js/pdf.js never need to know which property they're rendering
+// for): city-deep/flagging_data.js needs its own branch since City Deep alone has 4 municipal
+// accounts across 3 Recovery sections (see recovery_groups.js); every other tenant-model property
+// (currently just Wingfield) uses wingfield/flagging_data.js's simpler single-account/single-section
+// shape; every flat_site property shares flat_site_flagging_data.js (no tenants at all - see that
+// module's own header comment).
 function currentPropFlagRows(user) {
   const currentProp = properties.find((p) => p.slug === user.currentProperty);
   if (!currentProp || !currentProp.hasFlagging) return null;
   const db = currentDb();
   const settings = flagging.getSettings(db);
-  return { settings, ...cityDeepFlagging.buildAllFlagRows(db, settings) };
+  const propertyName = currentPropertyName(user);
+  if (currentProp.slug === 'city-deep') {
+    return { settings, ...cityDeepFlagging.buildAllFlagRows(db, settings) };
+  }
+  if (currentProp.billingModel === 'flat_site') {
+    return { settings, ...flatSiteFlagging.buildAllFlagRows(db, settings, propertyName, !!currentProp.hasMunicipalStatements) };
+  }
+  return { settings, ...wingfieldFlagging.buildAllFlagRows(db, settings, propertyName) };
 }
 
 route('GET', '/flagging', async (req, res) => {
