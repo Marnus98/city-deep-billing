@@ -39,6 +39,10 @@ function layout({ title, user, active, body }) {
     ? [
       ['/dashboard', 'Dashboard'], ['/site-billing', 'Billing Slips'], ['/municipal-billing', 'Municipal Account'],
       ...(currentProp.hasMunicipalStatements ? [['/recovery', 'Recovery']] : []),
+      // Same Flagging gate as the tenant-model branch below (see its own comment) - missed in the
+      // initial all-properties rollout (2026-08-25), since every flat_site property also got
+      // hasFlagging: true in properties.js but this nav branch never checked it.
+      ...(currentProp.hasFlagging ? [['/flagging', 'Flagging']] : []),
       ['/audit-log', 'Audit Log'],
     ]
     : [
