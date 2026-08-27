@@ -774,12 +774,16 @@ function buildSiteBillingSlipsCombinedPdf(entries) {
 // solarBillingSlipsPage, which keeps every meter-level calculation section - the client is fine
 // with that detail staying on screen). Client asked (2026-08-27) for a PDF, one page per tenant,
 // that shows only the bottom-line split - municipal usage vs. solar/PV usage vs. total due - not
-// the underlying meter-by-meter maths (solar.js's per-tenant compute* functions). Mirrors the exact
-// 4-column shape (Item / kWh / Tariff Used / Charge) of the 3-row summary block already at the
-// bottom of each on-screen slip card, just promoted to be the ONLY thing on the page. "Tariff Used"
-// is always tariff code 1 here (every solar-connected meter at this property is on the same
-// Electrical flat+demand tariff - see solar.js's own header comment and activeTariffParams usage);
-// there's no separate "solar tariff", the split is by source, not by rate.
+// the underlying meter-by-meter maths (solar.js's per-tenant compute* functions), with the same
+// header field layout as the real tenant Billing Slip (buildBillingSlipPdf above) so the two
+// documents read as a matched pair, just titled "Solar Slip" instead of "Utility Billing
+// Statement" (client feedback 2026-08-27). Mirrors the exact 4-column shape (Item / kWh / Tariff
+// Used / Charge) of the 3-row summary block already at the bottom of each on-screen slip card, just
+// promoted to be the ONLY thing on the page, with the contributing meter serial(s) added under each
+// row (see solar.js's muniSerials/solarSerials on each slip). "Tariff Used" is always tariff code 1
+// here (every solar-connected meter at this property is on the same Electrical flat+demand tariff -
+// see solar.js's own header comment and activeTariffParams usage); there's no separate "solar
+// tariff", the split is by source, not by rate.
 function drawSolarSummaryPage(doc, { propertyName, period, slip }) {
   const left = 42, right = PAGE_W - 42;
   let y = PAGE_H - 50;
@@ -788,11 +792,23 @@ function drawSolarSummaryPage(doc, { propertyName, period, slip }) {
   doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
 
   doc.text(left, y, (propertyName || '').toUpperCase(), { size: 16, bold: true }); y -= 14;
-  doc.text(left, y, `Solar Usage Summary - ${(period && period.label) || '-'}`, { size: 10 });
+  doc.text(left, y, 'Solar Slip', { size: 10 });
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
-  doc.line(left, y, right, y); y -= 24;
+  doc.line(left, y, right, y); y -= 18;
 
-  doc.text(left, y, slip.title, { size: 13, bold: true }); y -= 22;
+  // Same Tenant/Unit-Site/Reading-Period/Billing-Reference/Billing-Month field layout as
+  // buildBillingSlipPdf's own header above, fed this report's own Tenant/Unit/Billing Reference
+  // (solar.js's getTenantHeaderInfo) and the billing period's own reading dates - uniform across
+  // every solar slip in the same period, unlike a real per-tenant bill's own reading period.
+  doc.text(left, y, 'Tenant:', { bold: true }); doc.text(left + 90, y, slip.tenantName || '-');
+  doc.text(right - 180, y, 'Billing Reference:', { bold: true }); doc.text(right - 92, y, slip.billingReference || '-'); y -= 15;
+  doc.text(left, y, 'Unit / Site:', { bold: true }); doc.text(left + 90, y, slip.unit || '-');
+  doc.text(right - 180, y, 'Billing Month:', { bold: true }); doc.text(right - 92, y, (period && period.label) || '-'); y -= 15;
+  const days = period ? daysBetween(period.start_date, period.end_date) : null;
+  const readingPeriodStr = period ? `${period.start_date} to ${period.end_date}${days != null && days > LONG_PERIOD_DAYS ? ` (${days} days)` : ''}` : '-';
+  doc.text(left, y, 'Reading Period:', { bold: true }); doc.text(left + 90, y, readingPeriodStr); y -= 20;
+
+  doc.line(left, y, right, y); y -= 24;
 
   const col1 = left, col2 = left + 260, col3 = col2 + 100, col4 = right;
   doc.text(col1, y, 'Item', { bold: true, size: 9 });
@@ -801,8 +817,11 @@ function drawSolarSummaryPage(doc, { propertyName, period, slip }) {
   doc.text(col4 - textWidth('Charge', { bold: true, size: 9 }), y, 'Charge', { bold: true, size: 9 });
   y -= 5; doc.line(left, y, right, y); y -= 16;
 
-  const row = (label, kwh, tariff, charge, bold) => {
-    const opts = { size: 9.5, bold: !!bold };
+  // Serial(s) are printed on their own small line under the item label rather than appended inline
+  // (e.g. Hudaco's municipal usage draws on 4 physical DB meters) - inline would overrun the kWh
+  // column for any tenant with more than one contributing meter.
+  const row = (label, kwh, tariff, charge, { bold = false, serials = [] } = {}) => {
+    const opts = { size: 9.5, bold };
     doc.text(col1, y, label, opts);
     const kwhStr = numFmt(kwh, 2);
     doc.text(col2 - textWidth(kwhStr, opts), y, kwhStr, opts);
@@ -812,13 +831,19 @@ function drawSolarSummaryPage(doc, { propertyName, period, slip }) {
     }
     const chargeStr = money(charge);
     doc.text(col4 - textWidth(chargeStr, opts), y, chargeStr, opts);
-    y -= 16;
+    if (serials.length) {
+      y -= 12;
+      doc.text(col1, y, `Meter${serials.length > 1 ? 's' : ''}: ${serials.join(', ')}`, { size: 7.5 });
+      y -= 14;
+    } else {
+      y -= 18;
+    }
   };
 
-  row('Tenant Munic Usage', slip.total.muniUsage.kwh, 1, slip.total.muniUsage.rand);
-  row('Solar Used', slip.total.solarUsed.kwh, 1, slip.total.solarUsed.rand);
-  y -= 2; doc.line(left, y + 12, right, y + 12);
-  row('Total Due', slip.total.due.kwh, null, slip.total.due.rand, true);
+  row('Tenant Munic Usage', slip.total.muniUsage.kwh, 1, slip.total.muniUsage.rand, { serials: slip.muniSerials || [] });
+  row('Solar Used', slip.total.solarUsed.kwh, 1, slip.total.solarUsed.rand, { serials: slip.solarSerials || [] });
+  doc.line(left, y + 6, right, y + 6); y -= 4;
+  row('Total Due', slip.total.due.kwh, null, slip.total.due.rand, { bold: true });
 }
 
 // One page per solar-connected tenant, in `slips`' own order (solar.getSolarSlips()'s fixed

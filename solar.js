@@ -106,6 +106,11 @@ function computeKimo(db, periodId, periodStart) {
       ] },
     ],
     total: { muniUsage: totalMuni, solarUsed: totalSolar, due: totalDue },
+    // Physical meter serials feeding each side of `total` above - for the simplified Summary PDF
+    // (pdf.js's drawSolarSummaryPage) only; matches exactly the serials passed into the add() calls
+    // that produced totalMuni/totalSolar above, nothing inferred or guessed from labels.
+    muniSerials: ['33883387', '33883386', '33883385'],
+    solarSerials: ['35775711', '33883387E'],
   };
 }
 
@@ -128,6 +133,8 @@ function computeLesco(db, periodId, periodStart) {
       ] },
     ],
     total: { muniUsage: muni, solarUsed, due: totalDue },
+    muniSerials: ['35775956'],
+    solarSerials: ['35778872', '35775956E'],
     _exportForAgrana: exp,
   };
 }
@@ -175,6 +182,8 @@ function computeAgrana(db, periodId, periodStart, tariff1, lescoExport) {
       ] },
     ],
     total: { muniUsage: totalMuni, solarUsed: totalSolar, due: totalDue },
+    muniSerials: ['35775957', '35775955'],
+    solarSerials: ['35778873', '35775957E'],
   };
 }
 
@@ -204,6 +213,8 @@ function computeHudaco(db, periodId, periodStart) {
       ] },
     ],
     total: { muniUsage: totalMuniRaw, solarUsed, due: totalDue },
+    muniSerials: ['35776117', '35776114', '35775649', '36533987'],
+    solarSerials: ['35775710', '35776127E'],
   };
 }
 
@@ -252,6 +263,8 @@ function computeTeraoka(db, periodId, periodStart, tariff1) {
       ] },
     ],
     total: { muniUsage: totalMuni, solarUsed: totalSolar, due: totalDue },
+    muniSerials: ['36533988', '36533989'],
+    solarSerials: ['36339313', '36533988E', '11100461380R'],
   };
 }
 
@@ -308,6 +321,8 @@ function computeSkillCraft(db, periodId, periodStart, tariff1) {
       ] },
     ],
     total: { muniUsage: totalMuni, solarUsed: totalSolar, due: totalDue },
+    muniSerials: ['35776120', '35775648', '35776119'],
+    solarSerials: ['35775887', '35776120E', '35775886', '35775648E'],
   };
 }
 
@@ -349,6 +364,44 @@ function computeJCBakery(db, periodId, periodStart, tariff1) {
       ] },
     ],
     total: { muniUsage: totalMuni, solarUsed: totalSolar, due: totalDue },
+    muniSerials: ['35775962', '35775964'],
+    solarSerials: ['35778877', '35775962E'],
+  };
+}
+
+// Real tenant name(s) behind each solar slip `key`, as they appear in the `tenants` table - used
+// only by getTenantHeaderInfo below to fill in the Summary PDF's Tenant/Unit/Billing Reference
+// fields (the calculation above is entirely keyed by meter serial and doesn't need this at all). A
+// few groups are billed as two separate tenant rows sharing one name but different `unit` values
+// (Agrana: 2B/2C, JC Bakery: 4A/4B, SkillCraft: 5A/5B, Teraoka: 6A&B/6C) - both are looked up live
+// from the tenants table below rather than hardcoding their units/ids, since tenant names and unit
+// numbers have been renamed before (see server.js's 2026-08-24 City Deep tenant rename).
+const SOLAR_TENANT_NAME = {
+  kimo: 'Kimmo (Pty) Ltd',
+  lesco: 'Lesco Manufacturing (Pty) Ltd',
+  agrana: 'Agrana Fruit South Africa (Pty) Ltd',
+  hudaco: 'Hudaco Trading (Pty) Ltd',
+  teraoka: 'Teraoka Sa (Pty) Ltd',
+  skillcraft: 'Skillcraft Agencies (Pty) Ltd',
+  jcbakery: 'JC Bakeries (Pty) Ltd',
+};
+
+function allRows(db, sql, params = []) { return db.prepare(sql).all(...params); }
+
+// Looks up the tenant name/unit(s)/id(s) for one slip and builds a "Billing Reference" in the same
+// `CD-<period label>-<tenant id>` shape billing.js's own invoice_number uses (see billing.js line
+// ~128), joining multiple ids with "/" for the two-tenant-row groups - not a real invoice number
+// (this report reconstructs figures from possibly several tenants' actual bills at once), just kept
+// visually consistent with the real billing slip's own field so it's recognisable at a glance.
+function getTenantHeaderInfo(db, key, periodLabel) {
+  const name = SOLAR_TENANT_NAME[key];
+  if (!name) return { tenantName: key, unit: '-', billingReference: '-' };
+  const site1 = allRows(db, "SELECT id, unit FROM tenants WHERE name = ? AND site_id = 1 ORDER BY unit", [name]);
+  const rows = site1.length ? site1 : allRows(db, 'SELECT id, unit FROM tenants WHERE name = ? ORDER BY unit', [name]);
+  return {
+    tenantName: name,
+    unit: rows.map((r) => r.unit).filter(Boolean).join(' / ') || '-',
+    billingReference: rows.length ? `CD-${periodLabel}-${rows.map((r) => r.id).join('/')}` : '-',
   };
 }
 
@@ -361,7 +414,7 @@ function getSolarSlips(db, periodId) {
   const periodStart = period.start_date;
 
   const lesco = computeLesco(db, periodId, periodStart);
-  return [
+  const slips = [
     computeKimo(db, periodId, periodStart),
     lesco,
     computeAgrana(db, periodId, periodStart, tariff1, lesco._exportForAgrana),
@@ -370,6 +423,9 @@ function getSolarSlips(db, periodId) {
     computeSkillCraft(db, periodId, periodStart, tariff1),
     computeJCBakery(db, periodId, periodStart, tariff1),
   ];
+  // Tenant/Unit/Billing Reference header fields (see getTenantHeaderInfo above) - only consumed by
+  // the Summary PDF (pdf.js's drawSolarSummaryPage), not the on-screen page or any of the maths.
+  return slips.map((slip) => ({ ...slip, ...getTenantHeaderInfo(db, slip.key, period.label) }));
 }
 
 module.exports = { getSolarSlips };
