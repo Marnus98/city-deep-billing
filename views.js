@@ -587,8 +587,10 @@ function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
         ${(allPeriods || []).map((p) => `<option value="${p.id}" ${period && p.id === period.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
       </select>
       <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
+      ${period ? `<a href="/solar-billing-slips-pdf?periodId=${period.id}" class="border border-slate-300 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50">Download Summary PDF</a>` : ''}
     </form>
   </div>
+  <p class="text-xs text-slate-400 mb-2">The Summary PDF shows only Municipal Usage, Solar Used and Total Due for each tenant &mdash; not the calculation detail below.</p>
   <p class="text-sm text-slate-500 mb-4">Breaks down each solar-connected tenant's already-billed electricity energy charge by source &mdash; municipal grid vs. the on-site solar installation. This is a reporting view only; it does not change any tenant's invoiced amount (every figure below is reconstructed from that tenant's actual bill).</p>
   ${!slips.length ? `<div class="bg-white border rounded p-6 text-slate-400">No billing data for this period yet.</div>` : `
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-w-2xl">

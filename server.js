@@ -8,7 +8,7 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { open, migrate } = require('./db');
 const auth = require('./auth');
 const views = require('./views');
-const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf, buildFlaggingReportPdf } = require('./pdf');
+const { buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf, buildFlaggingReportPdf, buildSolarSummaryPdf } = require('./pdf');
 const billing = require('./billing');
 const solar = require('./solar');
 const municipalCompare = require('./municipal_compare');
@@ -1264,6 +1264,22 @@ route('GET', '/solar-billing-slips', async (req, res, params, query) => {
   const period = query.periodId ? get('SELECT * FROM billing_periods WHERE id=?', [query.periodId]) : latestPeriod();
   const slips = period ? solar.getSolarSlips(currentDb(), period.id) : [];
   send(res, 200, views.solarBillingSlipsPage({ user, period, allPeriods, slips }));
+});
+
+// Simplified summary PDF - one page per solar-connected tenant, showing only the bottom-line split
+// (municipal usage / solar usage / total due) with no meter-level calculation detail, per the
+// client's 2026-08-27 request. The on-screen page above keeps every calculation section as-is; this
+// is a separate, deliberately lighter document (see pdf.js's buildSolarSummaryPdf).
+route('GET', '/solar-billing-slips-pdf', async (req, res, params, query) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const period = query.periodId ? get('SELECT * FROM billing_periods WHERE id=?', [query.periodId]) : latestPeriod();
+  const slips = period ? solar.getSolarSlips(currentDb(), period.id) : [];
+  const propertyName = currentPropertyName(user);
+  const pdfBuf = buildSolarSummaryPdf({ propertyName, period, slips });
+  audit(user.userId, 'pdf_download', 'solar_summary', period ? period.id : null, null, null, null, null);
+  const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-solar-summary-${period ? period.label : ''}.pdf"` });
+  res.end(pdfBuf);
 });
 
 route('GET', '/municipal-accounts', async (req, res, params, query) => {

@@ -769,6 +769,76 @@ function buildSiteBillingSlipsCombinedPdf(entries) {
   return doc.build();
 }
 
+// ---------------- solar billing slips: simplified summary PDF ----------------
+// A much lighter counterpart to the full on-screen Solar Billing Slips page (views.js's
+// solarBillingSlipsPage, which keeps every meter-level calculation section - the client is fine
+// with that detail staying on screen). Client asked (2026-08-27) for a PDF, one page per tenant,
+// that shows only the bottom-line split - municipal usage vs. solar/PV usage vs. total due - not
+// the underlying meter-by-meter maths (solar.js's per-tenant compute* functions). Mirrors the exact
+// 4-column shape (Item / kWh / Tariff Used / Charge) of the 3-row summary block already at the
+// bottom of each on-screen slip card, just promoted to be the ONLY thing on the page. "Tariff Used"
+// is always tariff code 1 here (every solar-connected meter at this property is on the same
+// Electrical flat+demand tariff - see solar.js's own header comment and activeTariffParams usage);
+// there's no separate "solar tariff", the split is by source, not by rate.
+function drawSolarSummaryPage(doc, { propertyName, period, slip }) {
+  const left = 42, right = PAGE_W - 42;
+  let y = PAGE_H - 50;
+
+  const logoW = 90, logoH = logoW * (LOGO.height / LOGO.width);
+  doc.image(right - logoW, PAGE_H - 32 - logoH, logoW, logoH, 'Logo');
+
+  doc.text(left, y, (propertyName || '').toUpperCase(), { size: 16, bold: true }); y -= 14;
+  doc.text(left, y, `Solar Usage Summary - ${(period && period.label) || '-'}`, { size: 10 });
+  y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
+  doc.line(left, y, right, y); y -= 24;
+
+  doc.text(left, y, slip.title, { size: 13, bold: true }); y -= 22;
+
+  const col1 = left, col2 = left + 260, col3 = col2 + 100, col4 = right;
+  doc.text(col1, y, 'Item', { bold: true, size: 9 });
+  doc.text(col2 - textWidth('kWh', { bold: true, size: 9 }), y, 'kWh', { bold: true, size: 9 });
+  doc.text(col3 - textWidth('Tariff Used', { bold: true, size: 9 }), y, 'Tariff Used', { bold: true, size: 9 });
+  doc.text(col4 - textWidth('Charge', { bold: true, size: 9 }), y, 'Charge', { bold: true, size: 9 });
+  y -= 5; doc.line(left, y, right, y); y -= 16;
+
+  const row = (label, kwh, tariff, charge, bold) => {
+    const opts = { size: 9.5, bold: !!bold };
+    doc.text(col1, y, label, opts);
+    const kwhStr = numFmt(kwh, 2);
+    doc.text(col2 - textWidth(kwhStr, opts), y, kwhStr, opts);
+    if (tariff != null) {
+      const tStr = String(tariff);
+      doc.text(col3 - textWidth(tStr, opts), y, tStr, opts);
+    }
+    const chargeStr = money(charge);
+    doc.text(col4 - textWidth(chargeStr, opts), y, chargeStr, opts);
+    y -= 16;
+  };
+
+  row('Tenant Munic Usage', slip.total.muniUsage.kwh, 1, slip.total.muniUsage.rand);
+  row('Solar Used', slip.total.solarUsed.kwh, 1, slip.total.solarUsed.rand);
+  y -= 2; doc.line(left, y + 12, right, y + 12);
+  row('Total Due', slip.total.due.kwh, null, slip.total.due.rand, true);
+}
+
+// One page per solar-connected tenant, in `slips`' own order (solar.getSolarSlips()'s fixed
+// Kimo/Lesco/Agrana/Hudaco/Teraoka/SkillCraft/JC Bakery order) - "PDFs for each of the following"
+// as one downloadable document, same combined-document convention as
+// buildSiteBillingSlipsCombinedPdf above.
+function buildSolarSummaryPdf({ propertyName, period, slips }) {
+  const doc = new PDFDoc();
+  doc.registerImage('Logo', LOGO);
+  if (!slips || !slips.length) {
+    drawSolarSummaryPage(doc, { propertyName, period, slip: { title: 'No solar billing data for this period yet.', total: { muniUsage: { kwh: 0, rand: 0 }, solarUsed: { kwh: 0, rand: 0 }, due: { kwh: 0, rand: 0 } } } });
+    return doc.build();
+  }
+  slips.forEach((slip, i) => {
+    if (i > 0) doc.newPage();
+    drawSolarSummaryPage(doc, { propertyName, period, slip });
+  });
+  return doc.build();
+}
+
 // ---------------- recovery: tenant billing vs municipal statement (flat_site) ----------------
 // See flat_site_recovery.js for the comparison logic. `rows` here is buildRecoveryRows()'s output
 // (chronological ascending) - a row with either side missing (no site slip or no municipal
@@ -1470,4 +1540,5 @@ function money2(n) { return numFmt(n, n >= 1000 || n <= -1000 ? 0 : 1); }
 module.exports = {
   PDFDoc, buildBillingSlipPdf, buildMunicipalStatementPdf, buildSiteBillingSlipPdf, buildRecoveryPdf, money,
   buildSiteBillingSlipsCombinedPdf, buildMunicipalStatementsCombinedPdf, buildFlaggingReportPdf,
+  buildSolarSummaryPdf,
 };
