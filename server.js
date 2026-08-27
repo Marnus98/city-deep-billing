@@ -1266,18 +1266,32 @@ route('GET', '/solar-billing-slips', async (req, res, params, query) => {
   send(res, 200, views.solarBillingSlipsPage({ user, period, allPeriods, slips }));
 });
 
-// Simplified summary PDF - one page per solar-connected tenant, showing only the bottom-line split
-// (municipal usage / solar usage / total due) with no meter-level calculation detail, per the
-// client's 2026-08-27 request. The on-screen page above keeps every calculation section as-is; this
-// is a separate, deliberately lighter document (see pdf.js's buildSolarSummaryPdf).
+// Simplified PDF - showing only the bottom-line split (municipal usage / solar usage / total due)
+// with no meter-level calculation detail, per the client's 2026-08-27 request. The on-screen page
+// above keeps every calculation section as-is; this is a separate, deliberately lighter document
+// (see pdf.js's buildSolarSummaryPdf). With `slipKey`, downloads just that one tenant's own 1-page
+// slip (added 2026-08-27 - the client wants each tenant's bill downloaded individually, not one
+// combined multi-tenant file); without it, falls back to the old combined "every tenant, one file"
+// document for anyone who still wants to print/save the whole park at once.
 route('GET', '/solar-billing-slips-pdf', async (req, res, params, query) => {
   const user = requireLogin(req, res); if (!user) return;
   const period = query.periodId ? get('SELECT * FROM billing_periods WHERE id=?', [query.periodId]) : latestPeriod();
-  const slips = period ? solar.getSolarSlips(currentDb(), period.id) : [];
+  const allSlips = period ? solar.getSolarSlips(currentDb(), period.id) : [];
   const propertyName = currentPropertyName(user);
-  const pdfBuf = buildSolarSummaryPdf({ propertyName, period, slips });
-  audit(user.userId, 'pdf_download', 'solar_summary', period ? period.id : null, null, null, null, null);
   const fileSlug = propertyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  if (query.slipKey) {
+    const slip = allSlips.find((s) => s.key === query.slipKey);
+    if (!slip) return send(res, 404, 'Not found');
+    const pdfBuf = buildSolarSummaryPdf({ propertyName, period, slips: [slip] });
+    audit(user.userId, 'pdf_download', 'solar_slip', period ? period.id : null, null, null, null, null);
+    const tenantSlug = slip.key;
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-solar-slip-${tenantSlug}-${period ? period.label : ''}.pdf"` });
+    return res.end(pdfBuf);
+  }
+
+  const pdfBuf = buildSolarSummaryPdf({ propertyName, period, slips: allSlips });
+  audit(user.userId, 'pdf_download', 'solar_summary', period ? period.id : null, null, null, null, null);
   res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileSlug}-solar-summary-${period ? period.label : ''}.pdf"` });
   res.end(pdfBuf);
 });

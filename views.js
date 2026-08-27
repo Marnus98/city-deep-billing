@@ -557,9 +557,12 @@ function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
 
   const slipHtml = (slip) => `
   <div class="bg-white rounded-lg border mb-6">
-    <div class="px-4 py-3 border-b font-semibold flex justify-between items-baseline">
+    <div class="px-4 py-3 border-b font-semibold flex justify-between items-baseline flex-wrap gap-2">
       <span>${esc(slip.title)}</span>
-      <span class="text-slate-500 text-sm font-normal">Total Due: ${kwh(slip.total.due.kwh)} &middot; ${money(slip.total.due.rand)}</span>
+      <span class="flex items-center gap-3">
+        <span class="text-slate-500 text-sm font-normal">Total Due: ${kwh(slip.total.due.kwh)} &middot; ${money(slip.total.due.rand)}</span>
+        ${period ? `<a href="/solar-billing-slips-pdf?periodId=${period.id}&slipKey=${slip.key}" class="border border-slate-300 rounded px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Download PDF</a>` : ''}
+      </span>
     </div>
     <div class="px-4 py-2">
       ${slip.sections.map(sectionHtml).join('')}
@@ -587,10 +590,10 @@ function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
         ${(allPeriods || []).map((p) => `<option value="${p.id}" ${period && p.id === period.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
       </select>
       <button class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">View</button>
-      ${period ? `<a href="/solar-billing-slips-pdf?periodId=${period.id}" class="border border-slate-300 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50">Download Summary PDF</a>` : ''}
+      ${period ? `<a href="/solar-billing-slips-pdf?periodId=${period.id}" class="border border-slate-300 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50">Download All (combined PDF)</a>` : ''}
     </form>
   </div>
-  <p class="text-xs text-slate-400 mb-2">The Summary PDF shows only Municipal Usage, Solar Used and Total Due for each tenant &mdash; not the calculation detail below.</p>
+  <p class="text-xs text-slate-400 mb-2">Each tenant's own "Download PDF" button below gives just that tenant's Solar Slip &mdash; Municipal Usage, Solar Used and Total Due only, not the calculation detail on this page. "Download All" combines every tenant into one file, in case you need to print or save the whole park at once.</p>
   <p class="text-sm text-slate-500 mb-4">Breaks down each solar-connected tenant's already-billed electricity energy charge by source &mdash; municipal grid vs. the on-site solar installation. This is a reporting view only; it does not change any tenant's invoiced amount (every figure below is reconstructed from that tenant's actual bill).</p>
   ${!slips.length ? `<div class="bg-white border rounded p-6 text-slate-400">No billing data for this period yet.</div>` : `
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-w-2xl">
