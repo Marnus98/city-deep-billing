@@ -242,18 +242,51 @@ function requireRole(req, res, user, allowed) {
 // ---------------- data helpers ----------------
 function latestPeriod() { return get('SELECT * FROM billing_periods ORDER BY start_date DESC LIMIT 1'); }
 
+// Electricity kWh billed to a tenant's own meters only - excludes any 'common_area'-role meter's
+// shared/estimated allocation (e.g. City Deep's park-wide "10000001" placeholder pool every tenant
+// pays a small % share of - see meters.role and meter_assignments.is_common_area). bill_line_items
+// .quantity is always stored unsigned (see calc.js) - the +/- sign (export/credit meters read
+// negative) comes from that meter's own assignment as of the period start, reconstructed here the
+// same way solar.js's billedEnergy() already does it. Added 2026-08-27 per the client's feedback
+// that a tenant's own "Consumption" figure and meter-readings table showing a shared common-area
+// reading was confusing and inflated their reported usage - deliberately electricity-only: unlike
+// electricity, several tenants' ENTIRE water bill is that same shared meter (no dedicated water
+// meter of their own), so excluding common_area there would incorrectly zero out their real usage.
+function tenantOwnElecKwh(billId, tenantId, periodStartDate) {
+  const row = get(`
+    SELECT COALESCE(SUM(bli.quantity * COALESCE(
+      (SELECT ma.sign FROM meter_assignments ma WHERE ma.meter_id = bli.meter_id AND ma.tenant_id = ?
+       AND ma.effective_from <= ? AND (ma.effective_to IS NULL OR ma.effective_to > ?)
+       ORDER BY ma.id DESC LIMIT 1), 1)
+    ), 0) AS kwh
+    FROM bill_line_items bli JOIN meters m ON m.id = bli.meter_id
+    WHERE bli.bill_id = ? AND bli.utility_type = 'electricity' AND bli.category = 'energy_charge' AND m.role != 'common_area'
+  `, [tenantId, periodStartDate, periodStartDate, billId]);
+  return row.kwh;
+}
+
 // Trailing up-to-12-month view of a tenant's billed cost (excl. VAT), split Electricity / Water /
 // Sanitation, ending at (and including) the given period - feeds the trend chart on the PDF slip.
 // Sanitation is stored under utility_type='water' in bill_line_items (it's part of the same
 // municipal water/sewer account), so it's split out here by category rather than being a
-// separate utility_type in the schema.
+// separate utility_type in the schema. `elec`/`water`/`sanitation` (Rand, cost) stay tied to every
+// bill_line_items row including any common-area share, since that's genuinely billed - only
+// `elecKwh` (a consumption count, not a cost) excludes it, matching tenantOwnElecKwh above.
 function monthlyTrendForTenant(tenantId, asOfStartDate) {
   const rows = all(`
     SELECT bp.label, bp.start_date,
       COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) as elec,
       COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category NOT IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as water,
       COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as sanitation,
-      COALESCE(MAX(b.electricity_consumption_kwh), 0) as elecKwh,
+      COALESCE((
+        SELECT SUM(bli2.quantity * COALESCE(
+          (SELECT ma2.sign FROM meter_assignments ma2 WHERE ma2.meter_id = bli2.meter_id AND ma2.tenant_id = b.tenant_id
+           AND ma2.effective_from <= bp.start_date AND (ma2.effective_to IS NULL OR ma2.effective_to > bp.start_date)
+           ORDER BY ma2.id DESC LIMIT 1), 1)
+        )
+        FROM bill_line_items bli2 JOIN meters m2 ON m2.id = bli2.meter_id
+        WHERE bli2.bill_id = b.id AND bli2.utility_type = 'electricity' AND bli2.category = 'energy_charge' AND m2.role != 'common_area'
+      ), 0) as elecKwh,
       COALESCE(MAX(b.water_consumption_m3), 0) as waterM3
     FROM billing_periods bp
     LEFT JOIN bills b ON b.billing_period_id = bp.id AND b.tenant_id = ?
@@ -1212,9 +1245,12 @@ route('GET', '/billing/:tenantId/:periodId', async (req, res, params) => {
   }
   const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' ORDER BY id", [bill.id]);
   const waterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water' ORDER BY id", [bill.id]);
+  // role != 'common_area' - a tenant's own meter-readings table shouldn't list the shared park-wide
+  // allocation meter (see tenantOwnElecKwh's own header comment above) as if it were one of their
+  // own dedicated meters; the charge itself still appears below in elecItems/waterItems unchanged.
   const elecMeters = all(`SELECT DISTINCT m.serial, m.unit_scale, mr.start_reading, mr.end_reading FROM bill_line_items bli
     JOIN meters m ON m.id=bli.meter_id LEFT JOIN meter_readings mr ON mr.meter_id=m.id AND mr.billing_period_id=?
-    WHERE bli.bill_id=? AND bli.utility_type='electricity'`, [period.id, bill.id]);
+    WHERE bli.bill_id=? AND bli.utility_type='electricity' AND m.role != 'common_area'`, [period.id, bill.id]);
   const waterMeters = all(`SELECT DISTINCT m.serial, mr.start_reading, mr.end_reading FROM bill_line_items bli
     JOIN meters m ON m.id=bli.meter_id LEFT JOIN meter_readings mr ON mr.meter_id=m.id AND mr.billing_period_id=?
     WHERE bli.bill_id=? AND bli.utility_type='water'`, [period.id, bill.id]);
@@ -1223,7 +1259,12 @@ route('GET', '/billing/:tenantId/:periodId', async (req, res, params) => {
   const prevPeriod = idx > 0 ? periods[idx - 1] : null;
   const nextPeriod = idx >= 0 && idx < periods.length - 1 ? periods[idx + 1] : null;
   const excelRef = all('SELECT * FROM excel_reference WHERE tenant_id=? AND billing_period_id=?', [tenant.id, period.id]);
-  send(res, 200, views.billDetailPage({ user, tenant, period, bill, elecItems, waterItems, elecMeters, waterMeters, prevPeriod, nextPeriod, excelRef }));
+  // Override just the displayed electricity kWh (not the stored bill row) with the tenant's own-
+  // meter figure - see tenantOwnElecKwh's header comment; water is left untouched (several tenants'
+  // entire water bill IS the shared common-area meter, so excluding it there would zero out real
+  // usage, not fix anything).
+  const billForView = { ...bill, electricity_consumption_kwh: tenantOwnElecKwh(bill.id, tenant.id, period.start_date) };
+  send(res, 200, views.billDetailPage({ user, tenant, period, bill: billForView, elecItems, waterItems, elecMeters, waterMeters, prevPeriod, nextPeriod, excelRef }));
 });
 
 route('GET', '/pdf/:billId', async (req, res, params) => {
@@ -1237,9 +1278,11 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
   // Same meter-readings lookup the on-screen billing-slip page uses (billDetailPage's elecMeters/
   // waterMeters query, just above in this file) - added to the PDF 2026-08-24 so tenants can see
   // their own meter's start/end reading on the slip itself, not just a bare serial number.
+  // role != 'common_area' - see tenantOwnElecKwh's header comment above (billDetailPage's own
+  // elecMeters query, just above in this file, is filtered the same way).
   const elecMetersForPdf = all(`SELECT DISTINCT m.serial, m.unit_scale, mr.start_reading, mr.end_reading FROM bill_line_items bli
     JOIN meters m ON m.id=bli.meter_id LEFT JOIN meter_readings mr ON mr.meter_id=m.id AND mr.billing_period_id=?
-    WHERE bli.bill_id=? AND bli.utility_type='electricity'`, [period.id, bill.id]);
+    WHERE bli.bill_id=? AND bli.utility_type='electricity' AND m.role != 'common_area'`, [period.id, bill.id]);
   const waterMetersForPdf = all(`SELECT DISTINCT m.serial, mr.start_reading, mr.end_reading FROM bill_line_items bli
     JOIN meters m ON m.id=bli.meter_id LEFT JOIN meter_readings mr ON mr.meter_id=m.id AND mr.billing_period_id=?
     WHERE bli.bill_id=? AND bli.utility_type='water'`, [period.id, bill.id]);
@@ -1248,7 +1291,7 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
     tenantName: tenant.name, invoiceNumber: bill.invoice_number, unit: tenant.unit,
     periodLabel: period.label, accountNumber: tenant.account_number, startDate: period.start_date,
     endDate: period.end_date, dueDate: period.due_date, vatNumber: tenant.vat_number,
-    elecConsumption: bill.electricity_consumption_kwh.toFixed(2), waterConsumption: bill.water_consumption_m3.toFixed(2),
+    elecConsumption: tenantOwnElecKwh(bill.id, tenant.id, period.start_date).toFixed(2), waterConsumption: bill.water_consumption_m3.toFixed(2),
     elecLineItems: elecItems, waterLineItems: waterItems, elecMeters: elecMetersForPdf, waterMeters: waterMetersForPdf,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
     status: bill.status, generatedAt: bill.generated_at, monthlyTrend, propertyName: currentPropertyName(user),
