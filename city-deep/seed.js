@@ -144,6 +144,12 @@ const TENANT_DISPLAY_OVERRIDES = {
   'Unit 3 SANSKAR Trading': { name: 'Sanskar Trading CC', unit: 'Unit 3' },
   'Unit 4 Americandy Manufacturers (PTY)LTD': { name: 'Americandy Manufacturers (Pty) Ltd', unit: 'Unit 4' },
   'Unit 5 AGRANA': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 5' },
+  // The two synthetic post-handover tenant identities TENANT_HANDOVERS redirects Unit 4/5 to from
+  // 2026-08 onward (see that const's own header comment) - display-overridden the same way as
+  // every other raw-workbook-name entry in this map, just keyed by a name that never came off a
+  // real workbook tab.
+  '__HANDOVER_TWINPOUCH_UNIT4__': { name: 'Twinpouch (Pty) Ltd', unit: 'Unit 4' },
+  '__HANDOVER_TWINPOUCH_UNIT5__': { name: 'Twinpouch (Pty) Ltd', unit: 'Unit 5' },
   'Shop 6 Unit 6 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 6' },
   'Shop 5 Unit 7 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 7' },
   'Shop 4 Unit 8 Citrashine': { name: 'Citrashine (Pty) Ltd', unit: 'Unit 8 (Shop 4)' },
@@ -156,6 +162,37 @@ function applyTenantDisplayOverrides() {
   for (const [oldName, { name, unit }] of Object.entries(TENANT_DISPLAY_OVERRIDES)) {
     run('UPDATE tenants SET name=?, unit=? WHERE name=?', [name, unit, oldName]);
   }
+}
+
+// Mid-history tenant handovers: same physical unit/meters, occupant changed on a specific date -
+// from the client's "Tenant Occupancy Changes" mapping table (2026-08-24), applied 2026-08-31 once
+// the first period on/after each handover's effective month was actually imported (no point
+// redirecting bills to a tenant with zero workbook data behind it). Tenant identity in this schema
+// is one continuous DB row matched by raw workbook name (getOrCreateTenant), so a mid-year occupant
+// change can't be expressed as a TENANT_DISPLAY_OVERRIDES rename alone without incorrectly
+// relabeling the outgoing tenant's own pre-handover history too. Instead, seedMonth() below checks
+// this list before resolving a block's tenant: once the billing period's own label reaches
+// `fromLabel`, that workbook row's bills/meter-assignments/readings get attached to a brand-new
+// synthetic tenant identity (`newRawName`, display-renamed via TENANT_DISPLAY_OVERRIDES above)
+// instead of the outgoing tenant - every period before `fromLabel` is completely unaffected, still
+// resolving to the original tenant exactly as before. meter_assignments' own effective_from/
+// effective_to versioning (see upsertAssignment) then naturally closes out the old tenant's
+// assignment on each shared meter as of the handover period's start and opens a new one for the
+// incoming tenant - the same mechanism that already handles a tariff or allocation change mid-year,
+// just triggered by a tenant_id change instead this time.
+//
+// Source table had 3 rows; only 2 are listed here. The 3rd (Unit 9, Sanskar Trading CC -> Uber
+// Nutrition (Pty) Ltd, effective 2026-09) is client-confirmed but deliberately NOT added yet - no
+// billing period with label >= '2026-09' has been imported, so there is nothing for it to redirect.
+// Add it here (matching rawName 'Shop 3 Unit 9 SANSKAR Trading', fromLabel '2026-09') once the
+// first September 2026 workbook is imported.
+const TENANT_HANDOVERS = [
+  { rawName: 'Unit 4 Americandy Manufacturers (PTY)LTD', fromLabel: '2026-08', newRawName: '__HANDOVER_TWINPOUCH_UNIT4__' },
+  { rawName: 'Unit 5 AGRANA', fromLabel: '2026-08', newRawName: '__HANDOVER_TWINPOUCH_UNIT5__' },
+];
+function resolveTenantWorkbookName(rawName, periodLabel) {
+  const handover = TENANT_HANDOVERS.find((h) => h.rawName === rawName && periodLabel >= h.fromLabel);
+  return handover ? handover.newRawName : rawName;
 }
 
 // ---------- Tenants / Meters / Assignments ----------
@@ -368,7 +405,11 @@ function seedMonth(monthData) {
   const allNames = new Set([...Object.keys(elecTenantsByName), ...Object.keys(waterTenantsByName)]);
   let count = 0;
   for (const name of allNames) {
-    const tenant = getOrCreateTenant(name, siteForTenantName(name));
+    // Redirects to a brand-new tenant identity once this period reaches a handover's effective
+    // month - see TENANT_HANDOVERS' own header comment. siteForTenantName still runs on the
+    // original raw `name` (not the synthetic handover name), since that's what its own regex
+    // matching depends on.
+    const tenant = getOrCreateTenant(resolveTenantWorkbookName(name, billingPeriod.label), siteForTenantName(name));
     const elecBlock = elecTenantsByName[name];
     const waterBlock = waterTenantsByName[name];
     // The kVArh demand charge (column Y) only has a working formula in the "Mini Park" precinct's
