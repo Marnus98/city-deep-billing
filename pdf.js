@@ -489,7 +489,11 @@ function drawLineItemsTable(doc, items, left, right, y) {
   doc.line(left, y, right, y);
   y -= 12;
   for (const it of items) {
-    doc.text(left, y, it.description, { size: 9 });
+    // meter_serial is only present on tenant billing-slip line items (see server.js's elecItems/
+    // waterItems queries) - municipal statement line items (drawMunicipalStatementSummaryPage,
+    // below) have no meter of their own, so this is undefined there and the label is left plain.
+    const label = it.meter_serial ? `${it.description}  [${it.meter_serial}]` : it.description;
+    doc.text(left, y, label, { size: 9 });
     doc.text(right - 90, y, money(it.amount), { size: 9 });
     y -= 12;
   }

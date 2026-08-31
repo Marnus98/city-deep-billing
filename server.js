@@ -1243,8 +1243,12 @@ route('GET', '/billing/:tenantId/:periodId', async (req, res, params) => {
       body: `<div class="bg-white border rounded p-6">No bill has been generated for <b>${views.esc(tenant.name)}</b> in <b>${views.esc(period.label)}</b> yet.</div>`,
     }));
   }
-  const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' ORDER BY id", [bill.id]);
-  const waterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water' ORDER BY id", [bill.id]);
+  // m.serial joined in so the charge-breakdown table (views.js's lineTable) can show which meter
+  // each line item came from, not just the meter-readings table above it - added 2026-08-31 per
+  // client feedback on a multi-meter tenant's bill (Agrana) where it wasn't obvious which of the
+  // 3 electricity meters a given "Energy charge" row belonged to.
+  const elecItems = all("SELECT bli.*, m.serial AS meter_serial FROM bill_line_items bli LEFT JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='electricity' ORDER BY bli.id", [bill.id]);
+  const waterItems = all("SELECT bli.*, m.serial AS meter_serial FROM bill_line_items bli LEFT JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='water' ORDER BY bli.id", [bill.id]);
   // role != 'common_area' - a tenant's own meter-readings table shouldn't list the shared park-wide
   // allocation meter (see tenantOwnElecKwh's own header comment above) as if it were one of their
   // own dedicated meters; the charge itself still appears below in elecItems/waterItems unchanged.
@@ -1273,8 +1277,11 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
   if (!bill) return send(res, 404, 'Not found');
   const tenant = get('SELECT * FROM tenants WHERE id=?', [bill.tenant_id]);
   const period = get('SELECT * FROM billing_periods WHERE id=?', [bill.billing_period_id]);
-  const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' ORDER BY id", [bill.id]);
-  const waterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water' ORDER BY id", [bill.id]);
+  // m.serial joined in - see the matching change to billDetailPage's own elecItems/waterItems query
+  // above, same reason: show which meter a charge-breakdown row came from, not just the separate
+  // meter-readings table.
+  const elecItems = all("SELECT bli.*, m.serial AS meter_serial FROM bill_line_items bli LEFT JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='electricity' ORDER BY bli.id", [bill.id]);
+  const waterItems = all("SELECT bli.*, m.serial AS meter_serial FROM bill_line_items bli LEFT JOIN meters m ON m.id=bli.meter_id WHERE bli.bill_id=? AND bli.utility_type='water' ORDER BY bli.id", [bill.id]);
   // Same meter-readings lookup the on-screen billing-slip page uses (billDetailPage's elecMeters/
   // waterMeters query, just above in this file) - added to the PDF 2026-08-24 so tenants can see
   // their own meter's start/end reading on the slip itself, not just a bare serial number.

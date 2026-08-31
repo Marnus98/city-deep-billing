@@ -490,7 +490,7 @@ function billDetailPage({ user, tenant, period, bill, elecItems, waterItems, ele
       <div class="text-xs uppercase text-slate-400 mb-1">Charge breakdown</div>
       <table class="w-full text-sm">
         <tbody>
-        ${items.map(i => `<tr class="border-t"><td class="py-1">${esc(i.description)}${i.quantity != null ? ` <span class="text-slate-400">(${fmtNum(i.quantity, 2)})</span>` : ''}</td><td class="py-1 text-right">${money(i.amount)}</td></tr>`).join('') || '<tr><td class="py-2 text-slate-400" colspan="2">No charges</td></tr>'}
+        ${items.map(i => `<tr class="border-t"><td class="py-1">${esc(i.description)}${i.quantity != null ? ` <span class="text-slate-400">(${fmtNum(i.quantity, 2)})</span>` : ''}${i.meter_serial ? ` <span class="text-slate-400 font-mono text-xs">[${esc(i.meter_serial)}]</span>` : ''}</td><td class="py-1 text-right">${money(i.amount)}</td></tr>`).join('') || '<tr><td class="py-2 text-slate-400" colspan="2">No charges</td></tr>'}
         <tr class="border-t font-semibold"><td class="py-1">Subtotal</td><td class="py-1 text-right">${money(items.reduce((s, i) => s + i.amount, 0))}</td></tr>
         </tbody>
       </table>
