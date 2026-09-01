@@ -1,6 +1,6 @@
 {
  "label": "2026-08",
- "file": "/sessions/beautiful-stoic-allen/mnt/uploads/City Deep Aug 2026 with solar Recon^L.xlsx",
+ "file": "/sessions/beautiful-stoic-allen/mnt/uploads/City Deep Aug 2026.xlsx",
  "period": {
   "start": "2026-07-24",
   "end": "2026-08-25"
@@ -1366,11 +1366,11 @@
    "serial": "35775955",
    "reading_type": "Automatic",
    "billing_mult": 1,
-   "start_kwh": "(460128.576/769.44)",
-   "end_kwh": "(473599.936/18761.3)",
+   "start_kwh": null,
+   "end_kwh": null,
    "usage_kwh": 32087,
-   "start_kvarh": "(104.12/194937.184)",
-   "end_kvarh": "(104.24/194937.680)",
+   "start_kvarh": null,
+   "end_kvarh": null,
    "usage_kvarh": 0.44,
    "kva": 88.054,
    "notes": null
@@ -1381,8 +1381,8 @@
    "serial": "35775955E",
    "reading_type": "Automatic",
    "billing_mult": 1,
-   "start_kwh": "(756.65/473601.280)",
-   "end_kwh": "(756.78/473601.280)",
+   "start_kwh": null,
+   "end_kwh": null,
    "usage_kwh": 0.13,
    "start_kvarh": null,
    "end_kvarh": null,
@@ -2051,7 +2051,7 @@
    "notes": "Closed"
   },
   {
-   "tenant_alloc": "Americandy Manufacturers (Pty)Ltd",
+   "tenant_alloc": "Twinpouch",
    "location": "UNIT 4",
    "serial": "240957643",
    "reading_type": "automatic",
@@ -2066,7 +2066,7 @@
    "notes": "DB Switched Off"
   },
   {
-   "tenant_alloc": "AGRANA",
+   "tenant_alloc": "Twinpouch",
    "location": "UNIT 5 (Main meter)",
    "serial": "ELON133635",
    "reading_type": "Manual",
@@ -2081,7 +2081,7 @@
    "notes": null
   },
   {
-   "tenant_alloc": "AGRANA",
+   "tenant_alloc": "Twinpouch",
    "location": "UNIT 5 (Check meter + Gen)",
    "serial": "ELON071392",
    "reading_type": "Manual",
@@ -2308,17 +2308,6 @@
  ],
  "water_readings": [
   {
-   "location": "Location",
-   "tenant_alloc": "Tenant Allocation",
-   "serial": "Serial number ",
-   "reading_type": "Reading Type",
-   "billing_rx": "Billing Rx",
-   "start_m3": "m\u00b3 Reading (Start)",
-   "end_m3": "m\u00b3 Reading (End)",
-   "usage_m3": "Usage",
-   "notes": "Issues / Notes"
-  },
-  {
    "location": "Unit 1 - Kimmo",
    "tenant_alloc": "Unit 1 - Kimmo",
    "serial": "190726259",
@@ -2451,7 +2440,7 @@
    "notes": null
   },
   {
-   "location": "AGRANA",
+   "location": "Twinpouch",
    "tenant_alloc": "UNIT 5",
    "serial": "104400",
    "reading_type": "Manual",
@@ -2462,7 +2451,7 @@
    "notes": null
   },
   {
-   "location": "AGRANA",
+   "location": "Twinpouch",
    "tenant_alloc": "UNIT 5",
    "serial": "104770",
    "reading_type": "Manual",
@@ -2627,7 +2616,7 @@
    "notes": null
   },
   {
-   "location": "Americandy Manufacurers (PTY)LTD",
+   "location": "Twinpouch",
    "tenant_alloc": "UNIT 4",
    "serial": "104854",
    "reading_type": "Manual",
@@ -2638,7 +2627,7 @@
    "notes": null
   },
   {
-   "location": "Americandy Manufacurers (PTY)LTD",
+   "location": "Twinpouch",
    "tenant_alloc": "UNIT 4",
    "serial": "C-BHA5214",
    "reading_type": "Manual",
@@ -3117,9 +3106,9 @@
     {
      "row": 21,
      "serial": "35775955",
-     "start": "(460128.576/769.44)",
-     "end": "(473599.936/18761.3)",
-     "consumption_kwh": 32087,
+     "start": null,
+     "end": null,
+     "consumption_kwh": 31463.219999999987,
      "kva": 88.054,
      "kvarh": null,
      "tenant_meter_label": "DB-BB Unit 2B",
@@ -3127,19 +3116,19 @@
      "common_area_pct": null,
      "service_flag": 1,
      "sign": 1,
-     "billable_consumption": 32087,
+     "billable_consumption": 31463.219999999987,
      "billable_kvarh": null,
      "billable_kva": 88.054,
      "tariff_code": 1,
      "service_charge": 1527.71,
      "capacity_charge": 0,
-     "energy_charge": 107103.19730000001,
+     "energy_charge": 105021.08203799996,
      "demand_kva_charge": 40612.265880000006,
      "demand_kvarh_charge": 0,
-     "network_surcharge": 1925.22,
-     "business_surcharge": 2984.863463600001,
+     "network_surcharge": 1887.7931999999992,
+     "business_surcharge": 2943.2211583599997,
      "network_levy": null,
-     "row_total": 154153.25664360003
+     "row_total": 151992.07227635995
     },
     {
      "row": 22,
@@ -3173,13 +3162,13 @@
     "row": 23,
     "service_charge": 1527.71,
     "capacity_charge": 0,
-    "energy_charge": 110662.43925694602,
+    "energy_charge": 108580.32399494597,
     "demand_kva_charge": 40612.265880000006,
     "demand_kvarh_charge": 0,
-    "network_surcharge": 1925.22,
-    "business_surcharge": 2984.863463600001,
+    "network_surcharge": 1887.7931999999992,
+    "business_surcharge": 2943.2211583599997,
     "network_levy": 0,
-    "row_total": 157712.49860054604
+    "row_total": 155551.31423330595
    }
   },
   {
@@ -4931,7 +4920,7 @@
      "consumption_kwh": 301.5999999998894,
      "kva": 7.039999999999999,
      "kvarh": 0,
-     "tenant_meter_label": "AGRANA",
+     "tenant_meter_label": "Twinpouch",
      "location": "UNIT 5 (Main meter)",
      "common_area_pct": null,
      "service_flag": 1,
@@ -5003,7 +4992,7 @@
      "consumption_kwh": 0.168,
      "kva": 0.168,
      "kvarh": 0.009,
-     "tenant_meter_label": "Americandy Manufacturers (Pty)Ltd",
+     "tenant_meter_label": "Twinpouch",
      "location": "UNIT 4",
      "common_area_pct": null,
      "service_flag": 1,

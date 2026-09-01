@@ -483,8 +483,13 @@ function billDetailPage({ user, tenant, period, bill, elecItems, waterItems, ele
         <thead><tr class="text-left text-slate-500"><th class="py-1">Serial</th><th>Start</th><th>End</th><th>Consumption</th></tr></thead>
         <tbody>${meters.map(m => {
           const scale = m.unit_scale || 1;
-          const consumption = (m.end_reading - m.start_reading) * scale;
-          return `<tr class="border-t"><td class="py-1 font-mono">${esc(m.serial)}</td><td>${fmtNum(m.start_reading, 2)}</td><td>${fmtNum(m.end_reading, 2)}</td><td>${fmtNum(consumption, 2)}${scale !== 1 ? ` <span class="text-slate-400">(&times;${scale})</span>` : ''}</td></tr>`;
+          // A null start/end (source workbook cell wasn't a clean number for this meter/period -
+          // see seed.js's own comment on the meter_readings insert) shows as '-' rather than
+          // attempting a bogus subtraction that renders as NaN - same convention pdf.js's
+          // drawMeterReadingsTable already uses.
+          const hasReadings = m.start_reading != null && m.end_reading != null;
+          const consumption = hasReadings ? (m.end_reading - m.start_reading) * scale : null;
+          return `<tr class="border-t"><td class="py-1 font-mono">${esc(m.serial)}</td><td>${hasReadings ? fmtNum(m.start_reading, 2) : '-'}</td><td>${hasReadings ? fmtNum(m.end_reading, 2) : '-'}</td><td>${hasReadings ? fmtNum(consumption, 2) : '-'}${hasReadings && scale !== 1 ? ` <span class="text-slate-400">(&times;${scale})</span>` : ''}</td></tr>`;
         }).join('') || '<tr><td class="py-1 text-slate-400" colspan="4">No meter readings</td></tr>'}</tbody>
       </table>
       <div class="text-xs uppercase text-slate-400 mb-1">Charge breakdown</div>

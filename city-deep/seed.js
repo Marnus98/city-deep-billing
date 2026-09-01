@@ -289,11 +289,22 @@ function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tari
   for (const row of elecMeterRows) {
     const unitScale = (unitScaleBySerial && unitScaleBySerial[row.serial]) || 1;
     const meter = getOrCreateMeter(row.serial, 'electricity', row.common_area_pct != null ? 'common_area' : 'tenant', row.location, unitScale);
-    // store reading
-    run(`INSERT OR REPLACE INTO meter_readings
-        (meter_id, billing_period_id, start_reading, end_reading, start_reading_kvarh, end_reading_kvarh, kva_reading, source)
-        VALUES (?,?,?,?,?,?,?,?)`,
-      [meter.id, billingPeriod.id, row.start || 0, row.end || 0, null, null, row.kva || 0, 'excel_import']);
+    // meter_readings.start_reading/end_reading are NOT NULL columns, so a genuinely unusable
+    // reading (source workbook cell wasn't a clean number - see august2026.json's own patch note:
+    // one meter's Aug 2026 Start/End cells came through as literal text like
+    // '(460128.576/769.44)' instead of a reading, a source data-quality issue sanitized to null at
+    // extraction time rather than guessed at) simply skips this INSERT instead of storing a false
+    // 0. The elecMeters/waterMeters queries (server.js) LEFT JOIN meter_readings, so a meter with
+    // no row for this period naturally comes back with start_reading/end_reading = NULL anyway -
+    // pdf.js's drawMeterReadingsTable and views.js's lineTable both already render that as '-'
+    // rather than a bogus start-minus-end subtraction. The bill's own Consumption total is
+    // unaffected either way since it comes from row.consumption_kwh directly, never from end-start.
+    if (row.start != null && row.end != null) {
+      run(`INSERT OR REPLACE INTO meter_readings
+          (meter_id, billing_period_id, start_reading, end_reading, start_reading_kvarh, end_reading_kvarh, kva_reading, source)
+          VALUES (?,?,?,?,?,?,?,?)`,
+        [meter.id, billingPeriod.id, row.start, row.end, null, null, row.kva || 0, 'excel_import']);
+    }
 
     const allocationPct = allocationFromRow(row.consumption_kwh, row.billable_consumption, row.common_area_pct);
     const kvarhAlloc = allocationFromRow(row.kvarh, row.billable_kvarh, row.common_area_pct);
@@ -321,10 +332,15 @@ function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tari
 
   for (const row of waterMeterRows) {
     const meter = getOrCreateMeter(row.serial, 'water', row.common_area_pct != null ? 'common_area' : 'tenant', null);
-    run(`INSERT OR REPLACE INTO meter_readings
-        (meter_id, billing_period_id, start_reading, end_reading, source)
-        VALUES (?,?,?,?,?)`,
-      [meter.id, billingPeriod.id, row.start || 0, row.end || 0, 'excel_import']);
+    // Same skip-rather-than-fake-a-0 convention as the electricity meter insert above (meter_
+    // readings.start_reading/end_reading are NOT NULL columns) - a non-numeric source cell reads
+    // as "no reading available" via the LEFT JOIN in server.js's waterMeters query, not a false 0.
+    if (row.start != null && row.end != null) {
+      run(`INSERT OR REPLACE INTO meter_readings
+          (meter_id, billing_period_id, start_reading, end_reading, source)
+          VALUES (?,?,?,?,?)`,
+        [meter.id, billingPeriod.id, row.start, row.end, 'excel_import']);
+    }
 
     const allocationPct = allocationFromRow(row.consumption_m3, row.billable_consumption, row.common_area_pct);
     upsertAssignment({
