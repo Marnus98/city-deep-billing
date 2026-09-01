@@ -65,6 +65,16 @@ const MUNICIPAL_ACCOUNTS = [
   { label: 'Rittle', title: 'Rittle (559304085)' },
 ];
 
+// The property's own "current period" - the latest billing_period that actually has tenant bills
+// generated for it (always created every month regardless of whether a municipal statement has
+// arrived yet - see seed.js's generateBill). This is what a municipal account's own latest label
+// gets compared against below to decide whether it's showing this month's real figures or a stale
+// prior month (see flagging.js's header comment on this feature).
+function currentPeriodLabel(db) {
+  const row = get(db, 'SELECT label FROM billing_periods ORDER BY start_date DESC LIMIT 1');
+  return row ? row.label : null;
+}
+
 // "Possible contributing meters" (spec section 7) - every tenant in `sectionKey` with at least one
 // prior month of history, sorted by |variance| descending so the most likely explanation for a
 // site-level flag surfaces first. Deliberately NOT run through flagging.js's full classifier (no
@@ -93,14 +103,19 @@ function buildContributingTenants(db, sectionKey, utility, latestLabel) {
 // real month of data (a brand-new account/section with nothing billed yet is simply absent, not
 // shown as green).
 function buildAllFlagRows(db, settings) {
+  const cpLabel = currentPeriodLabel(db);
   const municipalRows = [];
   for (const acc of MUNICIPAL_ACCOUNTS) {
     for (const utility of ['electricity', 'water']) {
       const series = tenantModel.municipalAccountSeries(db, acc.label, utility);
-      if (!series.length) continue;
+      if (!series.length) {
+        municipalRows.push(flagging.noDataRow({ entityType: 'municipal_account', entityKey: acc.label, title: acc.title, utility }, cpLabel));
+        continue;
+      }
       const result = flagging.evaluate(series, settings, utility);
       const annotation = tenantModel.getAnnotation(db, 'municipal_account', acc.label, utility, result.stats.latest.label);
-      municipalRows.push({ entityType: 'municipal_account', entityKey: acc.label, title: acc.title, utility, series, ...result, annotation });
+      const noCurrentData = !!cpLabel && result.stats.latest.label !== cpLabel;
+      municipalRows.push({ entityType: 'municipal_account', entityKey: acc.label, title: acc.title, utility, series, ...result, annotation, noCurrentData, currentPeriodLabel: cpLabel });
     }
   }
   const sectionRows = [];

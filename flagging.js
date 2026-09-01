@@ -199,7 +199,31 @@ function evaluate(history, settings, utility) {
 
 const EMOJI = { green: '\u{1F7E2}', amber: '\u{1F7E0}', red: '\u{1F534}' };
 
+// ---------- "No data yet" support ----------
+// The client's own ask (2026-09-01): tenant/client-billing flagging should be available for the
+// latest bill even when a municipal account statement hasn't been uploaded for that period yet, and
+// a missing municipal account should read as an explicit "No data" note rather than either silently
+// vanishing (the old `if (!series.length) continue` skip used everywhere) or silently showing a
+// stale prior month as if it were the current one. Two small building blocks, used by every
+// *_flagging_data.js module's municipal-account loop:
+//   - noDataRow(): a placeholder row for an account with literally zero statements ever imported -
+//     `level: 'nodata'` short-circuits the usual green/amber/red badge everywhere it's rendered
+//     (views.js's flagBadge/trendChartCard/flagDetailRows, pdf.js's FLAG_COLOR/drawFlagChartCard).
+//   - a row that DOES have data but whose own latest period is behind the property's current period
+//     (computed by each flagging_data.js module from its own always-current source - tenant/site
+//     billing, generated every month regardless of municipal) gets `noCurrentData: true` and
+//     `currentPeriodLabel` set directly on it (no separate wrapper needed - see each module's own
+//     municipal loop for where this is set).
+function noDataRow(base, currentPeriodLabel) {
+  return {
+    ...base, series: [], stats: null, level: 'nodata',
+    reasons: ['No statement has been imported for this account yet.'],
+    pctVsBaseline: null, pctVsPrevious: null, annotation: null,
+    noCurrentData: true, currentPeriodLabel,
+  };
+}
+
 module.exports = {
   DEFAULT_SETTINGS, getSettings, updateSettings,
-  computeSeriesStats, classify, evaluate, EMOJI, LEVEL_RANK, worse,
+  computeSeriesStats, classify, evaluate, EMOJI, LEVEL_RANK, worse, noDataRow,
 };

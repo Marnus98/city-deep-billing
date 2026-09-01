@@ -16,6 +16,13 @@ function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 // ("'Refinery' is Wingfield's own single City of Ekurhuleni account (2210755502)").
 const MUNICIPAL_ACCOUNT = { label: 'Refinery', title: 'Refinery (2210755502)' };
 
+// See city-deep/flagging_data.js's own currentPeriodLabel() for what this is and why - same idea,
+// just against this property's own billing_periods table.
+function currentPeriodLabel(db) {
+  const row = db.prepare('SELECT label FROM billing_periods ORDER BY start_date DESC LIMIT 1').get();
+  return row ? row.label : null;
+}
+
 // Every tenant's billing summed together, one utility - Wingfield's own equivalent of City Deep's
 // per-Recovery-section total, just with every tenant in the one bucket since this property has no
 // sub-sections. Built on the same shared tenantGroupSeries used by City Deep's own siteSectionSeries
@@ -31,13 +38,18 @@ function wholeSiteSeries(db, utility) {
 // header note on this - flagging.js's classify() already checks pctVsPrevious, no engine change
 // needed here either).
 function buildAllFlagRows(db, settings, propertyName) {
+  const cpLabel = currentPeriodLabel(db);
   const municipalRows = [];
   for (const utility of ['electricity', 'water']) {
     const series = tenantModel.municipalAccountSeries(db, MUNICIPAL_ACCOUNT.label, utility);
-    if (!series.length) continue;
+    if (!series.length) {
+      municipalRows.push(flagging.noDataRow({ entityType: 'municipal_account', entityKey: MUNICIPAL_ACCOUNT.label, title: MUNICIPAL_ACCOUNT.title, utility }, cpLabel));
+      continue;
+    }
     const result = flagging.evaluate(series, settings, utility);
     const annotation = tenantModel.getAnnotation(db, 'municipal_account', MUNICIPAL_ACCOUNT.label, utility, result.stats.latest.label);
-    municipalRows.push({ entityType: 'municipal_account', entityKey: MUNICIPAL_ACCOUNT.label, title: MUNICIPAL_ACCOUNT.title, utility, series, ...result, annotation });
+    const noCurrentData = !!cpLabel && result.stats.latest.label !== cpLabel;
+    municipalRows.push({ entityType: 'municipal_account', entityKey: MUNICIPAL_ACCOUNT.label, title: MUNICIPAL_ACCOUNT.title, utility, series, ...result, annotation, noCurrentData, currentPeriodLabel: cpLabel });
   }
 
   const sectionRows = [];

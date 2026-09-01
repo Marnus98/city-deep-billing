@@ -1476,6 +1476,7 @@ const FLAG_STATUSES = ['Open', 'Under Review', 'Explained', 'Municipality Query 
 // Dot only (no Green/Amber/Red text label) per client request 2026-08-25 - the coloured emoji
 // carries the meaning on its own; title="" keeps the level available on hover/screen readers.
 function flagBadge(level) {
+  if (level === 'nodata') return '<span class="badge bg-slate-100 text-slate-500">No data</span>';
   return `<span title="${esc(level)}">${FLAG_EMOJI[level] || ''}</span>`;
 }
 function pctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`; }
@@ -1592,12 +1593,35 @@ function bandedConsumptionChart(months, { baselineMonthlyAvg, amberPct, redPct, 
 // lose the ability to leave a HolmStone/RPI comment on a flag.
 function trendChartCard(row, settings) {
   const unit = row.utility === 'water' ? 'kL' : 'kWh';
+  const a = row.annotation;
+  const statusNote = a ? `<span class="badge bg-slate-100 text-slate-600 ml-1">${esc(a.status)}</span>` : '';
+  // No statement imported for this account at all yet (flagging.js's noDataRow) - a lightweight
+  // card with no chart/stats to plot, rather than crashing on row.stats being null. See flagging.js's
+  // header comment on this feature (client ask 2026-09-01: missing municipal accounts should read as
+  // an explicit "No data" note, not silently vanish).
+  if (row.level === 'nodata') {
+    return `
+    <div class="bg-white rounded-lg border p-4 mb-4">
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-1">
+        <div class="font-semibold">${esc(row.title)} <span class="text-slate-400 font-normal">&middot; ${row.utility[0].toUpperCase()}${row.utility.slice(1)}</span></div>
+        <div class="flex items-center gap-2 text-sm">${flagBadge('nodata')}${statusNote}</div>
+      </div>
+      <div class="flex items-center justify-center text-xs text-slate-400" style="height:120px">No statement has been imported${row.currentPeriodLabel ? ` for ${esc(row.currentPeriodLabel)}` : ''} yet.</div>
+      <details class="mt-2">
+        <summary class="text-xs text-blue-600 cursor-pointer select-none py-1">Review / comment${a ? ` &mdash; currently "${esc(a.status)}"` : ''}</summary>
+        <div class="pb-1">${flagCommentForm(row)}</div>
+      </details>
+    </div>`;
+  }
   const chart = bandedConsumptionChart(row.series, {
     baselineMonthlyAvg: row.stats.baselineMonthlyAvg, amberPct: settings.amber_pct, redPct: settings.red_pct,
     level: row.level, unit,
   });
-  const a = row.annotation;
-  const statusNote = a ? `<span class="badge bg-slate-100 text-slate-600 ml-1">${esc(a.status)}</span>` : '';
+  // Has data, but its own latest period is behind the property's current period (e.g. tenant
+  // billing already reached August, this municipal account is still on July) - surfaced as an
+  // explicit note rather than silently presenting July's figures as if they were current.
+  const staleNote = row.noCurrentData
+    ? `<p class="text-xs text-amber-600 mt-2">No ${esc(row.currentPeriodLabel)} statement uploaded yet - showing ${esc(row.stats.latest.label)}, the latest available.</p>` : '';
   return `
   <div class="bg-white rounded-lg border p-4 mb-4">
     <div class="flex items-center justify-between mb-2 flex-wrap gap-1">
@@ -1609,6 +1633,7 @@ function trendChartCard(row, settings) {
       </div>
     </div>
     ${chart}
+    ${staleNote}
     <p class="text-xs text-slate-600 mt-3">${row.reasons.slice(0, 2).map((r) => esc(r)).join(' ')}</p>
     <details class="mt-2">
       <summary class="text-xs text-blue-600 cursor-pointer select-none py-1">Review / comment${a ? ` &mdash; currently "${esc(a.status)}"` : ''}</summary>
@@ -1632,7 +1657,7 @@ function flagCommentForm(row) {
     <input type="hidden" name="entity_type" value="${esc(row.entityType)}"/>
     <input type="hidden" name="entity_key" value="${esc(row.entityKey)}"/>
     <input type="hidden" name="utility_type" value="${esc(row.utility)}"/>
-    <input type="hidden" name="period_label" value="${esc(row.stats.latest.label)}"/>
+    <input type="hidden" name="period_label" value="${esc(row.stats ? row.stats.latest.label : (row.currentPeriodLabel || ''))}"/>
     <div>
       <label class="block text-xs font-medium text-slate-500 mb-1">HolmStone comment</label>
       <textarea name="holmstone_comment" rows="2" class="w-full border rounded px-2 py-1">${esc(a.holmstone_comment || '')}</textarea>
@@ -1662,16 +1687,42 @@ function flagCommentForm(row) {
 // site sections only, amber/red only) and the comment/status form (spec section 8). Native <details>
 // rather than JS so this works with zero client-side script, consistent with the rest of this app.
 function flagDetailRows(row) {
-  const s = row.stats;
-  const latest = s.latest;
   const a = row.annotation;
   const statusBadge = a ? `<span class="badge bg-slate-100 text-slate-600 ml-1">${esc(a.status)}</span>` : '';
+  // No statement imported for this account at all yet - a simplified row with '-' placeholders
+  // instead of crashing on row.stats being null (see flagging.js's noDataRow / header comment).
+  if (row.level === 'nodata') {
+    return `
+    <tr class="border-b hover:bg-slate-50 align-top">
+      <td class="px-3 py-2 font-medium">${esc(row.title)}</td>
+      <td class="px-3 py-2 capitalize">${esc(row.utility)}</td>
+      <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${row.currentPeriodLabel ? esc(row.currentPeriodLabel) : '-'}</td>
+      <td class="px-3 py-2 text-right">-</td>
+      <td class="px-3 py-2 text-right">-</td>
+      <td class="px-3 py-2 text-right">-</td>
+      <td class="px-3 py-2 text-right">-</td>
+      <td class="px-3 py-2 text-right whitespace-nowrap">-</td>
+      <td class="px-3 py-2 whitespace-nowrap">${flagBadge('nodata')}${statusBadge}</td>
+      <td class="px-3 py-2 text-xs text-slate-600 max-w-xs">No statement has been imported for this account yet.</td>
+    </tr>
+    <tr class="border-b bg-slate-50/60">
+      <td colspan="10" class="px-3 py-1.5">
+        <details>
+          <summary class="text-xs text-blue-600 cursor-pointer select-none py-1">Review / comment${a ? ` &mdash; currently "${esc(a.status)}"` : ''}</summary>
+          <div class="pb-3">${flagCommentForm(row)}</div>
+        </details>
+      </td>
+    </tr>`;
+  }
+  const s = row.stats;
+  const latest = s.latest;
   const tenants = row.contributingTenants;
+  const staleNote = row.noCurrentData ? `<div class="text-amber-600">No ${esc(row.currentPeriodLabel)} data yet</div>` : '';
   return `
   <tr class="border-b hover:bg-slate-50 align-top">
     <td class="px-3 py-2 font-medium">${esc(row.title)}</td>
     <td class="px-3 py-2 capitalize">${esc(row.utility)}</td>
-    <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${esc(latest.label)}</td>
+    <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">${esc(latest.label)}${staleNote}</td>
     <td class="px-3 py-2 text-right">${latest.billingDays}</td>
     <td class="px-3 py-2 text-right">${fmtNum(latest.consumption, 0)}</td>
     <td class="px-3 py-2 text-right">${fmtNum(latest.avgDaily, 1)}</td>
@@ -1765,7 +1816,10 @@ function flaggingPage({ user, propertyName, municipalRows, sectionRows, tenantRo
   // Tenants: only surface amber/red in both the summary and their own table/chart section - showing
   // every green tenant every month (25+ tenants x 2 utilities) would bury the actual exceptions.
   const flaggedTenantRows = tenantRows.filter((r) => r.level !== 'green');
-  const allRows = [...municipalRows, ...sectionRows, ...flaggedTenantRows];
+  // 'nodata' rows (an account with no statement imported at all - see flagging.js's noDataRow) are
+  // informational, not an exception to review, so they're excluded from the Exception Summary but
+  // still show up in their own Municipal Accounts table/chart section below.
+  const allRows = [...municipalRows, ...sectionRows, ...flaggedTenantRows].filter((r) => r.level !== 'nodata');
   // Chart layout (prototype, AutoZone only for now - see properties.js's flaggingChartLayout and
   // chartSection's own header comment above) replaces the two/three dense tables with one card per
   // entity+utility; the Exception Summary table at the top stays either way since it's already

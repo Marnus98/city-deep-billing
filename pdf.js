@@ -1284,7 +1284,7 @@ function buildRecoveryPdf(data) {
 // Dot only in the Flag column (no GREEN/AMBER/RED text) per client request 2026-08-25, matching
 // views.js's on-screen flagBadge() - roughly Tailwind's green-600/amber-600/red-600 in 0-1 RGB,
 // since rect()'s fill takes the same [r,g,b] triple line()/rect() already use elsewhere in this file.
-const FLAG_COLOR = { green: [0.086, 0.639, 0.290], amber: [0.851, 0.467, 0.024], red: [0.863, 0.149, 0.149] };
+const FLAG_COLOR = { green: [0.086, 0.639, 0.290], amber: [0.851, 0.467, 0.024], red: [0.863, 0.149, 0.149], nodata: [0.6, 0.6, 0.6] };
 
 function flagPctStr(pct) { return pct == null ? '-' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`; }
 
@@ -1439,7 +1439,10 @@ function drawBandedSeriesChart(doc, { x, y, width, height, series, unit, baselin
 // automatically when it wouldn't fit above the bottom margin. Returns the y position after the card.
 function drawFlagChartCard(doc, { row, settings, left, right, y, propertyName }) {
   const chartHeight = 92;
-  const cardHeight = 20 + chartHeight + 26 + 24; // title + chart + month-labels + ~2 description lines
+  const staleLines = row.noCurrentData
+    ? wrapText(`No ${row.currentPeriodLabel} statement uploaded yet - showing ${row.stats.latest.label}, the latest available.`, right - left, { size: 7.5 })
+    : [];
+  const cardHeight = 20 + chartHeight + 26 + 24 + staleLines.length * 10; // title + chart + month-labels + description + stale note
   if (y - cardHeight < 50) {
     doc.newPage();
     doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true });
@@ -1465,9 +1468,32 @@ function drawFlagChartCard(doc, { row, settings, left, right, y, propertyName })
   });
   y -= chartHeight + 24;
 
+  for (const line of staleLines) { doc.text(left, y, line, { size: 7.5 }); y -= 10; }
   const lines = wrapText(row.reasons.slice(0, 2).join(' '), right - left, { size: 7.5 });
   for (const line of lines) { doc.text(left, y, line, { size: 7.5 }); y -= 10; }
   return y - 8;
+}
+
+// Lightweight card for an account with literally zero statements ever imported (flagging.js's
+// noDataRow, level: 'nodata') - no chart to draw, just the title + a "No data" note, so this account
+// still shows up in the PDF instead of silently being skipped.
+function drawNoDataFlagCard(doc, { row, left, right, y, propertyName }) {
+  const cardHeight = 20 + 30;
+  if (y - cardHeight < 50) {
+    doc.newPage();
+    doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true });
+    y = PAGE_H - 74;
+  }
+  const titleOpts = { size: 10.5, bold: true };
+  doc.text(left, y, row.title, titleOpts);
+  const utilLabel = `  - ${row.utility[0].toUpperCase()}${row.utility.slice(1)}`;
+  doc.text(left + textWidth(row.title, titleOpts), y, utilLabel, { size: 9 });
+  doc.rect(right - 96, y - 6, 7, 7, { fill: FLAG_COLOR.nodata });
+  doc.currentOps.push('0 0 0 rg');
+  doc.text(right - 84, y - 5, 'No data', { size: 8 });
+  y -= 20;
+  doc.text(left, y, `No statement has been imported${row.currentPeriodLabel ? ` for ${row.currentPeriodLabel}` : ''} yet.`, { size: 8.5 });
+  return y - 22;
 }
 
 function buildFlaggingReportPdf(data) {
@@ -1487,7 +1513,9 @@ function buildFlaggingReportPdf(data) {
   // Tenants: only amber/red make the PDF (same as views.js's flaggingPage) - every tenant every
   // month would swamp a report meant to be pasted straight into the RPI summary.
   const flaggedTenantRows = (data.tenantRows || []).filter((r) => r.level !== 'green');
-  const allRows = [...(data.municipalRows || []), ...(data.sectionRows || []), ...flaggedTenantRows];
+  // 'nodata' rows (no statement imported at all - flagging.js's noDataRow) are informational, not an
+  // exception to review, so excluded here - they still get their own card/row further down the page.
+  const allRows = [...(data.municipalRows || []), ...(data.sectionRows || []), ...flaggedTenantRows].filter((r) => r.level !== 'nodata');
   const rank = { red: 0, amber: 1, green: 2 };
   const sorted = [...allRows].sort((a, b) => rank[a.level] - rank[b.level]);
   const latestLabel = allRows.length ? allRows[0].stats.latest.label : '';
@@ -1519,21 +1547,27 @@ function buildFlaggingReportPdf(data) {
       if (!rows.length) return;
       if (y < 130) { doc.newPage(); doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true }); y = PAGE_H - 74; }
       doc.text(left, y, title, { size: 11, bold: true }); y -= 16;
-      for (const row of rows) y = drawFlagChartCard(doc, { row, settings: data.settings || {}, left, right, y, propertyName });
+      for (const row of rows) {
+        y = row.level === 'nodata'
+          ? drawNoDataFlagCard(doc, { row, left, right, y, propertyName })
+          : drawFlagChartCard(doc, { row, settings: data.settings || {}, left, right, y, propertyName });
+      }
     };
     chartSection('Municipal Accounts', data.municipalRows || []);
     chartSection('Site Sections (Our Billing)', data.sectionRows || []);
     chartSection('Tenants (exceptions only)', flaggedTenantRows);
   } else {
+    // Every accessor is null-safe on r.stats - a 'nodata' row (flagging.js's noDataRow, no
+    // statement imported at all) has stats: null and should print as '-' rather than crash.
     const detailCols = (labelCol) => [
       { label: labelCol, width: 154, get: (r) => r.title },
       { label: 'Utility', width: 46, get: (r) => r.utility[0].toUpperCase() + r.utility.slice(1) },
-      { label: 'Period', width: 42, get: (r) => r.stats.latest.label },
-      { label: 'Days', width: 26, align: 'right', get: (r) => r.stats.latest.billingDays },
-      { label: 'Consumption', width: 58, align: 'right', get: (r) => money2(r.stats.latest.consumption) },
-      { label: 'Avg Daily', width: 52, align: 'right', get: (r) => money2(r.stats.latest.avgDaily) },
-      { label: 'Hist. Avg Daily', width: 58, align: 'right', get: (r) => r.stats.baselineAvgDaily != null ? money2(r.stats.baselineAvgDaily) : '-' },
-      { label: 'Variance', width: 42, align: 'right', get: (r) => flagPctStr(r.pctVsBaseline) },
+      { label: 'Period', width: 42, get: (r) => (r.stats ? r.stats.latest.label : (r.currentPeriodLabel || '-')) },
+      { label: 'Days', width: 26, align: 'right', get: (r) => (r.stats ? r.stats.latest.billingDays : '-') },
+      { label: 'Consumption', width: 58, align: 'right', get: (r) => (r.stats ? money2(r.stats.latest.consumption) : '-') },
+      { label: 'Avg Daily', width: 52, align: 'right', get: (r) => (r.stats ? money2(r.stats.latest.avgDaily) : '-') },
+      { label: 'Hist. Avg Daily', width: 58, align: 'right', get: (r) => (r.stats && r.stats.baselineAvgDaily != null ? money2(r.stats.baselineAvgDaily) : '-') },
+      { label: 'Variance', width: 42, align: 'right', get: (r) => (r.stats ? flagPctStr(r.pctVsBaseline) : '-') },
       { label: 'Flag', width: 33, dot: (r) => FLAG_COLOR[r.level] },
     ];
 
