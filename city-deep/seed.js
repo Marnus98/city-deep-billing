@@ -202,6 +202,22 @@ function getOrCreateTenant(name, siteName) {
   if (!site) { run('INSERT INTO sites (name) VALUES (?)', [siteName]); site = get('SELECT * FROM sites WHERE name=?', [siteName]); }
   let tenant = get('SELECT * FROM tenants WHERE name=?', [name]);
   if (!tenant) {
+    // Not found under the raw workbook name - either genuinely new, or a PRIOR run's own
+    // applyTenantDisplayOverrides() (see below) already renamed this tenant's row from the raw name
+    // to its display (name, unit) identity, so the raw-name lookup above no longer finds it (that
+    // rename only happens once, at the very end of a full seed run - within THIS run every month
+    // still resolves by raw name, same as always, until this function's caller finishes and
+    // applyTenantDisplayOverrides() runs). Falling back to a (display name, unit) lookup before
+    // inserting a new row is what makes re-seeding an already-seeded db idempotent - found the hard
+    // way 2026-09-01: a one-tenant correction re-seed silently tripled up every one of the 18
+    // renamed City Deep tenants without this fallback. Each raw key's own (display name, unit) pair
+    // is unique by construction (two raw keys only ever share a display name when they're
+    // deliberately different units on the same company - see TENANT_DISPLAY_OVERRIDES' own header
+    // comment), so it's a safe lookup key.
+    const override = TENANT_DISPLAY_OVERRIDES[name];
+    if (override) tenant = get('SELECT * FROM tenants WHERE name=? AND unit=?', [override.name, override.unit]);
+  }
+  if (!tenant) {
     run('INSERT INTO tenants (site_id, name, unit, status) VALUES (?,?,?,?)', [site.id, name, null, 'active']);
     tenant = get('SELECT * FROM tenants WHERE name=?', [name]);
   }
