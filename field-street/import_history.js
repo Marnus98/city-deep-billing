@@ -196,6 +196,44 @@ function main(dbFile = 'field-street.db') {
     db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key IN ('water','sewer')").run(222.48, julSlip.id);
   }
 
+  // August 2026: fresh real statement from the client's "8 Field Street Slips Aug 2026.xlsx" -
+  // rate*reading=cost verified to the cent for every electrical line, so this is seeded directly
+  // with apply_correction_factor off from the start (matching every real-statement month since
+  // March 2026), no UPDATE-after-the-fact fixup needed like Mar-Jul above.
+  //
+  // Water/Sewer: this month's workbook prints the tariff's own R54.51/R22.07 rate again (208.965
+  // kL reading) - the SAME rate the client explicitly overrode to R49.11/R18.91 for Mar-Jul 2026
+  // (see the July block's comment above). Not knowing whether that override is meant to be
+  // ongoing or was a one-off historical correction, this seeds August with the rate the new
+  // workbook actually shows (R54.51/R22.07) rather than silently re-applying last month's
+  // override - flagged here and in the delivery summary for the client to confirm/correct via
+  // the Edit page if R49.11/R18.91 should still apply.
+  const RATES_AUG26 = {
+    fixed_charge: 6195.35, network_access: 98.8, network_demand: 160.74,
+    peak_high: 12.3639, peak_low: 3.7591, standard_high: 3.541, standard_low: 2.4678,
+    offpeak_high: 2.081, offpeak_low: 1.8519, water: 54.51, sewer: 22.07,
+  };
+  const aug26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01', shape: EKURHULENI_E_TOU, rates: RATES_AUG26, factors: FACTORS,
+    notes: 'Real statement from "8 Field Street Slips Aug 2026.xlsx", uploaded 2026-09-01 - '
+      + 'rate*reading=cost verified exactly for every electrical line, no correction factor. '
+      + 'Water/Sewer billed at the tariff\'s own printed R54.51/R22.07 this month, not the '
+      + 'R49.11/R18.91 the client corrected to for Mar-Jul 2026 - unclear if that override was '
+      + 'meant to persist; flagged for the client to confirm.',
+  });
+  const augSlipId = seedSlip(db, aug26TariffId, {
+    label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', applyCorrectionFactor: 0,
+    readings: {
+      network_access: { reading: 633.6382785232253, comment: '2026/07/15 22:00' },
+      network_demand: { reading: 633.6382785232253, comment: '2026/07/15 22:00' },
+      peak_high: 55916.978813472, peak_low: 0,
+      standard_high: 106143.99240341545, standard_low: 0,
+      offpeak_high: 154043.855379985, offpeak_low: 0,
+      water: 208.965, sewer: 208.965,
+    },
+  });
+  if (augSlipId) console.log('8 Field Street: August 2026 slip added.');
+
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via
   // the live "Add Billing Slip" form (default unticked there too - see views.js). The blocks above

@@ -206,6 +206,47 @@ function main(dbFile = 'autozone.db') {
     setReading.run(julSlip.id, 'sewer', 762.052, null);
   }
 
+  // August 2026: fresh real statement from the client's "AutoZone Slips Aug 2026.xlsx" -
+  // rate*reading=cost verified to the cent for every electrical line, so seeded directly with
+  // apply_correction_factor off, same as every real-statement month since Jan 2026.
+  //
+  // Water/Sewer flag: this month's Water Consumption (762.052 kL, cost R58,454.78) and Sewer
+  // (762.052 kL @ R58.66) are BYTE-IDENTICAL to July 2026's already-seeded figures above
+  // (julRate.run(58454.78404 / 762.052, ...) / julSet water/sewer reading 762.052) - suspicious
+  // for two different months' real meter readings to match to 3 decimal places. Likely the
+  // client's workbook template carried July's water figures forward without updating them for
+  // August, rather than a genuine reading. Seeded as given (matching the "trust the uploaded
+  // workbook, let the client correct via the Edit page" convention used throughout this file)
+  // but flagged here and in the delivery summary - worth the client double-checking the actual
+  // August water meter reading.
+  const RATES_AUG26 = {
+    service_charge: 4629.64, capacity_charge: 0, demand_charge: 461.28, excess_reactive: 0.4625,
+    peak_high: 7.6624, peak_low: 3.22, standard_high: 2.9256, standard_low: 2.4242,
+    offpeak_high: 2.0044, offpeak_low: 1.8635, network_surcharge: 0,
+    water: 58454.78404 / 762.052, sewer: 58.66,
+  };
+  const aug26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01', shape: CITY_POWER_LV_TOU, rates: RATES_AUG26, factors: FACTORS,
+    notes: 'Real statement from "AutoZone Slips Aug 2026.xlsx", uploaded 2026-09-01 - rate*reading'
+      + '=cost verified exactly for every electrical line, no correction factor. Water/Sewer '
+      + 'reading (762.052 kL) is identical to July 2026\'s - possibly a stale/carried-forward '
+      + 'workbook figure rather than a fresh August reading; flagged for the client to confirm.',
+  });
+  const aug26SlipId = seedSlip(db, aug26TariffId, {
+    label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', applyCorrectionFactor: 0,
+    readings: {
+      service_charge: 1, capacity_charge: 0,
+      demand_charge: { reading: 208.234494, comment: '2026/08/12 10:30' },
+      excess_reactive: 1466.782,
+      peak_high: 12417.02, peak_low: 0,
+      standard_high: 29014.395, standard_low: 0,
+      offpeak_high: 12028.74, offpeak_low: 0,
+      network_surcharge: 0,
+      water: 762.052, sewer: 762.052,
+    },
+  });
+  if (aug26SlipId) console.log('AutoZone: August 2026 slip added.');
+
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via
   // the live "Add Billing Slip" form (default unticked there too - see views.js). Runs
