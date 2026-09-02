@@ -152,6 +152,32 @@ function main(dbFile = 'cranbrook-flavours.db') {
       + 'ON CONFLICT(slip_id, item_key) DO UPDATE SET reading=excluded.reading').run(julSlip.id, 'sewer', 211);
   }
 
+  // August 2026: fresh real statement from the client's "Cranbrook Flavours - Tunney Slips August
+  // 2026.xlsx" - same electrical rate card as RATES_B (July 2026), water/sewer also already at
+  // 54.51/22.07 (same rate-year), rate*reading=cost verified exactly for every line.
+  const RATES_AUG26 = {
+    fixed_charge: 5676.25, network_access: 105.33, network_demand: 159.25,
+    peak_high: 11.4354, peak_low: 3.7227, standard_high: 3.3142, standard_low: 2.4324,
+    offpeak_high: 2.0286, offpeak_low: 1.8451, water: 54.51, sewer: 22.07,
+  };
+  const aug26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01', shape: EKURHULENI_E_TOU, rates: RATES_AUG26, factors: FACTORS,
+    notes: 'Real statement from "Cranbrook Flavours - Tunney Slips August 2026.xlsx", uploaded '
+      + '2026-09-02 - same rate card as RATES_B (July 2026), rate*reading=cost verified exactly for '
+      + 'every electrical and water/sewer line, no correction factor.',
+  });
+  const aug26SlipId = seedSlip(db, aug26TariffId, {
+    label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', applyCorrectionFactor: 0,
+    readings: {
+      network_access: { reading: 42.898734, comment: '2026/08/24 13:30' },
+      network_demand: { reading: 42.898734, comment: '2026/08/24 13:30' },
+      peak_high: 359.31095, peak_low: 0, standard_high: 2229.3028149932, standard_low: 0,
+      offpeak_high: 730.817914999999, offpeak_low: 0,
+      water: 228, sewer: 228,
+    },
+  });
+  if (aug26SlipId) console.log('Cranbrook Flavours: August 2026 slip added.');
+
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via
   // the live "Add Billing Slip" form (default unticked there too - see views.js). Runs

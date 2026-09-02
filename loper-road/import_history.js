@@ -104,6 +104,29 @@ function main(dbFile = 'loper-road.db') {
   if (julSlipId) created++;
   if (julSlipId) console.log('Loper Road - Sandvic history import: July 2026 (new tariff year) added.');
 
+  // August 2026: fresh real statement from the client's "Loper Road Slips August 2026.xlsx" - same
+  // 2026/27 tariff-year rate card as July (RATES_JUL26), rate*reading=cost verified exactly for
+  // every line. Still no water/sewer billed for this site.
+  const RATES_AUG26 = {
+    basic_charge: 3695.14, total_energy_high: 4.9344, total_energy_low: 2.4001,
+    network_access: 104.9, demand_charge: 257.85, water: 0, sewer: 0,
+  };
+  const aug26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01',
+    shape: EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, rates: RATES_AUG26, factors: FACTORS,
+    notes: 'Real statement from "Loper Road Slips August 2026.xlsx", uploaded 2026-09-02 - same '
+      + 'rate card as RATES_JUL26, rate*reading=cost verified exactly for every line, no correction '
+      + 'factor.',
+  });
+  const aug26SlipId = seedSlip(db, aug26TariffId, {
+    label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', applyCorrectionFactor: 0,
+    readings: {
+      network_access: { reading: 38.03, comment: '2026/08/12 10:00' }, demand_charge: { reading: 38.03, comment: '2026/08/12 10:00' },
+      total_energy_high: 4597.75099999999, total_energy_low: 0,
+    },
+  });
+  if (aug26SlipId) console.log('Loper Road - Sandvic: August 2026 slip added.');
+
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via
   // the live "Add Billing Slip" form (default unticked there too - see views.js). Runs

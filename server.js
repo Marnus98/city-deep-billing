@@ -96,6 +96,15 @@ require('./bob-martin/import_history').run('bob-martin.db');
 require('./loper-road/import_history').run('loper-road.db');
 require('./autozone/import_history').run('autozone.db');
 require('./cranbrook-flavours/import_history').run('cranbrook-flavours.db');
+// The 5 "Loper Ave" template flat_site properties - each started as a single-month seed.js (their
+// own seedFile) until a second month arrived (2026-09-02), at which point each was renamed to
+// import_history.js and registered here too, matching every other multi-month flat_site property's
+// dual-pathway pattern above (own de-dup key: slip label, always safe to re-run).
+require('./adh-machine-tool/import_history').run('adh-machine-tool.db');
+require('./zelvio-global/import_history').run('zelvio-global.db');
+require('./interoll/import_history').run('interoll.db');
+require('./rcl-group/import_history').run('rcl-group.db');
+require('./colorobbia/import_history').run('colorobbia.db');
 // Bob Martin's actual municipal account statements (Dec 2025, Jan/Feb/Mar/May 2026 - Apr 2026
 // missing, no statement provided for it) - own de-dup key (label), separate tables from the above
 // (see db.js), always safe to re-run; see bob-martin/municipal_import.js for extraction notes.

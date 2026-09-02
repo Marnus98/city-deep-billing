@@ -133,7 +133,7 @@ module.exports = [
     // 2026-08-20 that the full name should be shown, not a shortened "ADH Machine Tool".
     name: '55 Loper Ave - ADH Machine Tool South Africa (PTY) Ltd',
     dbFile: 'adh-machine-tool.db',
-    seedFile: './adh-machine-tool/seed',
+    seedFile: './adh-machine-tool/import_history',
     billingModel: 'flat_site',
     // No municipal_import.js yet - the client will upload the real municipal account statement
     // "once received" each month, same as every other flat_site property's own bill. Add
@@ -152,7 +152,7 @@ module.exports = [
     slug: 'zelvio-global',
     name: '55 Loper Ave - Zelvio Global', // exactly as given on the client's own workbook - no legal suffix was provided for this one
     dbFile: 'zelvio-global.db',
-    seedFile: './zelvio-global/seed',
+    seedFile: './zelvio-global/import_history',
     billingModel: 'flat_site',
     hasFlagging: true,
     flaggingChartLayout: true,
@@ -161,7 +161,7 @@ module.exports = [
     slug: 'interoll',
     name: '63 Loper Ave - Interoll',
     dbFile: 'interoll.db',
-    seedFile: './interoll/seed',
+    seedFile: './interoll/import_history',
     billingModel: 'flat_site',
     hasFlagging: true,
     flaggingChartLayout: true,
@@ -170,7 +170,7 @@ module.exports = [
     slug: 'rcl-group',
     name: '65 Loper Ave - RCL GROUP SERVICES (PTY) LTD',
     dbFile: 'rcl-group.db',
-    seedFile: './rcl-group/seed',
+    seedFile: './rcl-group/import_history',
     billingModel: 'flat_site',
     hasFlagging: true,
     flaggingChartLayout: true,
@@ -179,7 +179,7 @@ module.exports = [
     slug: 'colorobbia',
     name: '122 Loper - Colorobbia', // exactly as given on the client's own workbook (not "122 Loper Ave")
     dbFile: 'colorobbia.db',
-    seedFile: './colorobbia/seed',
+    seedFile: './colorobbia/import_history',
     billingModel: 'flat_site',
     hasFlagging: true,
     flaggingChartLayout: true,

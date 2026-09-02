@@ -141,6 +141,32 @@ function main(dbFile = 'bob-martin.db') {
     }
   }
 
+  // August 2026: fresh real statement from the client's "Bob Martin Slips August 2026.xlsx" - same
+  // rate card as July (RATES_C, including its own water/sewer rates of 54.51/22.07), rate*reading=
+  // cost verified exactly for every line, so seeded directly with no correction factor.
+  const RATES_AUG26 = {
+    fixed_charge: 3599.88, network_access: 131.43, network_demand: 153.36,
+    peak_high: 7.7211, peak_low: 3.5769, standard_high: 2.4079, standard_low: 2.29,
+    offpeak_high: 1.8176, offpeak_low: 1.8176, water: 54.51, sewer: 22.07,
+  };
+  const aug26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01', shape: EKURHULENI_E_TOU, rates: RATES_AUG26, factors: FACTORS,
+    notes: 'Real statement from "Bob Martin Slips August 2026.xlsx", uploaded 2026-09-02 - same '
+      + 'rate card as RATES_C (July 2026), rate*reading=cost verified exactly for every electrical '
+      + 'and water/sewer line, no correction factor.',
+  });
+  const aug26SlipId = seedSlip(db, aug26TariffId, {
+    label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', applyCorrectionFactor: 0,
+    readings: {
+      network_access: { reading: 485.441766, comment: '2026/08/13 09:00' },
+      network_demand: { reading: 485.441766, comment: '2026/08/13 09:00' },
+      peak_high: 22857.7077, peak_low: 0, standard_high: 55076.4222, standard_low: 0,
+      offpeak_high: 37373.78775, offpeak_low: 0,
+      water: 117.7, sewer: 117.7,
+    },
+  });
+  if (aug26SlipId) console.log('Bob Martin: August 2026 slip added.');
+
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via
   // the live "Add Billing Slip" form (default unticked there too - see views.js). Runs
