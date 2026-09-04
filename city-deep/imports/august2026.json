@@ -2321,7 +2321,7 @@
   {
    "location": "Unit 1 - Kimmo",
    "tenant_alloc": "Unit 1 - Kimmo inside meter",
-   "serial": "SN240700267",
+   "serial": "240700267",
    "reading_type": "Manual",
    "billing_rx": 1,
    "start_m3": 824,
@@ -5204,7 +5204,7 @@
    "meters": [
     {
      "row": 5,
-     "serial": "SN240700267",
+     "serial": "240700267",
      "start": 824,
      "end": 957,
      "consumption_m3": 133,
