@@ -1,9 +1,17 @@
 // bob-martin/import_history.js - seeds Bob Martin's database with its full known billing history
 // (July 2025 - July 2026), taken directly from the client-provided workbook "Other Sites - Past
-// billing.xlsx" (tab 'Bob Martin'). Same Ekurhuleni Tariff E TOU shape as 8 Field Street (see
-// flat_site_tariff_shapes.js) - just its own rates. Combines what field-street splits into
-// seed.js + import_history.js into one script, since here every month (including the most recent)
-// comes from the same source workbook rather than a separate reference statement.
+// billing.xlsx" (tab 'Bob Martin'). Same line-item shape (EKURHULENI_E_TOU in
+// flat_site_tariff_shapes.js) as 8 Field Street - just its own rates. Combines what field-street
+// splits into seed.js + import_history.js into one script, since here every month (including the
+// most recent) comes from the same source workbook rather than a separate reference statement.
+//
+// TARIFF_NAME below reads "Tariff D1", not "Tariff E", despite reusing the EKURHULENI_E_TOU shape
+// constant - client correction 2026-09-04: Bob Martin is actually billed on Ekurhuleni's D1 tariff
+// category, not E. This is a display-label fix only (confirmed with the client) - D1 and E share
+// the same line-item structure at this municipality, and Bob Martin's own rates already reflect
+// what it's actually billed, so nothing here changes except the name shown on the PDF/screen. The
+// EKURHULENI_E_TOU shape constant itself is untouched (still shared with 8 Field Street/Cranbrook
+// Flavours, which genuinely are on tariff E) - only this site's own TARIFF_NAME string changed.
 //
 // Correction factors: per the client's instruction, reusing the same 4 factor constants already
 // applied to 8 Field Street "for now" - not yet confirmed against Bob Martin's own meters.
@@ -20,7 +28,7 @@ const { seedTariff, seedSlip } = require('../flat_site_seed_helpers');
 
 const FACTORS = { kva_factor: 1.038681688, peak_factor: 1.017448464, standard_factor: 1.017563209, offpeak_factor: 1.017174764 };
 
-const TARIFF_NAME = 'Ekurhuleni_Tariff_E_TOU_Bob Martin';
+const TARIFF_NAME = 'Ekurhuleni_Tariff_D1_TOU_Bob Martin';
 
 // Three rate versions found across the 13 months - Jul 2025 - Jan 2026, Feb 2026 - Jun 2026, and
 // Jul 2026 (each taken verbatim from that month's statement).
