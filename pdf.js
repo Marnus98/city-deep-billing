@@ -1496,6 +1496,24 @@ function drawNoDataFlagCard(doc, { row, left, right, y, propertyName }) {
   return y - 22;
 }
 
+// Groups a flat rows array (each row already carrying entityType/entityKey/title - see e.g.
+// city-deep/flagging_data.js's buildAllFlagRows) into one entry per distinct entity, in first-seen
+// order. municipalRows/sectionRows already interleave a given entity's electricity+water rows
+// adjacently, but tenantRows does NOT - buildAllFlagRows pushes every tenant's electricity row
+// before any tenant's water row (one `for (const t of ...)` loop per utility) - so this groups by
+// entityKey explicitly rather than assuming adjacency. `kicker` is a fixed category label (not
+// per-row data), carried on the group so buildFlaggingReportPdf's one-page-per-entity loop below
+// can print it above that entity's own cards.
+function groupByEntity(rows, kicker) {
+  const map = new Map();
+  const order = [];
+  for (const r of rows) {
+    if (!map.has(r.entityKey)) { map.set(r.entityKey, { kicker, title: r.title, rows: [] }); order.push(r.entityKey); }
+    map.get(r.entityKey).rows.push(r);
+  }
+  return order.map((k) => map.get(k));
+}
+
 function buildFlaggingReportPdf(data) {
   const doc = new PDFDoc();
   const left = 42, right = PAGE_W - 42;
@@ -1539,23 +1557,41 @@ function buildFlaggingReportPdf(data) {
   y -= 10;
 
   if (data.useCharts) {
-    // Chart layout (prototype, AutoZone only for now - see properties.js's flaggingChartLayout,
-    // views.js's matching on-screen trendChartCard) - one drawFlagChartCard per entity+utility
-    // instead of the dense detail tables, per client feedback 2026-08-25 ("a proper graph with
-    // axis" - see drawBandedSeriesChart's own header comment).
-    const chartSection = (title, rows) => {
-      if (!rows.length) return;
-      if (y < 130) { doc.newPage(); doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true }); y = PAGE_H - 74; }
-      doc.text(left, y, title, { size: 11, bold: true }); y -= 16;
-      for (const row of rows) {
-        y = row.level === 'nodata'
-          ? drawNoDataFlagCard(doc, { row, left, right, y, propertyName })
-          : drawFlagChartCard(doc, { row, settings: data.settings || {}, left, right, y, propertyName });
+    // One full page per entity (municipal account / site section / tenant), each page carrying
+    // that entity's electricity AND water cards together - client's own ask 2026-09-04: Exception
+    // Summary stays page 1 (2 if it overflows - drawFlagTable's own pagination handles that
+    // already, nothing to change there), then every municipal account gets its own page ("if
+    // several munic bills, I want to see each on a separate page"), then every flagged tenant gets
+    // its own page ("all the tenants... one per page... containing the Electricity and water").
+    // Site Sections (Our Billing) are grouped with Municipal Accounts rather than getting a third
+    // category of their own - client's own call 2026-09-04, since both are account-level aggregate
+    // rows, distinct from individual tenants. Tenants stay filtered to amber/red only
+    // (flaggedTenantRows, already computed above for the Exception Summary table) - client's own
+    // call 2026-09-04 to keep a clean month from turning into 20+ all-green tenant pages.
+    const groups = [
+      ...groupByEntity(data.municipalRows || [], 'Municipal Account'),
+      ...groupByEntity(data.sectionRows || [], 'Site Section (Our Billing)'),
+      ...groupByEntity(flaggedTenantRows, 'Tenant (Flagged)'),
+    ];
+    for (const group of groups) {
+      // Forced doc.newPage() per entity - unlike every other page break in this file (which only
+      // fires when content overflows, via drawFlagChartCard/drawNoDataFlagCard's own y-checks),
+      // this one is unconditional so an entity never shares a page with the one before it. Those
+      // same per-card y-checks still apply once we're on the page, so an entity whose
+      // electricity+water cards don't both fit (a long stale-data note, say) still spills onto a
+      // second physical page for that entity rather than overlapping - it just never starts
+      // sharing a page with a DIFFERENT entity.
+      doc.newPage();
+      doc.text(left, PAGE_H - 50, propertyName, { size: 12, bold: true });
+      let gy = PAGE_H - 74;
+      doc.text(left, gy, group.kicker.toUpperCase(), { size: 8 });
+      gy -= 18;
+      for (const row of group.rows) {
+        gy = row.level === 'nodata'
+          ? drawNoDataFlagCard(doc, { row, left, right, y: gy, propertyName })
+          : drawFlagChartCard(doc, { row, settings: data.settings || {}, left, right, y: gy, propertyName });
       }
-    };
-    chartSection('Municipal Accounts', data.municipalRows || []);
-    chartSection('Site Sections (Our Billing)', data.sectionRows || []);
-    chartSection('Tenants (exceptions only)', flaggedTenantRows);
+    }
   } else {
     // Every accessor is null-safe on r.stats - a 'nodata' row (flagging.js's noDataRow, no
     // statement imported at all) has stats: null and should print as '-' rather than crash.
