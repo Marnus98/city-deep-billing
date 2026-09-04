@@ -238,8 +238,14 @@ function computeTeraoka(db, periodId, periodStart, tariff1) {
   const solarUsedC = add(bulkExportF, tenantExportAB);
   const muniUsedC = { kwh: mixedC.kwh - solarUsedC.kwh, rand: mixedC.rand - solarUsedC.rand };
 
-  const totalMuni = add(muniAB, mixedC);
-  const totalSolar = add(solarUsedAB, saWireless);
+  // saWireless belongs in totalMuni, not totalSolar - client correction 2026-09-04: SA Wireless
+  // Infrastructure isn't a solar consumer at all, it's an unrelated tenant that happens to share
+  // Teraoka's Unit 6C meter (36533989), so its billed energy is credited out of Teraoka's municipal
+  // consumption, same as it's already correctly netted out of mixedC just above (totalDueC). Total
+  // Due is unaffected either way (it's still muniUsage+solarUsed either way) - only the Tenant Munic
+  // Usage / Solar Used split on the slip changes.
+  const totalMuni = add(muniAB, mixedC, saWireless);
+  const totalSolar = solarUsedAB;
   const totalDue = add(totalMuni, totalSolar);
 
   return {
@@ -263,8 +269,10 @@ function computeTeraoka(db, periodId, periodStart, tariff1) {
       ] },
     ],
     total: { muniUsage: totalMuni, solarUsed: totalSolar, due: totalDue },
-    muniSerials: ['36533988', '36533989'],
-    solarSerials: ['36339313', '36533988E', '11100461380R'],
+    // 11100461380R (SA Wireless) moved from solarSerials to muniSerials - see totalMuni/totalSolar's
+    // own comment above for why.
+    muniSerials: ['36533988', '36533989', '11100461380R'],
+    solarSerials: ['36339313', '36533988E'],
   };
 }
 
