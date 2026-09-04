@@ -75,17 +75,19 @@ function main(dbFile = 'zelvio-global.db') {
   });
   if (julSlipId) console.log('55 Loper Ave - Zelvio Global: seeded initial tariff + July 2026 billing slip.');
 
-  // August 2026: fresh real statement from the client's "55 Loper - Zelvio Global - August
-  // 2026.xlsx" - same rate card as July, but the same template formula glitch as July persists this
-  // month too (its own Cost cells don't equal that sheet's own Rate x Reading). Readings below are
-  // back-solved (Cost / Rate) so Reading x Rate reproduces the workbook's own Cost column exactly,
-  // same 2026-08-20 client choice as July - preserves its R20,995.64 Sub Total (Excl VAT).
+  // August 2026: real statement from the client's "55 Loper - Zelvio Global - August 2026.xlsx" -
+  // same rate card as July. Client re-uploaded a corrected version of this workbook 2026-09-04 (the
+  // first upload's water/sewer consumption readings were wrong - see the water/sewer comments
+  // below); electricity (energy_high, capacity_charge) is unchanged from the first upload. The
+  // Capacity Charge / Common Area lines' own "rate used as reading" glitch persists unchanged in the
+  // corrected workbook too - still back-solved (Cost / Rate) same as every other month. Sub Total
+  // (Excl VAT) is now R21,307.55 (was R20,995.64 on the first, wrong upload).
   const aug26TariffId = seedTariff(db, {
     tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01', shape: EKURHULENI_TARIFF_B, rates: RATES, factors: FACTORS,
-    notes: 'Real statement from "55 Loper - Zelvio Global - August 2026.xlsx", uploaded 2026-09-02 - '
-      + "same rate card as July. Same template Cost-formula glitch as July persists this month "
-      + "(readings back-solved as Cost/Rate to reproduce the workbook's own Cost column exactly), "
-      + 'no correction factor.',
+    notes: 'Real statement from "55 Loper - Zelvio Global - August 2026.xlsx" - same rate card as '
+      + 'July. Client re-uploaded a corrected version 2026-09-04 (water/sewer readings only); the '
+      + 'Capacity Charge / Common Area "rate used as reading" glitch persists unchanged, no '
+      + 'correction factor.',
   });
   const aug26SlipId = seedSlip(db, aug26TariffId, {
     label: '2026-08', startDate: '2026-08-03', endDate: '2026-09-02', applyCorrectionFactor: 0,
@@ -94,13 +96,19 @@ function main(dbFile = 'zelvio-global.db') {
       energy_high: 1403.9999999999782, energy_low: 0,
       // Back-solved: 450 x 28.96 = R13,032.00 (workbook's own Cost cell; its Reading column shows 150A).
       capacity_charge: 450,
-      // Back-solved: 32.82829168959833 x 54.51 = R1,789.47 (workbook's own Cost cell).
-      water: 32.82829168959833,
-      // Back-solved: 54.51 x 0.682 = R37.18 (same "rate used as reading" quirk as July).
+      // 36.4380000000001 x 54.51 = R1,986.24, matching the corrected workbook's own Cost cell
+      // exactly (Cost = Rate x Reading directly this time, no back-solving needed - client's
+      // 2026-09-04 correction fixed the reading itself. Was 32.82829168959833 on the first, wrong
+      // upload).
+      water: 36.4380000000001,
+      // Back-solved: 54.51 x 0.682 = R37.18 (same "rate used as reading" quirk as July - unaffected
+      // by the 2026-09-04 water/sewer correction).
       water_common_area: 54.51,
-      // Back-solved: 31.220778432261078 x 22.07 = R689.04 (workbook's own Cost cell).
-      sewer: 31.220778432261078,
-      // Back-solved: 22.07 x 0.682 = R15.05 (same "rate used as reading" quirk as July).
+      // 36.4380000000001 x 22.07 = R804.19, matching the corrected workbook's own Cost cell exactly
+      // (was 31.220778432261078 on the first, wrong upload - same fix as water above).
+      sewer: 36.4380000000001,
+      // Back-solved: 22.07 x 0.682 = R15.05 (same "rate used as reading" quirk as July - unaffected
+      // by the 2026-09-04 water/sewer correction).
       sewer_common_area: 22.07,
     },
   });

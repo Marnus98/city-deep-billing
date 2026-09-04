@@ -70,17 +70,18 @@ function main(dbFile = 'colorobbia.db') {
   });
   if (julSlipId) console.log('122 Loper - Colorobbia: seeded initial tariff + July 2026 billing slip.');
 
-  // August 2026: fresh real statement from the client's "122 Loper - Colorobbia - August 2026.xlsx"
-  // - same rate card as July, but the same template formula glitch as July persists this month too
-  // (its own Cost cells don't equal that sheet's own Rate x Reading). Readings below are
-  // back-solved (Cost / Rate) so Reading x Rate reproduces the workbook's own Cost column exactly,
-  // same 2026-08-20 client choice as July - preserves its R22,184.85 Sub Total (Excl VAT).
+  // August 2026: real statement from the client's "122 Loper - Colorobbia - August 2026.xlsx" - same
+  // rate card as July. Client re-uploaded a corrected version of this workbook 2026-09-04 (the first
+  // upload's water/sewer consumption readings were wrong - see the water/sewer comments below);
+  // electricity (energy_high, capacity_charge) is unchanged from the first upload. The Capacity
+  // Charge "rate used as reading" glitch (Reading column shows 150A but Cost is 28.96 x 450)
+  // persists unchanged in the corrected workbook too - still back-solved (Cost / Rate) same as every
+  // other month. Sub Total (Excl VAT) is now R22,334.65 (was R22,184.85 on the first, wrong upload).
   const aug26TariffId = seedTariff(db, {
     tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01', shape: EKURHULENI_TARIFF_B_SIMPLE, rates: RATES, factors: FACTORS,
-    notes: 'Real statement from "122 Loper - Colorobbia - August 2026.xlsx", uploaded 2026-09-02 - '
-      + "same rate card as July. Same template Cost-formula glitch as July persists this month "
-      + "(readings back-solved as Cost/Rate to reproduce the workbook's own Cost column exactly), "
-      + 'no correction factor.',
+    notes: 'Real statement from "122 Loper - Colorobbia - August 2026.xlsx" - same rate card as '
+      + 'July. Client re-uploaded a corrected version 2026-09-04 (water/sewer readings only); the '
+      + 'Capacity Charge "rate used as reading" glitch persists unchanged, no correction factor.',
   });
   const aug26SlipId = seedSlip(db, aug26TariffId, {
     label: '2026-08', startDate: '2026-08-03', endDate: '2026-09-02', applyCorrectionFactor: 0,
@@ -89,10 +90,13 @@ function main(dbFile = 'colorobbia.db') {
       energy_high: 2070, energy_low: 0,
       // Back-solved: 450 x 28.96 = R13,032.00 (workbook's own Cost cell; its Reading column shows 150A).
       capacity_charge: 450,
-      // Back-solved: 15.766373142542653 x 54.51 = R859.43 (workbook's own Cost cell).
-      water: 15.766373142542653,
-      // Back-solved: 14.994336202990485 x 22.07 = R330.93 (workbook's own Cost cell).
-      sewer: 14.994336202990485,
+      // 17.5 x 54.51 = R953.93, matching the corrected workbook's own Cost cell exactly (Cost = Rate
+      // x Reading directly this time, no back-solving needed - client's 2026-09-04 correction fixed
+      // the reading itself. Was 15.766373142542653 on the first, wrong upload).
+      water: 17.5,
+      // 17.5 x 22.07 = R386.23, matching the corrected workbook's own Cost cell exactly (was
+      // 14.994336202990485 on the first, wrong upload - same fix as water above).
+      sewer: 17.5,
     },
   });
   if (aug26SlipId) console.log('122 Loper - Colorobbia: August 2026 slip added.');

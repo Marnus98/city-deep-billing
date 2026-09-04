@@ -85,18 +85,20 @@ function main(dbFile = 'adh-machine-tool.db') {
   });
   if (julSlipId) console.log('55 Loper Ave - ADH Machine Tool: seeded initial tariff + July 2026 billing slip.');
 
-  // August 2026: fresh real statement from the client's "55 Loper - ADH Machine Tool - August
-  // 2026.xlsx" - same rate card as July, but the same template formula glitch as July persists this
-  // month too (its own Cost cells don't equal that sheet's own Rate x Reading - e.g. Capacity
-  // Charge shows Reading=80 but Cost=R6,950.40, which is 28.96 x 240, not 28.96 x 80). Readings
-  // below are back-solved (Cost / Rate) so Reading x Rate reproduces the workbook's own Cost column
-  // exactly, same 2026-08-20 client choice as July - preserves its R8,164.38 Sub Total (Excl VAT).
+  // August 2026: real statement from the client's "55 Loper - ADH Machine Tool - August 2026.xlsx" -
+  // same rate card as July. Client re-uploaded a corrected version of this workbook 2026-09-04 (the
+  // first upload's water/sewer consumption readings were wrong - see the water/sewer comments
+  // below); electricity (energy_high, capacity_charge) is unchanged from the first upload. The
+  // Capacity Charge "rate used as reading" glitch (Reading column shows 80A but Cost is 28.96 x 240)
+  // and the Common Area lines' own glitch both persist unchanged in the corrected workbook too -
+  // still back-solved (Cost / Rate) same as every other month. Sub Total (Excl VAT) is now R8,187.47
+  // (was R8,164.38 on the first, wrong upload).
   const aug26TariffId = seedTariff(db, {
     tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01', shape: EKURHULENI_TARIFF_B, rates: RATES, factors: FACTORS,
-    notes: 'Real statement from "55 Loper - ADH Machine Tool - August 2026.xlsx", uploaded '
-      + '2026-09-02 - same rate card as July. Same template Cost-formula glitch as July persists '
-      + "this month (readings back-solved as Cost/Rate to reproduce the workbook's own Cost column "
-      + 'exactly), no correction factor.',
+    notes: 'Real statement from "55 Loper - ADH Machine Tool - August 2026.xlsx" - same rate card as '
+      + 'July. Client re-uploaded a corrected version 2026-09-04 (water/sewer readings only); '
+      + 'the Capacity Charge / Common Area "rate used as reading" glitch persists unchanged, no '
+      + 'correction factor.',
   });
   const aug26SlipId = seedSlip(db, aug26TariffId, {
     label: '2026-08', startDate: '2026-08-03', endDate: '2026-09-02', applyCorrectionFactor: 0,
@@ -105,14 +107,19 @@ function main(dbFile = 'adh-machine-tool.db') {
       energy_high: 233.99999999997817, energy_low: 0,
       // Back-solved: 240 x 28.96 = R6,950.40 (workbook's own Cost cell; its Reading column shows 80A).
       capacity_charge: 240,
-      // Back-solved: 2.4300035222899576 x 54.51 = R132.46 (workbook's own Cost cell; its Reading
-      // column shows 2.6972kL, but its Cost formula used a different figure).
-      water: 2.4300035222899576,
-      // Back-solved: 54.51 x 0.542 = R29.54 (same "rate used as reading" quirk as July).
+      // 2.697200000000521 x 54.51 = R147.02, matching the corrected workbook's own Cost cell exactly
+      // (Cost = Rate x Reading directly this time, no back-solving needed - client's 2026-09-04
+      // correction fixed the reading itself, not just the Cost formula. Was 2.4300035222899576 on
+      // the first, wrong upload).
+      water: 2.697200000000521,
+      // Back-solved: 54.51 x 0.542 = R29.54 (same "rate used as reading" quirk as July - unaffected
+      // by the 2026-09-04 water/sewer correction).
       water_common_area: 54.51,
-      // Back-solved: 2.3110127775265 x 22.07 = R51.00 (workbook's own Cost cell).
-      sewer: 2.3110127775265,
-      // Back-solved: 22.07 x 0.542 = R11.96 (same "rate used as reading" quirk as July).
+      // 2.697200000000521 x 22.07 = R59.53, matching the corrected workbook's own Cost cell exactly
+      // (was 2.3110127775265 on the first, wrong upload - same fix as water above).
+      sewer: 2.697200000000521,
+      // Back-solved: 22.07 x 0.542 = R11.96 (same "rate used as reading" quirk as July - unaffected
+      // by the 2026-09-04 water/sewer correction).
       sewer_common_area: 22.07,
     },
   });
