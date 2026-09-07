@@ -281,12 +281,22 @@ function tenantOwnElecKwh(billId, tenantId, periodStartDate) {
 // separate utility_type in the schema. `elec`/`water`/`sanitation` (Rand, cost) stay tied to every
 // bill_line_items row including any common-area share, since that's genuinely billed - only
 // `elecKwh` (a consumption count, not a cost) excludes it, matching tenantOwnElecKwh above.
+//
+// Category name for the sanitation charge itself isn't consistent across properties: City Deep
+// uses 'sanitation'/'sanitation_surcharge' (see calc.js), Wingfield uses 'sanitation_charge' (see
+// calc_wingfield.js) - all three need to be in the IN-list here (2026-09-07 fix - Wingfield's own
+// sanitation charge was silently falling into the NOT-IN 'water' bucket instead, so every
+// Wingfield tenant's PDF trend chart showed an empty Sanitation series with an inflated Water
+// series; the on-screen billing slip and PDF's own line-item breakdown were unaffected since
+// those list every bill_line_items row directly, uncategorised - see tenant_recovery.js's own
+// SITE_MAP query, already covering this same 3-way naming split, for the equivalent Recovery-page
+// fix this mirrors).
 function monthlyTrendForTenant(tenantId, asOfStartDate) {
   const rows = all(`
     SELECT bp.label, bp.start_date,
       COALESCE(SUM(CASE WHEN bli.utility_type='electricity' THEN bli.amount END), 0) as elec,
-      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category NOT IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as water,
-      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_surcharge') THEN bli.amount END), 0) as sanitation,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category NOT IN ('sanitation','sanitation_charge','sanitation_surcharge') THEN bli.amount END), 0) as water,
+      COALESCE(SUM(CASE WHEN bli.utility_type='water' AND bli.category IN ('sanitation','sanitation_charge','sanitation_surcharge') THEN bli.amount END), 0) as sanitation,
       COALESCE((
         SELECT SUM(bli2.quantity * COALESCE(
           (SELECT ma2.sign FROM meter_assignments ma2 WHERE ma2.meter_id = bli2.meter_id AND ma2.tenant_id = b.tenant_id
