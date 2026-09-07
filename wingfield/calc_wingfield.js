@@ -34,12 +34,21 @@ function buildWingfieldTariffParams(tariffRaw) {
 // carries a capacity charge, only basic + energy) and not a one-off gap - reproduced here rather
 // than assumed. The two charges are deliberately independent (not both gated on one flag): a row
 // can have a basic charge with no capacity charge, or neither, exactly as the source shows.
-function calcElectricityMeterLine({ consumptionKwh, breakerAmp, sign = 1, hasBasicCharge = true, tariff }) {
+//
+// `basicChargeAmount` (2026-09-07, Sept 2026 workbook): the source sheet started splitting the
+// flat monthly basic charge into a Single Phase rate (R36.95) and a Three Phase rate (R82.92),
+// billed per-meter depending on that meter's own connection - confirmed the large-breaker meters
+// (150A+) all bill at the Three Phase rate while small ones stay Single Phase. Every prior month
+// only ever had one rate in play, always equal to tariff.basicCharge, so this param is a pure
+// backward-compatible override: seed_wingfield.js now always passes the row's own basic_charge
+// value here, which just reproduces the old flat-rate behaviour for every month before Sept 2026.
+function calcElectricityMeterLine({ consumptionKwh, breakerAmp, sign = 1, hasBasicCharge = true, basicChargeAmount = null, tariff }) {
   const lineItems = [];
   const qty = (consumptionKwh || 0) * sign;
 
-  if (hasBasicCharge && tariff.basicCharge != null) {
-    lineItems.push({ category: 'basic_charge', description: 'Basic charge', quantity: null, rate: tariff.basicCharge, amount: round2(tariff.basicCharge * sign) });
+  const basicRate = basicChargeAmount != null ? basicChargeAmount : tariff.basicCharge;
+  if (hasBasicCharge && basicRate != null) {
+    lineItems.push({ category: 'basic_charge', description: 'Basic charge', quantity: null, rate: basicRate, amount: round2(basicRate * sign) });
   }
   if (breakerAmp && tariff.capacityRatePerAmp != null) {
     const amt = breakerAmp * tariff.capacityRatePerAmp * sign;
