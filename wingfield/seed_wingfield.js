@@ -276,14 +276,22 @@ function seedMonth(monthData) {
   console.log(`Seeded ${count} tenants for period ${monthData.label} (${billingPeriod.start_date} - ${billingPeriod.end_date})`);
 }
 
-// All 13 imported months, July 2025 - July 2026 (see extract_wingfield.py for why filenames,
-// not period-end dates, were used as labels - the "Aug 2025" file's own internal period falls
-// entirely within July, which would otherwise collide with the real July file's label).
+// All 14 imported months, June 2025 - July 2026 (see extract_wingfield.py for why filenames,
+// not period-end dates, were used as labels - each file's own internal period falls entirely
+// within the prior calendar month, which would otherwise collide with the following file's label).
+//
+// Client correction 2026-09-07: every label in this history was shifted back by exactly one
+// calendar month (what was '2026-08' is now '2026-07', what was '2026-07' is now '2026-06', etc.,
+// down to the original '2025-07' file which is now '2025-06') - the client's own workbooks were
+// consistently one month ahead of the actual billing period they covered. Each file's own
+// period.start/period.end dates are untouched, only the label (and filename) moved. The newest
+// file, now labelled '2026-07', also carries the client's 2026-09-07 correction removing Sange
+// SA's ELON086668 meter (see that file's own header/totals for detail).
 const MONTH_FILES = [
-  'wingfield_2025-07.json', 'wingfield_2025-08.json', 'wingfield_2025-09.json', 'wingfield_2025-10.json',
-  'wingfield_2025-11.json', 'wingfield_2025-12.json', 'wingfield_2026-01.json', 'wingfield_2026-02.json',
-  'wingfield_2026-03.json', 'wingfield_2026-04.json', 'wingfield_2026-05.json', 'wingfield_2026-06.json',
-  'wingfield_2026-07.json', 'wingfield_2026-08.json',
+  'wingfield_2025-06.json', 'wingfield_2025-07.json', 'wingfield_2025-08.json', 'wingfield_2025-09.json',
+  'wingfield_2025-10.json', 'wingfield_2025-11.json', 'wingfield_2025-12.json', 'wingfield_2026-01.json',
+  'wingfield_2026-02.json', 'wingfield_2026-03.json', 'wingfield_2026-04.json', 'wingfield_2026-05.json',
+  'wingfield_2026-06.json', 'wingfield_2026-07.json',
 ];
 
 function main(dbFile = 'wingfield.db') {
