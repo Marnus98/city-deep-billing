@@ -294,6 +294,77 @@ const MONTH_FILES = [
   'wingfield_2026-06.json', 'wingfield_2026-07.json', 'wingfield_2026-08.json',
 ];
 
+// ---------- Ptyprops 348 / Komatsu Offices cross-mirroring ----------
+// Client feedback 2026-09-08: "Ptyprops 348 (Pty) Ltd" and "Komatsu Offices" are the same real
+// occupant, and the client hasn't yet decided which of the two tenant records to actually invoice.
+// From 2026-07 onward the source workbook moved this occupant's water meters (B-XUU984, B-XUV018)
+// into a brand-new "Komatsu Offices" block while its electricity meter (ELON087025) stayed under
+// "Ptyprops 348 (Pty) Ltd" - so neither record on its own shows the full picture, and before
+// 2026-07 "Komatsu Offices" didn't exist as a tenant at all.
+//
+// Per the client's explicit instruction, both tenant records are kept as separate entries in the
+// billing-slip list (not merged into one), but are made to fully mirror each other: for every
+// period Ptyprops has data, both tenants show the SAME electricity + water consumption and
+// charges, each fully included in that tenant's own total (not a reference-only line) -
+// deliberately not deduplicated, so the client can compare both full slips side by side before
+// deciding which one to actually send. Runs once, after seedMonth has processed every month's raw
+// workbook data (which naturally produces the two lopsided records this function unions).
+function mirrorPtypropsKomatsu() {
+  const ptyprops = get('SELECT * FROM tenants WHERE name = ?', ['Ptyprops 348 (Pty) Ltd']);
+  if (!ptyprops) return;
+  const komatsu = getOrCreateTenant('Komatsu Offices');
+
+  const periods = all('SELECT * FROM billing_periods ORDER BY start_date');
+  let mirroredCount = 0;
+  for (const bp of periods) {
+    const ptyBill = get('SELECT * FROM bills WHERE tenant_id=? AND billing_period_id=?', [ptyprops.id, bp.id]);
+    if (!ptyBill) continue; // Ptyprops itself has no data this period (e.g. 2025-06) - nothing to mirror
+
+    const elecItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='electricity'", [ptyBill.id]);
+    const ptyWaterItems = all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water'", [ptyBill.id]);
+    const komBillExisting = get('SELECT * FROM bills WHERE tenant_id=? AND billing_period_id=?', [komatsu.id, bp.id]);
+    const komWaterItemsOwn = komBillExisting
+      ? all("SELECT * FROM bill_line_items WHERE bill_id=? AND utility_type='water'", [komBillExisting.id])
+      : [];
+
+    // Whichever tenant naturally has real (non-empty) water this period is the source of truth for
+    // both copies - see header comment (the workbook only ever puts real water on one of the two).
+    const waterSourceItems = ptyWaterItems.length ? ptyWaterItems : komWaterItemsOwn;
+
+    rebuildMirroredBill(ptyprops, bp, elecItems, waterSourceItems);
+    rebuildMirroredBill(komatsu, bp, elecItems, waterSourceItems);
+    mirroredCount++;
+  }
+  console.log(`Mirrored Ptyprops 348 / Komatsu Offices electricity + water across ${mirroredCount} periods.`);
+}
+
+// Rebuilds one tenant's bill for a period from an already-computed set of electricity and water
+// line items - used by mirrorPtypropsKomatsu so both tenants end up with byte-identical
+// consumption and charges. Line items are copied by value (quantity/rate/amount), not re-derived
+// from tariffs, so this exactly reproduces whatever the source tenant was actually charged.
+function rebuildMirroredBill(tenant, billingPeriod, elecItems, waterItems) {
+  const lineItems = [...elecItems, ...waterItems];
+  const elecKwhTotal = elecItems.filter((li) => li.category === 'energy_charge').reduce((s, li) => s + (li.quantity || 0), 0);
+  const waterKlTotal = waterItems.filter((li) => li.category === 'water_charge').reduce((s, li) => s + (li.quantity || 0), 0);
+  const subtotal = calc.round2(lineItems.reduce((s, li) => s + li.amount, 0));
+  const vatRate = 0.15;
+  const vatAmount = calc.round2(subtotal * vatRate);
+  const total = calc.round2(subtotal + vatAmount);
+
+  run('DELETE FROM bill_line_items WHERE bill_id IN (SELECT id FROM bills WHERE tenant_id=? AND billing_period_id=?)', [tenant.id, billingPeriod.id]);
+  run('DELETE FROM bills WHERE tenant_id=? AND billing_period_id=?', [tenant.id, billingPeriod.id]);
+  run(`INSERT INTO bills (tenant_id, billing_period_id, status, subtotal_excl_vat, vat_rate, vat_amount, total_incl_vat,
+        electricity_consumption_kwh, water_consumption_m3, invoice_number)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [tenant.id, billingPeriod.id, 'finalised', subtotal, vatRate, vatAmount, total, calc.round2(elecKwhTotal), calc.round2(waterKlTotal),
+     `WF-${billingPeriod.label}-${tenant.id}`]);
+  const bill = get('SELECT * FROM bills WHERE tenant_id=? AND billing_period_id=?', [tenant.id, billingPeriod.id]);
+  for (const li of lineItems) {
+    run('INSERT INTO bill_line_items (bill_id, meter_id, utility_type, category, description, quantity, rate, amount) VALUES (?,?,?,?,?,?,?,?)',
+      [bill.id, li.meter_id, li.utility_type, li.category, li.description, li.quantity, li.rate, li.amount]);
+  }
+}
+
 function main(dbFile = 'wingfield.db') {
   db = open(dbFile);
   migrate(db);
@@ -304,6 +375,7 @@ function main(dbFile = 'wingfield.db') {
   try {
     seedUsers();
     for (const monthData of months) seedMonth(monthData);
+    mirrorPtypropsKomatsu();
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
