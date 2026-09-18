@@ -834,7 +834,7 @@
   "grand_total_incl_vat": 1152304.13
  },
  {
-  "file": "07) Wingfield 2026-07.pdf",
+  "file": "221075502 - wingfield ekr.pdf",
   "account": "2210755502",
   "address": "0 Jones St, Witkoppie 64-IR",
   "market_value": 192150000.0,
@@ -848,33 +848,48 @@
    "incl_vat": 374692.5
   },
   "electricity": {
-   "reading_period": null,
-   "consumption_kwh": 0,
+   "reading_period": [
+    "2026-07-01",
+    "2026-08-01"
+   ],
+   "consumption_kwh": 126510.0,
    "consumption_kvarh": 0,
-   "tariff_type": null,
-   "excl_vat": 0.0,
-   "vat": 0.0,
-   "incl_vat": 0.0,
-   "lines": {}
+   "tariff_type": "TOU",
+   "lines": {
+    "off_peak_qty": 37814.0,
+    "off_peak": 70027.75,
+    "standard_qty": 67616.0,
+    "standard": 166862.76,
+    "peak_qty": 21080.0,
+    "peak": 260631.01,
+    "demand_qty": 373.909,
+    "demand": 60102.13,
+    "service": 6195.35,
+    "network_surcharge": 40039.68
+   },
+   "excl_vat": 603858.68,
+   "vat": 90578.79,
+   "incl_vat": 694437.47
   },
   "water": {
    "reading_period": null,
-   "consumption_kl": 0,
-   "water_excl_vat": 0.0,
-   "sanitation_excl_vat": 0.0,
-   "vat": 0.0
+   "consumption_kl": -505.0,
+   "water_excl_vat": -19208.01,
+   "sanitation_excl_vat": -6276.86,
+   "vat": -3822.71,
+   "note": "Net of a large INTERIM REVERSAL crediting back a prior over-estimate: one meter (60351776) billed a 32kL INTERIM estimate with no reading dates; the other (100087357) shows a real 2541kL reading over 2026-05-13 to 2026-08-11 (a stretched ~90-day catch-up) *and* a -3078kL INTERIM REVERSAL crediting back an earlier over-estimate on that same meter, so the net across both meters this cycle is -505kL (a genuine credit month, not a data error - the statement's own printed figures net out to exactly this). reading_period left null since the two meters' own periods don't share one clean window (one undated estimate, one real 90-day read) - see the account's Municipal Account page for the itemised source figures."
   },
   "refuse": {
-   "excl_vat": 0.0,
-   "vat": 0.0,
-   "incl_vat": 0.0
+   "excl_vat": 8356.57,
+   "vat": 1253.49,
+   "incl_vat": 9610.06
   },
   "sundry": {
-   "excl_vat": 590807.07,
-   "vat": 88621.21,
-   "incl_vat": 679428.28,
-   "note": "Fixed Charge + both electricity meters (STD meter S015523700's 67,616 kWh / R166,862.76 is legible, but meter P015523700's own Cons=2,108 reading has no kWh/Rand figure before the page cuts off) - uploaded 2026-09-18 as a 1-page 'COPY TAX INVOICE' (confirmed via pdfinfo genuinely only 1 page, not a Read-tool truncation), client confirmed this is all that was provided ('This is all I have'). Property Rates is the one figure clearly itemised and unambiguous, recorded on its own; everything else is folded into this single sundry line rather than guessing a TOU/electricity split for the invisible remainder, so the statement still reconciles exactly to its own printed Total Charge (excl. VAT) 965,499.57 / VAT 88,621.21 / incl. VAT 1,054,120.78. reading_period is left null on both electricity and water so this statement does not date-match into any billing period on the Recovery page (same convention as City Deep's own partial August 2026 statements) - the Municipal Account page's own grand total is accurate; only the Recovery page's per-utility comparison is affected (shows as no-statement-yet for July, same as before this upload)."
+   "excl_vat": 4077.57,
+   "vat": 611.64,
+   "incl_vat": 4689.21,
+   "note": "New 'R' meter (M-NO:R015523700) appearing for the first time this cycle, tariff code otherwise identical to the standard TOU meters ('TAR:ELE->230/400V <=11KV', not a reactive-energy meter) - billed as reading x a 1000 multiply-factor at a flat R0.3510/kWh (11,617 notional kWh -> R4,077.57 excl VAT). The exact same R0.3510/kWh rate appears on 8 Field Street's and Cranbrook Flavours' own new 'R' meters this same billing cycle (see their own municipal_import.js files) - a genuine new Ekurhuleni tariff item rolled out this period across multiple accounts, not a one-off. Recorded here as sundry since it isn't Peak/Standard/Off-Peak and its official name/purpose hasn't been confirmed with Ekurhuleni yet."
   },
-  "grand_total_incl_vat": 1054120.78
+  "grand_total_incl_vat": 1054121.66
  }
 ]
