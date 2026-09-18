@@ -69,6 +69,16 @@ for (const prop of properties) {
   }
   propertyDbs.set(prop.slug, propDb);
 }
+// City Deep's own tenant/billing history (city-deep/seed.js) - unlike every import below, this one
+// is NOT safe to leave gated behind the "only when empty" check above: that check only fires once,
+// the very first time tenants is empty, so once City Deep's db has ANY tenant row (which it always
+// will, days after first boot), adding a new month to seed.js's own MONTH_FILES array silently never
+// reaches an already-populated live database again - a real bug found 2026-09-18 (August 2026 was
+// added to MONTH_FILES weeks earlier but never appeared on the live Render site's Recovery page,
+// because that instance's city-deep.db had been populated long before). generateBill() there already
+// DELETEs-then-INSERTs by (tenant_id, billing_period_id), the same idempotent, safe-to-always-re-run
+// pattern as every script below, so registering it here too costs nothing and fixes the gap for good.
+require('./city-deep/seed').run('city-deep.db');
 // Each property's municipal-account statements are their own separate, self-contained pipeline
 // (own de-dup key: invoice_number per property db) - always safe to re-run on every boot, not just
 // when empty. City Deep is billed by City of Johannesburg (seed_municipal.js); Wingfield is billed
