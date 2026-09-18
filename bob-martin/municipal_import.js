@@ -146,23 +146,30 @@ const MONTHS = [
     readings: { network_access: { reading: 496.320, comment: 'Demand=496.320' }, network_demand: { reading: 496.320, comment: 'Demand=496.320' },
       peak_high: 24209.040, standard_high: 59919.600, offpeak_high: 40550.640,
       water: 125, sewer: 125 } },
-  // July 2026 - uploaded 2026-09-18 as a 1-page "COPY TAX INVOICE" (statement dated 2026-08-29,
-  // electricity reading dates Curr 26/08/01 Prev 26/07/01, so this is July's consumption). Same
-  // 1-page partial-capture situation as 8 Field Street's own July 2026 statement (confirmed via
-  // pdfinfo, not a Read-tool truncation) - cuts off right after the second (off-peak) meter's Cons
-  // reading, before Network Access/Demand, the rest of the TOU split, or any Water/Sewer/Refuse
-  // section appears. Client confirmed 2026-09-18 this is all that was provided ("This is all I
-  // have"). Property Rates is the one figure clearly itemised and unambiguous, so it's recorded on
-  // its own; everything else (Fixed Charge - notably lower this month, R3,345.78, than June's winter
-  // R6,154.68, consistent with June being a one-off High Demand season month per the file header note
-  // - both electricity meters, and Water/Sewer/Refuse) goes into one "sundry" line so the month
-  // reconciles exactly to the statement's own printed Total Charge (excl. VAT) 679,283.82 / VAT
-  // 98,771.64 / incl. VAT 778,055.46. No waterStartDate/waterEndDate - the water section never
-  // appears on the page.
-  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
-    rates: { property_rates: 20806.70, sundry: 679283.82 - 20806.70 },
-    readings: { property_rates: 1,
-      sundry: { reading: 1, comment: 'Fixed Charge + both electricity meters + Water/Sewer/Refuse (if billed) - statement is a 1-page capture that cuts off before any of these are itemised (see file header note); total matches the statement\'s own printed Total Charge (excl. VAT) less Property Rates' } } },
+  // July 2026 - a fuller 5-page capture of this same statement (account 1712101106, invoice
+  // 17121011062026/08/29) was uploaded 2026-09-18, superseding the 1-page partial capture recorded
+  // here originally. Full reconciliation (property_rates + fixed_charge + standard/offpeak/peak +
+  // network_demand/network_access + refuse_business/refuse_litter + water/sewer) matches the
+  // statement's own "TOTAL CURRENT LEVY" of 778,055.88 to the cent (a few cents above the statement's
+  // own "Total Charge (excl.VAT)"/"(incl.VAT)" of 679,283.82/778,055.46, since this account's
+  // R808,302.58 BALANCE BROUGHT FORWARD was almost fully paid off this cycle, leaving only a
+  // -R0.42 rounding remainder in the bottom-table total that isn't part of any itemised current
+  // charge). Fixed Charge is notably lower this month (R3,345.78) than June's winter R6,154.68,
+  // consistent with June being this account's one-off High Demand season month per the file header
+  // note above - this reverts to the Low Demand rate, now itself stepped up ~9% for the new tariff
+  // year (R3,069.24 -> R3,345.78).
+  //
+  // The M-NO:R015523686 meter this cycle is explicitly labelled "REACTIVE" on the statement (not the
+  // unexplained new "R" meter seen on 8 Field Street/Wingfield/Cranbrook Flavours this same cycle -
+  // different tariff code) and reads 0 kWh/R0.00, so it isn't recorded as its own line.
+  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01', waterStartDate: '2026-07-06', waterEndDate: '2026-08-08',
+    rates: { property_rates: 20806.70, fixed_charge: 3345.78,
+      standard_low: 175893.71 / 50782.029, offpeak_low: 79699.03 / 37233.840, peak_low: 253759.84 / 21419.574,
+      network_demand: 73062.05 / 633.120, network_access: 61723.99 / 633.120,
+      refuse_business: 604.33, refuse_litter: 1199.21, water: 6541.20 / 120, sewer: 2648.40 / 120 },
+    readings: { network_demand: { reading: 633.120, comment: 'Demand=633.120' }, network_access: { reading: 633.120, comment: 'Demand=633.120' },
+      standard_low: 50782.029, offpeak_low: 37233.840, peak_low: 21419.574,
+      water: 120, sewer: 120 } },
 ];
 
 function main(dbFile = 'bob-martin.db') {
@@ -179,7 +186,7 @@ function main(dbFile = 'bob-martin.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`Bob Martin municipal account import: ${created} statement(s) added (Dec 2025 - Jul 2026, no gaps; Jul 2026 partial - see file header note).`);
+  if (created) console.log(`Bob Martin municipal account import: ${created} statement(s) added (Dec 2025 - Jul 2026, no gaps).`);
   return db;
 }
 

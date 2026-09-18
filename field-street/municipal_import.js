@@ -137,24 +137,38 @@ const MONTHS = [
       peak_high: 41880.0, standard_high: 95230.8, offpeak_high: 116686.8,
       water: { reading: 193, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 193, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
-  // July 2026 - uploaded 2026-09-18 as a 1-page "COPY TAX INVOICE" (statement dated 2026-08-27,
-  // electricity reading dates Curr 26/08/01 Prev 26/07/01, so this is July's consumption per this
-  // file's own start-of-reading-period labelling convention). Unlike every month above, this capture
-  // is genuinely only 1 physical page (confirmed via pdfinfo, not a Read-tool truncation) and cuts off
-  // immediately after the second electricity meter's Cons reading, before Network Access/Demand, the
-  // rest of the TOU split, or any Water/Sewer/Refuse section ever appears - the client confirmed
-  // 2026-09-18 this is all that was provided ("This is all I have"), so rather than guess a TOU/
-  // utility split for the invisible remainder, only Property Rates (clearly itemised and unambiguous)
-  // is recorded on its own line; every other charge on the statement (Fixed Charge, both electricity
-  // meters, and whatever Water/Sewer/Refuse this cycle carries) is combined into one "sundry" line so
-  // this month still reconciles exactly to the statement's own printed Total Charge (excl. VAT)
-  // 2,251,668.63 / VAT 138,894.91 / incl. VAT 2,390,563.54, without fabricating readings for line
-  // items whose own figures were never visible. Deliberately no waterStartDate/waterEndDate this
-  // month - the water section itself never appears on the page, so there is no reading date to record.
-  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
-    rates: { property_rates: 21686.33, sundry: 2251668.63 - 21686.33 },
-    readings: { property_rates: 1,
-      sundry: { reading: 1, comment: 'Fixed Charge + both electricity meters + Water/Sewer/Refuse (if billed) - statement is a 1-page capture that cuts off before any of these are itemised (see file header note); total matches the statement\'s own printed Total Charge (excl. VAT) less Property Rates' } } },
+  // July 2026 - a fuller 5-page capture of this same statement (account 2617680552, invoice
+  // 26176805522026/08/27) was uploaded 2026-09-18, superseding the 1-page partial capture recorded
+  // here originally. Full reconciliation (property_rates + fixed_charge + offpeak/standard/peak +
+  // network_demand/network_access + refuse + water/sewer + the new "R" meter below) matches the
+  // statement's own "TOTAL CURRENT LEVY" of 1,086,547.38 to the cent - note this is LOWER than the
+  // statement's own printed "Total Charge (excl.VAT)"/"(incl.VAT)" (2,251,668.63 / 2,390,563.54)
+  // because that bottom-table figure also carries forward the account's R1,304,016.16 BALANCE BROUGHT
+  // FORWARD (unpaid this cycle) - excluded here per this file's own established convention of
+  // recording only the current period's own itemised charges.
+  //
+  // Water is a genuine NET NEGATIVE this cycle: the one physical meter (201033085) read 165kL over
+  // 2026-06-15 to 2026-07-16, but carries its own -193kL INTERIM REVERSAL crediting back a larger
+  // prior over-estimate, netting to -28kL (-R1,048.22 excl VAT) - a real credit month, not an error;
+  // sewer mirrors the same -28kL net.
+  //
+  // New "R" meter (M-NO:R017048114) appears for the first time this cycle - tariff code identical to
+  // the standard TOU meters, not reactive - billed 15.696 kWh @ a flat R0.3510/kWh (R5.51 excl VAT).
+  // The exact same R0.3510/kWh rate appears on Wingfield's and Cranbrook Flavours' own new "R" meters
+  // this same billing cycle (see their own municipal_import.js/JSON) - a genuine new Ekurhuleni tariff
+  // item rolled out this period across multiple accounts, not a one-off. Recorded here as sundry since
+  // it isn't Peak/Standard/Off-Peak and its official name/purpose hasn't been confirmed with Ekurhuleni
+  // yet.
+  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01', waterStartDate: '2026-06-15', waterEndDate: '2026-07-16',
+    rates: { property_rates: 21686.33, fixed_charge: 6195.35,
+      offpeak_low: 259851.20 / 140316.000, standard_low: 290198.47 / 117594.000, peak_low: 206527.96 / 54940.800,
+      network_demand: 101132.95 / 629.171, network_access: 62836.80 / 629.171,
+      refuse: 604.33, water: -1048.22 / -28, sewer: -338.21 / -28, sundry: 5.51 },
+    readings: { network_demand: { reading: 629.171, comment: 'Demand=629.171' }, network_access: { reading: 629.171, comment: 'Demand=629.171' },
+      offpeak_low: 140316.000, standard_low: 117594.000, peak_low: 54940.800,
+      water: { reading: -28, comment: 'NET of a true 165kL reading (meter read window 2026-06-15 to 2026-07-16) less a 193kL INTERIM REVERSAL credit correcting a prior over-estimate - a genuine net-negative (credit) month, not an error - see file header note' },
+      sewer: { reading: -28, comment: 'NET of the same -28kL position as water above (165kL true less 193kL reversal) - see file header note' },
+      sundry: { reading: 1, comment: 'New "R" meter M-NO:R017048114, 15.696 kWh @ R0.3510/kWh - see file header note' } } },
 ];
 
 function main(dbFile = 'field-street.db') {
@@ -171,7 +185,7 @@ function main(dbFile = 'field-street.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`8 Field Street municipal account import: ${created} statement(s) added (Sep 2025 - Jul 2026, no gaps; Jul 2026 partial - see file header note).`);
+  if (created) console.log(`8 Field Street municipal account import: ${created} statement(s) added (Sep 2025 - Jul 2026, no gaps).`);
   return db;
 }
 
