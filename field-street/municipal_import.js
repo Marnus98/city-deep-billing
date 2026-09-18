@@ -137,6 +137,24 @@ const MONTHS = [
       peak_high: 41880.0, standard_high: 95230.8, offpeak_high: 116686.8,
       water: { reading: 193, comment: 'INTERIM estimate, not an actual meter read this cycle' },
       sewer: { reading: 193, comment: 'INTERIM estimate, not an actual meter read this cycle' } } },
+  // July 2026 - uploaded 2026-09-18 as a 1-page "COPY TAX INVOICE" (statement dated 2026-08-27,
+  // electricity reading dates Curr 26/08/01 Prev 26/07/01, so this is July's consumption per this
+  // file's own start-of-reading-period labelling convention). Unlike every month above, this capture
+  // is genuinely only 1 physical page (confirmed via pdfinfo, not a Read-tool truncation) and cuts off
+  // immediately after the second electricity meter's Cons reading, before Network Access/Demand, the
+  // rest of the TOU split, or any Water/Sewer/Refuse section ever appears - the client confirmed
+  // 2026-09-18 this is all that was provided ("This is all I have"), so rather than guess a TOU/
+  // utility split for the invisible remainder, only Property Rates (clearly itemised and unambiguous)
+  // is recorded on its own line; every other charge on the statement (Fixed Charge, both electricity
+  // meters, and whatever Water/Sewer/Refuse this cycle carries) is combined into one "sundry" line so
+  // this month still reconciles exactly to the statement's own printed Total Charge (excl. VAT)
+  // 2,251,668.63 / VAT 138,894.91 / incl. VAT 2,390,563.54, without fabricating readings for line
+  // items whose own figures were never visible. Deliberately no waterStartDate/waterEndDate this
+  // month - the water section itself never appears on the page, so there is no reading date to record.
+  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
+    rates: { property_rates: 21686.33, sundry: 2251668.63 - 21686.33 },
+    readings: { property_rates: 1,
+      sundry: { reading: 1, comment: 'Fixed Charge + both electricity meters + Water/Sewer/Refuse (if billed) - statement is a 1-page capture that cuts off before any of these are itemised (see file header note); total matches the statement\'s own printed Total Charge (excl. VAT) less Property Rates' } } },
 ];
 
 function main(dbFile = 'field-street.db') {
@@ -153,7 +171,7 @@ function main(dbFile = 'field-street.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`8 Field Street municipal account import: ${created} statement(s) added (Sep 2025 - Jun 2026, no gaps).`);
+  if (created) console.log(`8 Field Street municipal account import: ${created} statement(s) added (Sep 2025 - Jul 2026, no gaps; Jul 2026 partial - see file header note).`);
   return db;
 }
 

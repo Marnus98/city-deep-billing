@@ -112,6 +112,12 @@ const EKURHULENI_MUNICIPAL_E_TOU_8FS = [
   { key: 'offpeak_high', label: 'Off-Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'refuse', label: 'Refuse Removal', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  // Added 2026-09-18 for the July 2026 statement, a 1-page partial capture (see
+  // field-street/municipal_import.js's own note on that month) whose remaining sections
+  // (Network Access/Demand, the rest of the TOU split, Water/Sewer/Refuse) never appear on the page
+  // at all before the statement's own total table - same catch-all purpose as Cranbrook's existing
+  // "sundry" line below.
+  { key: 'sundry', label: 'Sundry / Unitemised Balance', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: true, section: 'municipal' },
   ...WATER_SEWER_ITEMS,
 ];
 
@@ -138,6 +144,9 @@ const EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN = [
   { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'refuse_business', label: 'Refuse Removal - Business', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
   { key: 'refuse_litter', label: 'Refuse Removal - Litter-picking', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  // Added 2026-09-18, same reason/purpose as the identical line just added to
+  // EKURHULENI_MUNICIPAL_E_TOU_8FS above - see that comment.
+  { key: 'sundry', label: 'Sundry / Unitemised Balance', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: true, section: 'municipal' },
   ...WATER_SEWER_ITEMS,
 ];
 

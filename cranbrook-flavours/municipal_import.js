@@ -120,6 +120,28 @@ const MONTHS = [
       sundry: { reading: 1, comment: 'FINAL NOTICE fee (one-off, non-utility) - see file header note' },
       water: { reading: 239, comment: 'INTERIM estimate across both water meters (4kL + 235kL), not an actual meter read this cycle' },
       sewer: { reading: 239, comment: 'INTERIM estimate across both water meters (4kL + 235kL), not an actual meter read this cycle' } } },
+  // July 2026 - uploaded 2026-09-18 as a 1-page "COPY TAX INVOICE" (statement dated 2026-08-27,
+  // electricity reading dates Curr 26/08/01 Prev 26/07/01, so this is July's consumption). Same
+  // 1-page partial-capture situation as 8 Field Street/Bob Martin's own July 2026 statements
+  // (confirmed via pdfinfo) - cuts off right after the first (STD) meter's 831kWh reading, before the
+  // second (off-peak) meter's own charge or any Water/Sewer section appears. Client confirmed
+  // 2026-09-18 this is all that was provided ("This is all I have"). Property Rates Industrial is
+  // back on this account for the first time since Nov 2025 (57,824.54 - the account had none on
+  // Mar/May/Jun 2026's statements, see file header note) and is clearly itemised, so it's recorded on
+  // its own. Two further line items above it on the statement - "RF ASS RATES ADJUSTMENT" (R4,111.09,
+  // a correction to a prior rates bill, not a new charge) and "VA TRANSFER BETWEEN ACCOUNTS"
+  // (R399,669.57, reads as an inter-account ledger transfer, not a utility charge) - are ambiguous
+  // rather than a clear non-utility exclusion like Loper Road's own "Interest on Arrears": it's not
+  // possible to tell from this 1-page capture whether the statement's own bottom-line "Total Charge
+  // (excl. VAT)" already nets these out or includes them, so rather than guess, both are folded into
+  // the same "sundry" catch-all as the invisible second meter/Water/Sewer, keeping the month's total
+  // exactly reconciled without asserting a utility-vs-ledger classification that can't be verified
+  // from what's on the page. Total: excl. VAT 584,706.81 / VAT 7,954.82 / incl. VAT 592,661.63. No
+  // waterStartDate/waterEndDate - the water section never appears on the page.
+  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
+    rates: { property_rates: 57824.54, sundry: 584706.81 - 57824.54 },
+    readings: { property_rates: 1,
+      sundry: { reading: 1, comment: 'RF ASS RATES ADJUSTMENT (4,111.09) + VA TRANSFER BETWEEN ACCOUNTS (399,669.57, utility-vs-ledger status unverified - see file header note) + Fixed Charge + both electricity meters + Water/Sewer (if billed) - statement is a 1-page capture that cuts off before most of these are itemised; total matches the statement\'s own printed Total Charge (excl. VAT) less Property Rates' } } },
 ];
 
 function main(dbFile = 'cranbrook-flavours.db') {
@@ -136,7 +158,7 @@ function main(dbFile = 'cranbrook-flavours.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`Cranbrook Flavours municipal account import: ${created} statement(s) added (Nov 2025, Mar/May/Jun 2026 - Dec 2025/Jan/Feb 2026 missing, no statement provided).`);
+  if (created) console.log(`Cranbrook Flavours municipal account import: ${created} statement(s) added (Nov 2025, Mar/May/Jun/Jul 2026 - Dec 2025/Jan/Feb 2026 missing, no statement provided; Jul 2026 partial - see file header note).`);
   return db;
 }
 

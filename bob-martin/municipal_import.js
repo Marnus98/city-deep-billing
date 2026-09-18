@@ -146,6 +146,23 @@ const MONTHS = [
     readings: { network_access: { reading: 496.320, comment: 'Demand=496.320' }, network_demand: { reading: 496.320, comment: 'Demand=496.320' },
       peak_high: 24209.040, standard_high: 59919.600, offpeak_high: 40550.640,
       water: 125, sewer: 125 } },
+  // July 2026 - uploaded 2026-09-18 as a 1-page "COPY TAX INVOICE" (statement dated 2026-08-29,
+  // electricity reading dates Curr 26/08/01 Prev 26/07/01, so this is July's consumption). Same
+  // 1-page partial-capture situation as 8 Field Street's own July 2026 statement (confirmed via
+  // pdfinfo, not a Read-tool truncation) - cuts off right after the second (off-peak) meter's Cons
+  // reading, before Network Access/Demand, the rest of the TOU split, or any Water/Sewer/Refuse
+  // section appears. Client confirmed 2026-09-18 this is all that was provided ("This is all I
+  // have"). Property Rates is the one figure clearly itemised and unambiguous, so it's recorded on
+  // its own; everything else (Fixed Charge - notably lower this month, R3,345.78, than June's winter
+  // R6,154.68, consistent with June being a one-off High Demand season month per the file header note
+  // - both electricity meters, and Water/Sewer/Refuse) goes into one "sundry" line so the month
+  // reconciles exactly to the statement's own printed Total Charge (excl. VAT) 679,283.82 / VAT
+  // 98,771.64 / incl. VAT 778,055.46. No waterStartDate/waterEndDate - the water section never
+  // appears on the page.
+  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
+    rates: { property_rates: 20806.70, sundry: 679283.82 - 20806.70 },
+    readings: { property_rates: 1,
+      sundry: { reading: 1, comment: 'Fixed Charge + both electricity meters + Water/Sewer/Refuse (if billed) - statement is a 1-page capture that cuts off before any of these are itemised (see file header note); total matches the statement\'s own printed Total Charge (excl. VAT) less Property Rates' } } },
 ];
 
 function main(dbFile = 'bob-martin.db') {
@@ -162,7 +179,7 @@ function main(dbFile = 'bob-martin.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`Bob Martin municipal account import: ${created} statement(s) added (Dec 2025 - Jun 2026, no gaps).`);
+  if (created) console.log(`Bob Martin municipal account import: ${created} statement(s) added (Dec 2025 - Jul 2026, no gaps; Jul 2026 partial - see file header note).`);
   return db;
 }
 
