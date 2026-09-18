@@ -120,28 +120,63 @@ const MONTHS = [
       sundry: { reading: 1, comment: 'FINAL NOTICE fee (one-off, non-utility) - see file header note' },
       water: { reading: 239, comment: 'INTERIM estimate across both water meters (4kL + 235kL), not an actual meter read this cycle' },
       sewer: { reading: 239, comment: 'INTERIM estimate across both water meters (4kL + 235kL), not an actual meter read this cycle' } } },
-  // July 2026 - uploaded 2026-09-18 as a 1-page "COPY TAX INVOICE" (statement dated 2026-08-27,
-  // electricity reading dates Curr 26/08/01 Prev 26/07/01, so this is July's consumption). Same
-  // 1-page partial-capture situation as 8 Field Street/Bob Martin's own July 2026 statements
-  // (confirmed via pdfinfo) - cuts off right after the first (STD) meter's 831kWh reading, before the
-  // second (off-peak) meter's own charge or any Water/Sewer section appears. Client confirmed
-  // 2026-09-18 this is all that was provided ("This is all I have"). Property Rates Industrial is
-  // back on this account for the first time since Nov 2025 (57,824.54 - the account had none on
-  // Mar/May/Jun 2026's statements, see file header note) and is clearly itemised, so it's recorded on
-  // its own. Two further line items above it on the statement - "RF ASS RATES ADJUSTMENT" (R4,111.09,
-  // a correction to a prior rates bill, not a new charge) and "VA TRANSFER BETWEEN ACCOUNTS"
-  // (R399,669.57, reads as an inter-account ledger transfer, not a utility charge) - are ambiguous
-  // rather than a clear non-utility exclusion like Loper Road's own "Interest on Arrears": it's not
-  // possible to tell from this 1-page capture whether the statement's own bottom-line "Total Charge
-  // (excl. VAT)" already nets these out or includes them, so rather than guess, both are folded into
-  // the same "sundry" catch-all as the invisible second meter/Water/Sewer, keeping the month's total
-  // exactly reconciled without asserting a utility-vs-ledger classification that can't be verified
-  // from what's on the page. Total: excl. VAT 584,706.81 / VAT 7,954.82 / incl. VAT 592,661.63. No
-  // waterStartDate/waterEndDate - the water section never appears on the page.
-  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
-    rates: { property_rates: 57824.54, sundry: 584706.81 - 57824.54 },
-    readings: { property_rates: 1,
-      sundry: { reading: 1, comment: 'RF ASS RATES ADJUSTMENT (4,111.09) + VA TRANSFER BETWEEN ACCOUNTS (399,669.57, utility-vs-ledger status unverified - see file header note) + Fixed Charge + both electricity meters + Water/Sewer (if billed) - statement is a 1-page capture that cuts off before most of these are itemised; total matches the statement\'s own printed Total Charge (excl. VAT) less Property Rates' } } },
+  // July 2026 - a fuller 5-page capture of this same statement (account 2618624004, invoice
+  // 26186240042026/08/27) was uploaded 2026-09-18, superseding the 1-page partial capture recorded
+  // here originally - and in the process, CORRECTING A REAL ERROR in that original entry: the 1-page
+  // capture only showed the statement's own "Total Charge (excl.VAT)" bottom-table figure
+  // (584,706.81), which - unlike every City of Johannesburg statement, and unlike this same account's
+  // own Mar/May/Jun 2026 statements above - ALSO carries forward this cycle's R74,180.61 BALANCE
+  // BROUGHT FORWARD (fully unpaid this cycle, no "PAYMENT - THANK YOU" line at all this month, unlike
+  // Bob Martin/8 Field Street/Wingfield's own July statements). The original entry recorded that
+  // whole 584,706.81 figure as this month's sundry charge, silently overstating July's own municipal
+  // total by exactly that brought-forward balance. The true current-period total, reconciled from the
+  // full itemised breakdown below, is the statement's own "TOTAL CURRENT LEVY" of 518,481.02 - see the
+  // 27.42% smaller sundry figure below.
+  //
+  // Property Rates Industrial is back on this account for the first time since Nov 2025 (57,824.54 -
+  // the account had none on Mar/May/Jun 2026's statements, see file header note) and is clearly
+  // itemised, so it's recorded on its own. Two further line items above it on the statement -
+  // "RF ASS RATES ADJUSTMENT" (R4,111.09, a correction to a prior rates bill, not a new charge) and
+  // "VA TRANSFER BETWEEN ACCOUNTS" (R399,669.57, reads as an inter-account ledger transfer, not a
+  // utility charge) - are still ambiguous (not a clear non-utility exclusion like Loper Road's own
+  // "Interest on Arrears"): now that the full page is visible, it's clear both sit INSIDE "TOTAL
+  // CURRENT LEVY" (the itemised reconciliation below only balances to the cent with them included),
+  // so they're kept, folded into sundry alongside the new "R" meter (see below) rather than asserting
+  // a utility-vs-ledger classification that still can't be fully verified.
+  //
+  // Electricity has FOUR meters this cycle, not the usual three - a new M-NO:R021410763 meter
+  // (2351.220 kWh, R825.28 excl VAT, implied rate R0.3510/kWh) appears for the first time, tariff code
+  // identical to the standard TOU meters, not reactive. The exact same R0.3510/kWh rate appears on
+  // 8 Field Street's and Wingfield's own new "R" meters this same billing cycle (see their own
+  // municipal_import.js/JSON) - a genuine new Ekurhuleni tariff item rolled out this period across
+  // multiple accounts, not a one-off - folded into sundry since it isn't Peak/Standard/Off-Peak and
+  // its official name/purpose hasn't been confirmed with Ekurhuleni yet. The other three meters
+  // classify by implied rate as usual: P021410763 (831kWh, R3.759/kWh) = peak, S021410763 (3257.4kWh,
+  // R2.468/kWh) = standard, O021410763 (1984.2kWh, R1.852/kWh) = off-peak.
+  //
+  // Water/Sewer: both physical meters (949184903, 23092733) show a real current-period reading
+  // alongside their own INTERIM REVERSAL crediting back a prior over-estimate - meter 949184903 nets
+  // to -4kL, meter 23092733 to 294kL true less 235kL reversed = 59kL, combined net 55kL (same 2-meter-
+  // combining and NET-of-reversal conventions already used elsewhere in this file) - both meters read
+  // 2026-06-12 to 2026-07-16.
+  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01', waterStartDate: '2026-06-12', waterEndDate: '2026-07-16',
+    rates: { property_rates: 57824.54, fixed_charge: 6195.35,
+      peak_low: 3123.81 / 831.000, standard_low: 8038.61 / 3257.400, offpeak_low: 3674.54 / 1984.200,
+      network_demand: 11419.61 / 71.044, network_access: 10392.77 / 71.044,
+      refuse: 604.33, water: 3272.34 / 55, sewer: 1374.36 / 55,
+      // sundry (VAT-taxable) and deposit (VAT-exempt, borrowed for VA TRANSFER below since this
+      // shape has no other vat_exempt catch-all) are kept as two SEPARATE line items rather than one
+      // blended "sundry" figure - VA TRANSFER carries no VAT on the statement while the other two
+      // items do, and this app's calc engine always derives VAT fresh from each line's own excl_vat x
+      // 15% (unless vat_exempt), so blending a 0%-VAT item in with 15%-VAT items into one rate/reading
+      // pair would silently overstate VAT by taxing the whole blend.
+      sundry: 4111.09 + 825.28,
+      deposit: 399669.57 },
+    readings: { network_demand: { reading: 71.044, comment: 'Demand=71.044' }, network_access: { reading: 71.044, comment: 'Demand=71.044' },
+      peak_low: 831.000, standard_low: 3257.400, offpeak_low: 1984.200,
+      water: 55, sewer: 55,
+      sundry: { reading: 1, comment: 'RF ASS RATES ADJUSTMENT (4,111.09, correction to a prior rates bill) + new "R" meter M-NO:R021410763 (2,351.220 kWh @ R0.3510/kWh = 825.28, see file header note) - both VAT-taxable' },
+      deposit: { reading: 1, comment: 'VA TRANSFER BETWEEN ACCOUNTS (399,669.57) - reads as an inter-account ledger transfer, not a utility charge; utility-vs-ledger status still unverified (see file header note), but it prints with no VAT on the statement, unlike the sundry items above, so it\'s recorded on this shape\'s other vat_exempt line instead of blended in with them' } } },
 ];
 
 function main(dbFile = 'cranbrook-flavours.db') {
@@ -158,7 +193,7 @@ function main(dbFile = 'cranbrook-flavours.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`Cranbrook Flavours municipal account import: ${created} statement(s) added (Nov 2025, Mar/May/Jun/Jul 2026 - Dec 2025/Jan/Feb 2026 missing, no statement provided; Jul 2026 partial - see file header note).`);
+  if (created) console.log(`Cranbrook Flavours municipal account import: ${created} statement(s) added (Nov 2025, Mar/May/Jun/Jul 2026 - Dec 2025/Jan/Feb 2026 missing, no statement provided).`);
   return db;
 }
 
