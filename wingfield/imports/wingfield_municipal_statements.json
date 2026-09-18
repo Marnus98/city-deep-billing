@@ -832,5 +832,49 @@
    "incl_vat": 0.0
   },
   "grand_total_incl_vat": 1152304.13
+ },
+ {
+  "file": "07) Wingfield 2026-07.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-08-28",
+  "statement_for": "2026-07",
+  "due_date": "2026-09-25",
+  "invoice_number": "2210755502-2026-08-28",
+  "property_rates": {
+   "excl_vat": 374692.5,
+   "vat": 0.0,
+   "incl_vat": 374692.5
+  },
+  "electricity": {
+   "reading_period": null,
+   "consumption_kwh": 0,
+   "consumption_kvarh": 0,
+   "tariff_type": null,
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0,
+   "lines": {}
+  },
+  "water": {
+   "reading_period": null,
+   "consumption_kl": 0,
+   "water_excl_vat": 0.0,
+   "sanitation_excl_vat": 0.0,
+   "vat": 0.0
+  },
+  "refuse": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "sundry": {
+   "excl_vat": 590807.07,
+   "vat": 88621.21,
+   "incl_vat": 679428.28,
+   "note": "Fixed Charge + both electricity meters (STD meter S015523700's 67,616 kWh / R166,862.76 is legible, but meter P015523700's own Cons=2,108 reading has no kWh/Rand figure before the page cuts off) - uploaded 2026-09-18 as a 1-page 'COPY TAX INVOICE' (confirmed via pdfinfo genuinely only 1 page, not a Read-tool truncation), client confirmed this is all that was provided ('This is all I have'). Property Rates is the one figure clearly itemised and unambiguous, recorded on its own; everything else is folded into this single sundry line rather than guessing a TOU/electricity split for the invisible remainder, so the statement still reconciles exactly to its own printed Total Charge (excl. VAT) 965,499.57 / VAT 88,621.21 / incl. VAT 1,054,120.78. reading_period is left null on both electricity and water so this statement does not date-match into any billing period on the Recovery page (same convention as City Deep's own partial August 2026 statements) - the Municipal Account page's own grand total is accurate; only the Recovery page's per-utility comparison is affected (shows as no-statement-yet for July, same as before this upload)."
+  },
+  "grand_total_incl_vat": 1054120.78
  }
 ]
