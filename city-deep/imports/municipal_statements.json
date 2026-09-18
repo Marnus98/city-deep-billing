@@ -2754,5 +2754,185 @@
       "vat": 5086.8,
       "incl_vat": 38998.76
     }
+  },
+  {
+    "file": "07) City Deep - 2027-07.pdf",
+    "account": "559304053",
+    "statement_for": "August 2026",
+    "statement_date": "2026/09/04",
+    "invoice_number": "600002796059",
+    "due_date": "2026/09/21",
+    "address": "41 FORTUNE STREET",
+    "market_value": 85037000.0,
+    "grand_total_incl_vat": 1699766.34,
+    "property_rates": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "electricity": {
+      "consumption_kwh": 0,
+      "consumption_kvarh": 0,
+      "tariff_type": null,
+      "lines": {},
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0,
+      "reading_period": null
+    },
+    "water": {
+      "consumption_kl": 0,
+      "reading_period": null,
+      "water_excl_vat": 0.0,
+      "sanitation_excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "refuse": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "sundry": {
+      "excl_vat": 1500907.68,
+      "vat": 198858.66,
+      "incl_vat": 1699766.34,
+      "note": "Entire 'Current Charges (Excl. VAT)' lump sum for this statement - the uploaded PDF this month (misnamed '2027-07' but printed 'Statement for: September 2026', i.e. August 2026 consumption per the usual ~1-month lag) is a one-page-per-account cover/remittance summary only, with no itemised electricity/water/sanitation/property-rates breakdown at all (unlike every prior month for this account). Recorded here as a single sundry figure - deliberately excluded from the Recovery comparison (elec/water/sanitation only) rather than guessing a split, and reading_period is left null so this statement does not date-match into any billing period there either. The Municipal Account page's own grand total is accurate; only the Recovery page's per-utility comparison is affected (shows as no-statement-yet for August, same as before this upload)."
+    }
+  },
+  {
+    "file": "07) City Deep - 2027-07.pdf",
+    "account": "559304060",
+    "statement_for": "August 2026",
+    "statement_date": "2026/09/09",
+    "invoice_number": "600002798448",
+    "due_date": "2026/09/25",
+    "address": "40 FORTUNE STREET",
+    "market_value": 84000000.0,
+    "grand_total_incl_vat": 700947.63,
+    "property_rates": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "electricity": {
+      "consumption_kwh": 0,
+      "consumption_kvarh": 0,
+      "tariff_type": null,
+      "lines": {},
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0,
+      "reading_period": null
+    },
+    "water": {
+      "consumption_kl": 0,
+      "reading_period": null,
+      "water_excl_vat": 0.0,
+      "sanitation_excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "refuse": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "sundry": {
+      "excl_vat": 632091.03,
+      "vat": 68856.6,
+      "incl_vat": 700947.63,
+      "note": "Entire 'Current Charges (Excl. VAT)' lump sum for this statement - the uploaded PDF this month (misnamed '2027-07' but printed 'Statement for: September 2026', i.e. August 2026 consumption per the usual ~1-month lag) is a one-page-per-account cover/remittance summary only, with no itemised electricity/water/sanitation/property-rates breakdown at all (unlike every prior month for this account). Recorded here as a single sundry figure - deliberately excluded from the Recovery comparison (elec/water/sanitation only) rather than guessing a split, and reading_period is left null so this statement does not date-match into any billing period there either. The Municipal Account page's own grand total is accurate; only the Recovery page's per-utility comparison is affected (shows as no-statement-yet for August, same as before this upload)."
+    }
+  },
+  {
+    "file": "07) City Deep - 2027-07.pdf",
+    "account": "559304078",
+    "statement_for": "August 2026",
+    "statement_date": "2026/09/04",
+    "invoice_number": "600002795844",
+    "due_date": "2026/09/21",
+    "address": "160/RE CITY DEEP EXT.7 TS",
+    "market_value": 57630000.0,
+    "grand_total_incl_vat": 929327.61,
+    "property_rates": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "electricity": {
+      "consumption_kwh": 0,
+      "consumption_kvarh": 0,
+      "tariff_type": null,
+      "lines": {},
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0,
+      "reading_period": null
+    },
+    "water": {
+      "consumption_kl": 0,
+      "reading_period": null,
+      "water_excl_vat": 0.0,
+      "sanitation_excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "refuse": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "sundry": {
+      "excl_vat": 823596.52,
+      "vat": 105731.09,
+      "incl_vat": 929327.61,
+      "note": "Entire 'Current Charges (Excl. VAT)' lump sum for this statement - the uploaded PDF this month (misnamed '2027-07' but printed 'Statement for: September 2026', i.e. August 2026 consumption per the usual ~1-month lag) is a one-page-per-account cover/remittance summary only, with no itemised electricity/water/sanitation/property-rates breakdown at all (unlike every prior month for this account). Recorded here as a single sundry figure - deliberately excluded from the Recovery comparison (elec/water/sanitation only) rather than guessing a split, and reading_period is left null so this statement does not date-match into any billing period there either. The Municipal Account page's own grand total is accurate; only the Recovery page's per-utility comparison is affected (shows as no-statement-yet for August, same as before this upload)."
+    }
+  },
+  {
+    "file": "07) City Deep - 2027-07.pdf",
+    "account": "559304085",
+    "statement_for": "August 2026",
+    "statement_date": "2026/09/04",
+    "invoice_number": "600002795544",
+    "due_date": "2026/09/21",
+    "address": "34A FORTUNE STREET",
+    "market_value": 13970000.0,
+    "grand_total_incl_vat": 140110.8,
+    "property_rates": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "electricity": {
+      "consumption_kwh": 0,
+      "consumption_kvarh": 0,
+      "tariff_type": null,
+      "lines": {},
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0,
+      "reading_period": null
+    },
+    "water": {
+      "consumption_kl": 0,
+      "reading_period": null,
+      "water_excl_vat": 0.0,
+      "sanitation_excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "refuse": {
+      "excl_vat": 0.0,
+      "vat": 0.0,
+      "incl_vat": 0.0
+    },
+    "sundry": {
+      "excl_vat": 125589.3,
+      "vat": 14521.5,
+      "incl_vat": 140110.8,
+      "note": "Entire 'Current Charges (Excl. VAT)' lump sum for this statement - the uploaded PDF this month (misnamed '2027-07' but printed 'Statement for: September 2026', i.e. August 2026 consumption per the usual ~1-month lag) is a one-page-per-account cover/remittance summary only, with no itemised electricity/water/sanitation/property-rates breakdown at all (unlike every prior month for this account). Recorded here as a single sundry figure - deliberately excluded from the Recovery comparison (elec/water/sanitation only) rather than guessing a split, and reading_period is left null so this statement does not date-match into any billing period there either. The Municipal Account page's own grand total is accurate; only the Recovery page's per-utility comparison is affected (shows as no-statement-yet for August, same as before this upload)."
+    }
   }
 ]
