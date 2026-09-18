@@ -213,6 +213,27 @@ const MONTHS = [
       demand_charge: { reading: 204.300, comment: 'Demand=204.300' },
       water: 2676, sewer: 2676,
     } },
+  // August 2026 - added 2026-09-18 from 'COJ AUTOZONE SEP.pdf' (statement dated 2026/09/03, "Statement
+  // For September 2026" per this account's own one-cycle-ahead cover-page convention, so this is
+  // August's actual usage - see file header note). Clean single reading period throughout, same
+  // 2026/2027 rate card as June/July above. Property's own account number on this statement prints as
+  // 557875118 (this file's own established account for AutoZone, unchanged).
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', waterStartDate: '2026-07-29', waterEndDate: '2026-08-25',
+    rates: {
+      property_rates: 117733.76,
+      peak_high: 0, peak_low: 97874.19 / 13008.999, standard_high: 0, standard_low: 90059.46 / 30948.999, offpeak_high: 0, offpeak_low: 29499.96 / 14750.000,
+      surcharge_tou: 0, reactive_energy: 0,
+      network_surcharge: 3522.48 / 58708, demand_charge: 100835.81 / 218.600, service_charge: 4629.64,
+      water: 198592.28 / 2564, demand_management_levy: 413.84, sewer: 150404.24 / 2564,
+      refuse: 1112.00, sundry_surcharge: 6979.93 + 6457.98,
+    },
+    readings: {
+      peak_low: 13008.999, standard_low: 30948.999, offpeak_low: 14750.000,
+      reactive_energy: 16069.000,
+      network_surcharge: { reading: 58708, comment: 'Total metered kWh (peak+standard+offpeak) this cycle' },
+      demand_charge: { reading: 218.600, comment: 'Demand=218.600' },
+      water: 2564, sewer: 2564,
+    } },
 ];
 
 function main(dbFile = 'autozone.db') {
@@ -229,7 +250,7 @@ function main(dbFile = 'autozone.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`AutoZone municipal account import: ${created} statement(s) added (Dec 2025 - Jul 2026, Feb 2026 missing).`);
+  if (created) console.log(`AutoZone municipal account import: ${created} statement(s) added (Dec 2025 - Aug 2026, Feb 2026 missing).`);
   return db;
 }
 
