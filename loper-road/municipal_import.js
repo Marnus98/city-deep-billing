@@ -122,6 +122,21 @@ const MONTHS = [
       demand_charge: { reading: 26.880, comment: 'Demand=26.880' }, network_access: { reading: 26.880, comment: 'Demand=26.880' },
       water: { reading: 37, comment: 'INTERIM estimate (same 37kL figure as April/May\'s combined statement) - not an actual meter read this cycle, no water reading dates printed' },
       sewer: { reading: 37, comment: 'INTERIM estimate (same 37kL figure as April/May\'s combined statement) - not an actual meter read this cycle, no water reading dates printed' } } },
+  // July 2026 - the first statement on this account with a real, non-INTERIM water reading date
+  // range in a while, though the water/sewer figures themselves are still printed as "INTERIM 37 Kl"
+  // with no reading dates at all (same as every month since the account changeover - see file header
+  // note), so still treated as an estimate here. Sewer's rate jumped from the flat R18.91/kL seen
+  // every month before this to R22.07/kL (816.59 / 37kL, sewer mirroring water's own 37kL reading per
+  // this file's established convention) - a genuine tariff increase, not a data-entry slip: the
+  // statement's own "TOTAL CURRENT LEVY 51970.06" reconciles against every other line item here
+  // unchanged, isolating the jump to this one rate.
+  { label: '2026-07', startDate: '2026-07-01', endDate: '2026-08-01',
+    rates: { fixed_charge: 4338.39, energy_charge: 26603.89 / 5289.043, demand_charge: 7907.52 / 29.520,
+      network_access: 3507.92 / 29.520, refuse_litter: 0.17, refuse_levy: 0, water: 2016.87 / 37, sewer: 816.59 / 37 },
+    readings: { energy_charge: 5289.043,
+      demand_charge: { reading: 29.520, comment: 'Demand=29.520' }, network_access: { reading: 29.520, comment: 'Demand=29.520' },
+      water: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' },
+      sewer: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' } } },
 ];
 
 function main(dbFile = 'loper-road.db') {
@@ -138,7 +153,7 @@ function main(dbFile = 'loper-road.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`Loper Road - Sandvic municipal account import: ${created} statement(s) added (Dec 2025, Jan-Apr 2026, Jun 2026 - May 2026's usage is folded into Apr's combined statement, see file header note).`);
+  if (created) console.log(`Loper Road - Sandvic municipal account import: ${created} statement(s) added (Dec 2025, Jan-Apr 2026, Jun-Jul 2026 - May 2026's usage is folded into Apr's combined statement, see file header note).`);
   return db;
 }
 
