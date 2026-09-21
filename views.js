@@ -43,7 +43,7 @@ function layout({ title, user, active, body }) {
       // initial all-properties rollout (2026-08-25), since every flat_site property also got
       // hasFlagging: true in properties.js but this nav branch never checked it.
       ...(currentProp.hasFlagging ? [['/flagging', 'Flagging']] : []),
-      ['/audit-log', 'Audit Log'],
+      ['/recharge-export', 'Recharge Export'], ['/audit-log', 'Audit Log'],
     ]
     : [
       ['/dashboard', 'Dashboard'], ['/tenants', 'Tenants'], ['/meters', 'Meters'],
@@ -57,7 +57,8 @@ function layout({ title, user, active, body }) {
       // gated by its own flag rather than reusing hasMunicipalStatements/recoveryMultiSection since
       // a property can have Recovery without Flagging (piloting on City Deep only for now).
       ...(currentProp && currentProp.hasFlagging ? [['/flagging', 'Flagging']] : []),
-      ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'], ['/audit-log', 'Audit Log'],
+      ['/tariffs', 'Tariffs'], ['/reconciliation', 'Reconciliation'],
+      ['/recharge-export', 'Recharge Export'], ['/audit-log', 'Audit Log'],
     ];
   // Property switcher - auto-submits on change (same pattern as the Municipality Accounts page's
   // account selector). POSTs to /switch-property, which updates the session's currentProperty
@@ -1883,6 +1884,64 @@ function flaggingSettingsPage({ user, propertyName, settings }) {
   return layout({ title: 'Flagging Settings', user, active: '/flagging', body });
 }
 
+// rechargeExportPage - lets the client pick a billing period label and download the two monthly
+// accounting CSVs (CSV BEV = AutoZone + Wingfield, CSV Lisa = everything else) with columns F/G/I
+// auto-filled from this app's own billing data - see recharge_export.js for exactly how each row's
+// amount is computed. Shown as a preview table on screen (so a flagged/unresolved row is visible
+// before downloading, not just discovered later in Excel) plus the two download buttons.
+function rechargeExportPreviewTable(title, rows) {
+  const flagged = rows.filter((r) => r.flag);
+  return `
+  <div class="bg-white rounded-lg border p-4 mb-4">
+    <h2 class="font-semibold mb-3">${esc(title)} <span class="text-slate-400 text-sm font-normal">(${rows.length} rows)</span></h2>
+    ${flagged.length ? `<div class="bg-amber-50 text-amber-800 text-sm rounded p-3 mb-3">
+      <strong>${flagged.length} row${flagged.length === 1 ? '' : 's'} need attention</strong> (shown as R0.00 below):
+      <ul class="list-disc ml-5 mt-1">${flagged.map((r) => `<li>Building ${esc(r.building)} / Tenant ${esc(r.tenantCode)} (${esc(r.utility)}): ${esc(r.flag)}</li>`).join('')}</ul>
+    </div>` : ''}
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-slate-500 border-b">
+        <th class="py-1 pr-3">Building</th><th class="py-1 pr-3">Tenant</th><th class="py-1 pr-3">Utility</th>
+        <th class="py-1 pr-3">End date (F)</th><th class="py-1 pr-3">Start date (G)</th><th class="py-1 pr-3 text-right">Amount excl VAT (I)</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r) => `<tr class="border-b border-slate-100 ${r.flag ? 'bg-amber-50' : ''}">
+          <td class="py-1 pr-3">${esc(r.building)}</td>
+          <td class="py-1 pr-3">${esc(r.tenantCode)}${r.tenantCode2 !== r.tenantCode ? `/${esc(r.tenantCode2)}` : ''}</td>
+          <td class="py-1 pr-3">${esc(r.utility)}</td>
+          <td class="py-1 pr-3">${r.endDate ? esc(r.endDate.split('-').reverse().join('/')) : '-'}</td>
+          <td class="py-1 pr-3">${r.startDate ? esc(r.startDate.split('-').reverse().join('/')) : '-'}</td>
+          <td class="py-1 pr-3 text-right">${money(r.amount)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+function rechargeExportPage({ user, labels, label, bevRows, lisaRows }) {
+  const body = `
+  <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="text-2xl font-bold">Recharge Export</h1>
+      <p class="text-sm text-slate-500 mt-1">Monthly CSV BEV / CSV Lisa export for the accounting system - columns F (period end), G (period start) and I (amount excl VAT) are filled in live from this month's billing, matching the row template you've been maintaining by hand. Everything else about the template (Building Code, Tenant Code, Utility Code, the trailing "Elec period" label) stays fixed - see recharge_export.js for exactly how each row's tenant/property identity was resolved, including a couple of rows flagged below that still need your input.</p>
+    </div>
+  </div>
+  <form method="get" action="/recharge-export" class="flex items-center gap-2 mb-6">
+    <label class="text-sm text-slate-500">Billing period:</label>
+    <select name="label" class="border rounded px-3 py-2 text-sm" onchange="this.form.submit()">
+      ${labels.map((l) => `<option value="${esc(l)}" ${l === label ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+    </select>
+    ${label ? `
+    <a href="/recharge-export/csv?label=${encodeURIComponent(label)}&file=BEV" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download CSV BEV</a>
+    <a href="/recharge-export/csv?label=${encodeURIComponent(label)}&file=LISA" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Download CSV Lisa</a>
+    ` : ''}
+  </form>
+  ${label ? rechargeExportPreviewTable('CSV BEV (AutoZone + Wingfield)', bevRows) + rechargeExportPreviewTable('CSV Lisa (everything else)', lisaRows) : '<p class="text-sm text-slate-500">No billing periods found yet.</p>'}
+  `;
+  return layout({ title: 'Recharge Export', user, active: '/recharge-export', body });
+}
+
 module.exports = {
   esc, money, fmtNum, layout, loginPage, dashboardPage, tenantsPage, tenantDetailPage,
   metersPage, tariffsPage, billingPeriodsPage, newBillingPeriodPage, readingsCapturePage,
@@ -1892,4 +1951,5 @@ module.exports = {
   siteBillingListPage, siteBillingFormPage, siteBillingDetailPage,
   recoveryPage,
   flaggingPage, flaggingSettingsPage,
+  rechargeExportPage,
 };

@@ -23,6 +23,7 @@ const flagging = require('./flagging');
 const cityDeepFlagging = require('./city-deep/flagging_data');
 const wingfieldFlagging = require('./wingfield/flagging_data');
 const flatSiteFlagging = require('./flat_site_flagging_data');
+const rechargeExport = require('./recharge_export');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -1541,6 +1542,50 @@ route('GET', '/audit-log', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
   const entries = all(`SELECT al.*, u.username FROM audit_log al LEFT JOIN users u ON u.id=al.user_id ORDER BY al.id DESC LIMIT 200`);
   send(res, 200, views.auditLogPage({ user, entries }));
+});
+
+// ---------------- monthly recharge CSV export (CSV BEV / CSV Lisa) ----------------
+// Not tied to whichever property is "active" in the current session - this export spans every
+// property at once (see recharge_export.js), so it reads straight from `propertyDbs` instead of
+// going through the AsyncLocalStorage-based get()/all()/run() helpers above (which only ever see
+// the one currently-active property's db). Available regardless of which property the user has
+// selected - see views.js's nav, which lists it in both the tenant-model and flat_site nav arrays.
+function allKnownLabels() {
+  const labels = new Set();
+  const cityDeep = propertyDbs.get('city-deep');
+  const wingfield = propertyDbs.get('wingfield');
+  if (cityDeep) for (const r of cityDeep.prepare('SELECT label FROM billing_periods').all()) labels.add(r.label);
+  if (wingfield) for (const r of wingfield.prepare('SELECT label FROM billing_periods').all()) labels.add(r.label);
+  for (const prop of properties) {
+    if (prop.billingModel !== 'flat_site') continue;
+    const db = propertyDbs.get(prop.slug);
+    if (!db) continue;
+    for (const r of db.prepare('SELECT label FROM site_billing_slips').all()) labels.add(r.label);
+  }
+  return [...labels].sort().reverse();
+}
+
+route('GET', '/recharge-export', async (req, res, params, query) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const labels = allKnownLabels();
+  const label = query.label && labels.includes(query.label) ? query.label : labels[0];
+  const bevRows = label ? rechargeExport.buildRows(propertyDbs, label, 'BEV') : [];
+  const lisaRows = label ? rechargeExport.buildRows(propertyDbs, label, 'LISA') : [];
+  send(res, 200, views.rechargeExportPage({ user, labels, label, bevRows, lisaRows }));
+});
+
+route('GET', '/recharge-export/csv', async (req, res, params, query) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const label = query.label;
+  const file = (query.file || '').toUpperCase();
+  if (!label || (file !== 'BEV' && file !== 'LISA')) return send(res, 400, 'Missing or invalid label/file query params.');
+  const rows = rechargeExport.buildRows(propertyDbs, label, file);
+  const csv = rechargeExport.toCsv(rows);
+  res.writeHead(200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="CSV ${file === 'BEV' ? 'BEV' : 'Lisa'} ${label}.csv"`,
+  });
+  res.end(csv);
 });
 
 // ---------------- dispatcher ----------------
