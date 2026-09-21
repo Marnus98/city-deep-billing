@@ -376,17 +376,13 @@ function dashboardData(periodId, propSlug) {
     JOIN tenants t ON t.id=b.tenant_id JOIN billing_periods bp ON bp.id=b.billing_period_id
     ORDER BY b.generated_at DESC LIMIT 8`);
   const allPeriods = all('SELECT * FROM billing_periods ORDER BY start_date DESC');
-  // "Billed to Tenants vs Recovered" gauges (see dashboard_gauges.js) - reuses this function's own
-  // consumption.e/consumption.w (the plain property-wide SUM already computed above) as the "billed"
-  // side, so the gauge and the stat cards above it can never silently disagree.
-  const gauges = dashboardGauges.gaugesForProperty(currentDb(), propSlug, period, { elecKwh: consumption.e, waterKl: consumption.w });
   return {
     stats: {
       activeTenants, billedThisMonth, missingCount: missing.length, draftBills, finalisedBills,
       totalElecBilled: totals.elecBilled, totalWaterBilled: totals.waterBilled, totalBilled,
       totalElecKwh: consumption.e, totalWaterKl: consumption.w,
     },
-    recentBills, missing, currentPeriod: period, allPeriods, gauges,
+    recentBills, missing, currentPeriod: period, allPeriods,
   };
 }
 
@@ -437,13 +433,23 @@ route('POST', '/switch-property', async (req, res) => {
 
 route('GET', '/dashboard', async (req, res, params, query) => {
   const user = requireLogin(req, res); if (!user) return;
-  // The tenant/bills-oriented dashboard below doesn't mean anything for a flat_site property (see
-  // properties.js) - there are no tenants or per-tenant bills to summarise, just a list of monthly
-  // billing slips - so /site-billing (its own list page) stands in as this property's "dashboard".
+  // Every property now gets its own Dashboard (2026-09-28 client ask - previously flat_site
+  // properties (8 Field Street, Bob Martin, Loper Road, AutoZone, Cranbrook Flavours, the 5 Loper
+  // Ave sites) had none at all and this route just bounced straight to /site-billing). A flat_site
+  // property has no tenants/per-tenant bills to summarise though, so it gets a much simpler
+  // dashboard - just the Billed-vs-Recovered gauges (see dashboard_gauges.js) - while City Deep and
+  // Wingfield keep their existing tenant/bill-ops stat cards ABOVE the same gauges.
   const currentProp = properties.find((p) => p.slug === user.currentProperty);
-  if (currentProp && currentProp.billingModel === 'flat_site') return redirect(res, '/site-billing');
+  const propDb = currentDb();
+  const billingModel = currentProp ? currentProp.billingModel : 'tenant';
+  const gaugeOptions = dashboardGauges.periodOptionsForProperty(propDb, billingModel);
+  const gaugeSelector = query.gaugePeriod || dashboardGauges.latestLabel(propDb, billingModel);
+  const gauges = dashboardGauges.gaugesForSelector(propertyDbs, user.currentProperty, billingModel, gaugeSelector);
+  if (billingModel === 'flat_site') {
+    return send(res, 200, views.flatSiteDashboardPage({ user, propertyName: currentProp.name, gaugeOptions, gaugeSelector, gauges }));
+  }
   const data = dashboardData(query.periodId, user.currentProperty);
-  send(res, 200, views.dashboardPage({ user, ...data }));
+  send(res, 200, views.dashboardPage({ user, ...data, gaugeOptions, gaugeSelector, gauges }));
 });
 
 route('GET', '/tenants', async (req, res) => {

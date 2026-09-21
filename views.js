@@ -151,13 +151,13 @@ function statCard(label, value, sub) {
 // not just to their own 100%). Client explicitly asked for "just totals" (2026-09-21), not a
 // percentage/ratio gauge, so the number shown is always the raw total (kWh/kL) - the bar length is
 // only a visual aid for comparing the two (or three) totals in one card at a glance.
-function linearGauge(label, value, unit, colorClass, max) {
+function linearGauge(label, value, colorClass, max, formatFn) {
   const pct = max > 0 ? Math.min(100, Math.max(0, (Math.abs(value) / max) * 100)) : 0;
   return `
   <div class="mb-3 last:mb-0">
     <div class="flex justify-between text-sm mb-1">
       <span class="text-slate-500">${esc(label)}</span>
-      <span class="font-semibold">${fmtNum(value, 0)} ${esc(unit)}</span>
+      <span class="font-semibold">${formatFn(value)}</span>
     </div>
     <div class="w-full bg-slate-100 rounded-full h-3">
       <div class="${colorClass} h-3 rounded-full" style="width:${pct}%"></div>
@@ -166,14 +166,65 @@ function linearGauge(label, value, unit, colorClass, max) {
 }
 function utilityGaugeCard(title, unit, bars) {
   const max = Math.max(1, ...bars.map((b) => Math.abs(b.value))) * 1.05;
+  const formatFn = (v) => `${fmtNum(v, 0)} ${unit}`;
   return `
   <div class="bg-white rounded-lg border p-4">
     <div class="font-semibold mb-3">${esc(title)}</div>
-    ${bars.map((b) => linearGauge(b.label, b.value, unit, b.colorClass, max)).join('')}
+    ${bars.map((b) => linearGauge(b.label, b.value, b.colorClass, max, formatFn)).join('')}
+  </div>`;
+}
+// Rand gauge card - same bar visual as utilityGaugeCard, plus a net over/under recovery line
+// underneath (client ask, 2026-09-28): "Billed to tenants, Recovered ... net over/under recovery
+// below it". Positive net = billed more than it cost to recover (over-recovered); negative = under-
+// recovered - same sign convention flat_site_recovery.js/tenant_recovery.js's own totalRecoveryRand
+// already uses, so this always agrees with the Recovery page for the same period(s).
+function recoveryRandGaugeCard(title, billedLabel, billedRand, recoveredLabel, recoveredRand) {
+  const max = Math.max(1, Math.abs(billedRand), Math.abs(recoveredRand)) * 1.05;
+  const formatFn = (v) => money(v);
+  const net = billedRand - recoveredRand;
+  const over = net >= 0;
+  return `
+  <div class="bg-white rounded-lg border p-4">
+    <div class="font-semibold mb-3">${esc(title)}</div>
+    ${linearGauge(billedLabel, billedRand, 'bg-slate-900', max, formatFn)}
+    ${linearGauge(recoveredLabel, recoveredRand, 'bg-blue-600', max, formatFn)}
+    <div class="mt-3 pt-3 border-t flex justify-between items-center">
+      <span class="text-sm text-slate-500">Net ${over ? 'Over' : 'Under'}-Recovery</span>
+      <span class="font-bold ${over ? 'text-emerald-600' : 'text-red-600'}">${money(Math.abs(net))} ${over ? 'over-recovered' : 'under-recovered'}</span>
+    </div>
+  </div>`;
+}
+// The gauge period dropdown - every month (newest first) grouped under a "<year> - Year to Date"
+// entry per year (see dashboard_gauges.js's periodOptionsForProperty) - shared by both the
+// tenant-model dashboard and the flat_site one so the control looks/behaves identically everywhere.
+function gaugePeriodForm(gaugeOptions, gaugeSelector) {
+  return `
+  <form method="get" action="/dashboard" class="flex items-center gap-2 mb-4">
+    <label class="text-sm text-slate-500">Recovery period:</label>
+    <select name="gaugePeriod" class="border rounded px-3 py-2 text-sm" onchange="this.form.submit()">
+      ${gaugeOptions.map((o) => `<option value="${esc(o.value)}" ${o.value === gaugeSelector ? 'selected' : ''}>${esc(o.text)}</option>`).join('')}
+    </select>
+  </form>`;
+}
+function gaugeCardsSection(gauges) {
+  if (!gauges) return '<p class="text-sm text-slate-500">No billing data yet.</p>';
+  return `
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    ${utilityGaugeCard('Electricity - Billed vs Recovered', 'kWh', [
+      { label: 'Billed to Tenants (net of solar)', value: gauges.elecBilledKwh, colorClass: 'bg-slate-900' },
+      ...(gauges.hasSolar ? [{ label: 'Solar (Fortress)', value: gauges.solarKwh, colorClass: 'bg-amber-400' }] : []),
+      { label: `Recovered (Municipal${gauges.hasSolar ? ' + Solar' : ''})`, value: gauges.elecRecoveredKwh, colorClass: 'bg-blue-600' },
+    ])}
+    ${utilityGaugeCard('Water - Billed vs Recovered', 'kL', [
+      { label: 'Billed to Tenants', value: gauges.waterBilledKl, colorClass: 'bg-slate-900' },
+      { label: 'Recovered (Municipal)', value: gauges.waterRecoveredKl, colorClass: 'bg-blue-600' },
+    ])}
+    ${recoveryRandGaugeCard('Recovery (Rand, excl. VAT)', 'Billed to Tenants', gauges.billedRand,
+      `Recovered (Municipal${gauges.hasSolar ? ' + Solar cost' : ''})`, gauges.recoveredRand)}
   </div>`;
 }
 
-function dashboardPage({ user, stats, recentBills, missing, currentPeriod, allPeriods, gauges }) {
+function dashboardPage({ user, stats, recentBills, missing, currentPeriod, allPeriods, gauges, gaugeOptions, gaugeSelector }) {
   const body = `
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold">Dashboard</h1>
@@ -199,18 +250,9 @@ function dashboardPage({ user, stats, recentBills, missing, currentPeriod, allPe
     ${statCard('Total electricity consumption', fmtNum(stats.totalElecKwh, 0) + ' kWh')}
     ${statCard('Total water consumption', fmtNum(stats.totalWaterKl, 0) + ' kL')}
   </div>
-  ${gauges ? `
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    ${utilityGaugeCard('Electricity - Billed vs Recovered', 'kWh', [
-      { label: 'Billed to Tenants (net of solar)', value: gauges.elecBilledKwh, colorClass: 'bg-slate-900' },
-      ...(gauges.hasSolar ? [{ label: 'Solar (Fortress)', value: gauges.solarKwh, colorClass: 'bg-amber-400' }] : []),
-      { label: `Recovered (Municipal${gauges.hasSolar ? ' + Solar' : ''})`, value: gauges.elecRecoveredKwh, colorClass: 'bg-blue-600' },
-    ])}
-    ${utilityGaugeCard('Water - Billed vs Recovered', 'kL', [
-      { label: 'Billed to Tenants', value: gauges.waterBilledKl, colorClass: 'bg-slate-900' },
-      { label: 'Recovered (Municipal)', value: gauges.waterRecoveredKl, colorClass: 'bg-blue-600' },
-    ])}
-  </div>` : ''}
+  <h2 class="text-lg font-semibold mb-2">Recovery</h2>
+  ${gaugePeriodForm(gaugeOptions, gaugeSelector)}
+  ${gaugeCardsSection(gauges)}
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     <div class="bg-white rounded-lg border">
       <div class="px-4 py-3 border-b font-semibold">Recently generated billing slips</div>
@@ -953,6 +995,23 @@ function auditLogPage({ user, entries }) {
 // See properties.js's billingModel and server.js's /site-billing routes. The line-items table
 // layout below deliberately mirrors the client's reference statement column-for-column (Entry /
 // Rate / Unit / Reading / Cost / Comment) since that's the format they're used to reading.
+
+// flatSiteDashboardPage - the Dashboard for every flat_site property (2026-09-28 client ask: every
+// site should have its own dashboard). Much simpler than the tenant-model dashboardPage above - no
+// tenants, no per-tenant bills, so it's just the period/YTD picker and the same 3 Billed-vs-Recovered
+// gauge cards (see dashboard_gauges.js/gaugeCardsSection). "Billing Slips" (the property's actual
+// monthly statements) stays a separate nav tab, unchanged.
+function flatSiteDashboardPage({ user, propertyName, gaugeOptions, gaugeSelector, gauges }) {
+  const body = `
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Dashboard</h1>
+  </div>
+  <h2 class="text-lg font-semibold mb-2">Recovery</h2>
+  ${gaugePeriodForm(gaugeOptions, gaugeSelector)}
+  ${gaugeCardsSection(gauges)}
+  `;
+  return layout({ title: `Dashboard - ${propertyName}`, user, active: '/dashboard', body });
+}
 
 function siteBillingListPage({ user, rows, basePath = '/site-billing', pageTitle = 'Billing Slips', newLabel = '+ New billing slip', emptyLabel = '"+ New billing slip"' }) {
   const body = `
@@ -1991,4 +2050,5 @@ module.exports = {
   recoveryPage,
   flaggingPage, flaggingSettingsPage,
   rechargeExportPage,
+  flatSiteDashboardPage,
 };
