@@ -24,6 +24,7 @@ const cityDeepFlagging = require('./city-deep/flagging_data');
 const wingfieldFlagging = require('./wingfield/flagging_data');
 const flatSiteFlagging = require('./flat_site_flagging_data');
 const rechargeExport = require('./recharge_export');
+const dashboardGauges = require('./dashboard_gauges');
 
 const PORT = process.env.PORT || 8787;
 const DEFAULT_PROPERTY_SLUG = properties[0].slug;
@@ -358,7 +359,7 @@ function monthlyTrendForTenant(tenantId, asOfStartDate, isWingfield) {
   return rows.reverse();
 }
 
-function dashboardData(periodId) {
+function dashboardData(periodId, propSlug) {
   const period = periodId ? get('SELECT * FROM billing_periods WHERE id=?', [periodId]) : latestPeriod();
   const activeTenants = get("SELECT COUNT(*) c FROM tenants WHERE status='active'").c;
   const billedThisMonth = period ? get('SELECT COUNT(DISTINCT tenant_id) c FROM bills WHERE billing_period_id=?', [period.id]).c : 0;
@@ -375,13 +376,17 @@ function dashboardData(periodId) {
     JOIN tenants t ON t.id=b.tenant_id JOIN billing_periods bp ON bp.id=b.billing_period_id
     ORDER BY b.generated_at DESC LIMIT 8`);
   const allPeriods = all('SELECT * FROM billing_periods ORDER BY start_date DESC');
+  // "Billed to Tenants vs Recovered" gauges (see dashboard_gauges.js) - reuses this function's own
+  // consumption.e/consumption.w (the plain property-wide SUM already computed above) as the "billed"
+  // side, so the gauge and the stat cards above it can never silently disagree.
+  const gauges = dashboardGauges.gaugesForProperty(currentDb(), propSlug, period, { elecKwh: consumption.e, waterKl: consumption.w });
   return {
     stats: {
       activeTenants, billedThisMonth, missingCount: missing.length, draftBills, finalisedBills,
       totalElecBilled: totals.elecBilled, totalWaterBilled: totals.waterBilled, totalBilled,
       totalElecKwh: consumption.e, totalWaterKl: consumption.w,
     },
-    recentBills, missing, currentPeriod: period, allPeriods,
+    recentBills, missing, currentPeriod: period, allPeriods, gauges,
   };
 }
 
@@ -437,7 +442,7 @@ route('GET', '/dashboard', async (req, res, params, query) => {
   // billing slips - so /site-billing (its own list page) stands in as this property's "dashboard".
   const currentProp = properties.find((p) => p.slug === user.currentProperty);
   if (currentProp && currentProp.billingModel === 'flat_site') return redirect(res, '/site-billing');
-  const data = dashboardData(query.periodId);
+  const data = dashboardData(query.periodId, user.currentProperty);
   send(res, 200, views.dashboardPage({ user, ...data }));
 });
 

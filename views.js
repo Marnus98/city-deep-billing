@@ -146,7 +146,34 @@ function statCard(label, value, sub) {
   </div>`;
 }
 
-function dashboardPage({ user, stats, recentBills, missing, currentPeriod, allPeriods }) {
+// Linear "gauge" bar - a labeled horizontal bar whose fill length is proportional to `value` against
+// `max` (shared across every bar in the same card, so bars are visually comparable to each other,
+// not just to their own 100%). Client explicitly asked for "just totals" (2026-09-21), not a
+// percentage/ratio gauge, so the number shown is always the raw total (kWh/kL) - the bar length is
+// only a visual aid for comparing the two (or three) totals in one card at a glance.
+function linearGauge(label, value, unit, colorClass, max) {
+  const pct = max > 0 ? Math.min(100, Math.max(0, (Math.abs(value) / max) * 100)) : 0;
+  return `
+  <div class="mb-3 last:mb-0">
+    <div class="flex justify-between text-sm mb-1">
+      <span class="text-slate-500">${esc(label)}</span>
+      <span class="font-semibold">${fmtNum(value, 0)} ${esc(unit)}</span>
+    </div>
+    <div class="w-full bg-slate-100 rounded-full h-3">
+      <div class="${colorClass} h-3 rounded-full" style="width:${pct}%"></div>
+    </div>
+  </div>`;
+}
+function utilityGaugeCard(title, unit, bars) {
+  const max = Math.max(1, ...bars.map((b) => Math.abs(b.value))) * 1.05;
+  return `
+  <div class="bg-white rounded-lg border p-4">
+    <div class="font-semibold mb-3">${esc(title)}</div>
+    ${bars.map((b) => linearGauge(b.label, b.value, unit, b.colorClass, max)).join('')}
+  </div>`;
+}
+
+function dashboardPage({ user, stats, recentBills, missing, currentPeriod, allPeriods, gauges }) {
   const body = `
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold">Dashboard</h1>
@@ -172,6 +199,18 @@ function dashboardPage({ user, stats, recentBills, missing, currentPeriod, allPe
     ${statCard('Total electricity consumption', fmtNum(stats.totalElecKwh, 0) + ' kWh')}
     ${statCard('Total water consumption', fmtNum(stats.totalWaterKl, 0) + ' kL')}
   </div>
+  ${gauges ? `
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    ${utilityGaugeCard('Electricity - Billed vs Recovered', 'kWh', [
+      { label: 'Billed to Tenants (net of solar)', value: gauges.elecBilledKwh, colorClass: 'bg-slate-900' },
+      ...(gauges.hasSolar ? [{ label: 'Solar (Fortress)', value: gauges.solarKwh, colorClass: 'bg-amber-400' }] : []),
+      { label: `Recovered (Municipal${gauges.hasSolar ? ' + Solar' : ''})`, value: gauges.elecRecoveredKwh, colorClass: 'bg-blue-600' },
+    ])}
+    ${utilityGaugeCard('Water - Billed vs Recovered', 'kL', [
+      { label: 'Billed to Tenants', value: gauges.waterBilledKl, colorClass: 'bg-slate-900' },
+      { label: 'Recovered (Municipal)', value: gauges.waterRecoveredKl, colorClass: 'bg-blue-600' },
+    ])}
+  </div>` : ''}
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     <div class="bg-white rounded-lg border">
       <div class="px-4 py-3 border-b font-semibold">Recently generated billing slips</div>
