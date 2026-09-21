@@ -146,54 +146,90 @@ function statCard(label, value, sub) {
   </div>`;
 }
 
-// Linear "gauge" bar - a labeled horizontal bar whose fill length is proportional to `value` against
-// `max` (shared across every bar in the same card, so bars are visually comparable to each other,
-// not just to their own 100%). Client explicitly asked for "just totals" (2026-09-21), not a
-// percentage/ratio gauge, so the number shown is always the raw total (kWh/kL) - the bar length is
-// only a visual aid for comparing the two (or three) totals in one card at a glance.
-function linearGauge(label, value, colorClass, max, formatFn) {
-  const pct = max > 0 ? Math.min(100, Math.max(0, (Math.abs(value) / max) * 100)) : 0;
+// Semi-circular "speedometer" dial gauges (client ask, 2026-09-28, with a reference image of a
+// red/orange/yellow/light-green/green "PERFORMANCE" dial): each dial's 5 colored bands are purely
+// decorative context - there's no pass/fail threshold for a Rand or kWh total - the needle just
+// points to where `value` sits against `max` (the scale shared by every dial in the same gaugeGroup,
+// so dials stay visually comparable to each other). Client's "just totals" instruction (2026-09-21)
+// still holds: the printed number under each dial is always the real total, never a percentage.
+const GAUGE_BAND_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'];
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+  const rad = (angleDeg * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
+}
+
+function donutSegmentPath(cx, cy, rOuter, rInner, angleStart, angleEnd) {
+  const p1 = polarToCartesian(cx, cy, rOuter, angleStart);
+  const p2 = polarToCartesian(cx, cy, rOuter, angleEnd);
+  const p3 = polarToCartesian(cx, cy, rInner, angleEnd);
+  const p4 = polarToCartesian(cx, cy, rInner, angleStart);
+  return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${rOuter} ${rOuter} 0 0 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)} L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)} A ${rInner} ${rInner} 0 0 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)} Z`;
+}
+
+// One dial: 5 fixed 36-degree bands (red...green, left to right) plus a needle. `formatFn` renders
+// the raw total shown under the dial (money() for Rand, "1,234 kWh"/"1,234 kL" for consumption).
+function speedometerGauge(label, value, max, formatFn) {
+  const cx = 110, cy = 105, rOuter = 95, rInner = 58;
+  const bands = GAUGE_BAND_COLORS.map((color, i) => {
+    const aStart = 180 - i * 36;
+    const aEnd = 180 - (i + 1) * 36;
+    return `<path d="${donutSegmentPath(cx, cy, rOuter, rInner, aStart, aEnd)}" fill="${color}"/>`;
+  }).join('');
+  const pct = max > 0 ? Math.min(1, Math.max(0, Math.abs(value) / max)) : 0;
+  const needleAngle = 180 - pct * 180;
+  const tip = polarToCartesian(cx, cy, rInner - 6, needleAngle);
+  return `
+  <div class="flex flex-col items-center">
+    <svg viewBox="0 0 220 120" class="w-full max-w-[180px]">
+      ${bands}
+      <line x1="${cx}" y1="${cy}" x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="7" fill="#1e293b"/>
+    </svg>
+    <div class="text-sm font-bold -mt-2">${formatFn(value)}</div>
+    <div class="text-xs text-slate-500 text-center leading-tight">${esc(label)}</div>
+  </div>`;
+}
+
+// A titled row of dials sharing one `max` scale (each item: {label, value, formatFn}).
+function gaugeGroup(title, gauges) {
+  if (!gauges || !gauges.length) return '';
+  const max = Math.max(1, ...gauges.map((g) => Math.abs(g.value))) * 1.05;
   return `
   <div class="mb-3 last:mb-0">
-    <div class="flex justify-between text-sm mb-1">
-      <span class="text-slate-500">${esc(label)}</span>
-      <span class="font-semibold">${formatFn(value)}</span>
-    </div>
-    <div class="w-full bg-slate-100 rounded-full h-3">
-      <div class="${colorClass} h-3 rounded-full" style="width:${pct}%"></div>
+    <div class="text-xs uppercase tracking-wide text-slate-400 mb-1">${esc(title)}</div>
+    <div class="grid gap-1" style="grid-template-columns: repeat(${gauges.length}, minmax(0,1fr));">
+      ${gauges.map((g) => speedometerGauge(g.label, g.value, max, g.formatFn)).join('')}
     </div>
   </div>`;
 }
-function utilityGaugeCard(title, unit, bars) {
-  const max = Math.max(1, ...bars.map((b) => Math.abs(b.value))) * 1.05;
-  const formatFn = (v) => `${fmtNum(v, 0)} ${unit}`;
-  return `
-  <div class="bg-white rounded-lg border p-4">
-    <div class="font-semibold mb-3">${esc(title)}</div>
-    ${bars.map((b) => linearGauge(b.label, b.value, b.colorClass, max, formatFn)).join('')}
-  </div>`;
-}
-// Rand gauge card - same bar visual as utilityGaugeCard, plus a net over/under recovery line
-// underneath (client ask, 2026-09-28): "Billed to tenants, Recovered ... net over/under recovery
-// below it". Positive net = billed more than it cost to recover (over-recovered); negative = under-
-// recovered - same sign convention flat_site_recovery.js/tenant_recovery.js's own totalRecoveryRand
-// already uses, so this always agrees with the Recovery page for the same period(s).
-function recoveryRandGaugeCard(title, billedLabel, billedRand, recoveredLabel, recoveredRand) {
-  const max = Math.max(1, Math.abs(billedRand), Math.abs(recoveredRand)) * 1.05;
-  const formatFn = (v) => money(v);
-  const net = billedRand - recoveredRand;
+
+// Net over/under recovery line (client ask, 2026-09-28): positive = billed more than it cost to
+// recover (over-recovered); negative = under-recovered - same sign convention
+// flat_site_recovery.js/tenant_recovery.js's own totalRecoveryRand already uses.
+function netRecoveryLine(billed, recovered) {
+  const net = billed - recovered;
   const over = net >= 0;
   return `
-  <div class="bg-white rounded-lg border p-4">
-    <div class="font-semibold mb-3">${esc(title)}</div>
-    ${linearGauge(billedLabel, billedRand, 'bg-slate-900', max, formatFn)}
-    ${linearGauge(recoveredLabel, recoveredRand, 'bg-blue-600', max, formatFn)}
-    <div class="mt-3 pt-3 border-t flex justify-between items-center">
-      <span class="text-sm text-slate-500">Net ${over ? 'Over' : 'Under'}-Recovery</span>
-      <span class="font-bold ${over ? 'text-emerald-600' : 'text-red-600'}">${money(Math.abs(net))} ${over ? 'over-recovered' : 'under-recovered'}</span>
-    </div>
+  <div class="mt-2 pt-2 border-t flex justify-between items-center">
+    <span class="text-sm text-slate-500">Net ${over ? 'Over' : 'Under'}-Recovery</span>
+    <span class="font-bold ${over ? 'text-emerald-600' : 'text-red-600'}">${money(Math.abs(net))} ${over ? 'over-recovered' : 'under-recovered'}</span>
   </div>`;
 }
+
+// One utility's card: an optional consumption (kWh/kL) dial group, a Rand dial group, and the net
+// over/under-recovery line. Sewer has no consumption group of its own (client: "the kL is the same
+// as the Water"), so `unitGroupHtml` is '' for Sewer.
+function utilitySectionCard(title, unitGroupHtml, randGroupHtml, netBilled, netRecovered) {
+  return `
+  <div class="bg-white rounded-lg border p-4">
+    <div class="font-semibold mb-2">${esc(title)}</div>
+    ${unitGroupHtml || ''}
+    ${randGroupHtml || ''}
+    ${netRecoveryLine(netBilled, netRecovered)}
+  </div>`;
+}
+
 // The gauge period dropdown - every month (newest first) grouped under a "<year> - Year to Date"
 // entry per year (see dashboard_gauges.js's periodOptionsForProperty) - shared by both the
 // tenant-model dashboard and the flat_site one so the control looks/behaves identically everywhere.
@@ -206,21 +242,43 @@ function gaugePeriodForm(gaugeOptions, gaugeSelector) {
     </select>
   </form>`;
 }
+// 3 utility sections (Electricity, Water, Sewer), each Billed-to-Tenants vs Municipality, in the
+// units the client asked for (2026-09-28): Electricity in kWh + Rand, Water in kL + Rand, Sewer in
+// Rand only.
 function gaugeCardsSection(gauges) {
   if (!gauges) return '<p class="text-sm text-slate-500">No billing data yet.</p>';
+  const kwhFmt = (v) => `${fmtNum(v, 0)} kWh`;
+  const klFmt = (v) => `${fmtNum(v, 0)} kL`;
+  const randFmt = (v) => money(v);
+
+  const elecKwhGauges = [
+    { label: 'Billed to Tenants (net of solar)', value: gauges.elecBilledKwh, formatFn: kwhFmt },
+    ...(gauges.hasSolar ? [{ label: 'Solar (Fortress)', value: gauges.solarKwh, formatFn: kwhFmt }] : []),
+    { label: `Municipality${gauges.hasSolar ? ' + Solar' : ''}`, value: gauges.elecRecoveredKwh, formatFn: kwhFmt },
+  ];
+  const elecRandGauges = [
+    { label: 'Billed to Tenants', value: gauges.elecBilledRand, formatFn: randFmt },
+    ...(gauges.hasSolar ? [{ label: 'Solar cost (Fortress)', value: gauges.solarCostRand, formatFn: randFmt }] : []),
+    { label: `Municipality${gauges.hasSolar ? ' + Solar cost' : ''}`, value: gauges.elecRecoveredRand, formatFn: randFmt },
+  ];
+  const waterKlGauges = [
+    { label: 'Billed to Tenants', value: gauges.waterBilledKl, formatFn: klFmt },
+    { label: 'Municipality', value: gauges.waterRecoveredKl, formatFn: klFmt },
+  ];
+  const waterRandGauges = [
+    { label: 'Billed to Tenants', value: gauges.waterBilledRand, formatFn: randFmt },
+    { label: 'Municipality', value: gauges.waterRecoveredRand, formatFn: randFmt },
+  ];
+  const sewerRandGauges = [
+    { label: 'Billed to Tenants', value: gauges.sewerBilledRand, formatFn: randFmt },
+    { label: 'Municipality', value: gauges.sewerRecoveredRand, formatFn: randFmt },
+  ];
+
   return `
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-    ${utilityGaugeCard('Electricity - Billed vs Recovered', 'kWh', [
-      { label: 'Billed to Tenants (net of solar)', value: gauges.elecBilledKwh, colorClass: 'bg-slate-900' },
-      ...(gauges.hasSolar ? [{ label: 'Solar (Fortress)', value: gauges.solarKwh, colorClass: 'bg-amber-400' }] : []),
-      { label: `Recovered (Municipal${gauges.hasSolar ? ' + Solar' : ''})`, value: gauges.elecRecoveredKwh, colorClass: 'bg-blue-600' },
-    ])}
-    ${utilityGaugeCard('Water - Billed vs Recovered', 'kL', [
-      { label: 'Billed to Tenants', value: gauges.waterBilledKl, colorClass: 'bg-slate-900' },
-      { label: 'Recovered (Municipal)', value: gauges.waterRecoveredKl, colorClass: 'bg-blue-600' },
-    ])}
-    ${recoveryRandGaugeCard('Recovery (Rand, excl. VAT)', 'Billed to Tenants', gauges.billedRand,
-      `Recovered (Municipal${gauges.hasSolar ? ' + Solar cost' : ''})`, gauges.recoveredRand)}
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    ${utilitySectionCard('Electricity', gaugeGroup('kWh', elecKwhGauges), gaugeGroup('Rand (excl. VAT)', elecRandGauges), gauges.elecBilledRand, gauges.elecRecoveredRand)}
+    ${utilitySectionCard('Water', gaugeGroup('kL', waterKlGauges), gaugeGroup('Rand (excl. VAT)', waterRandGauges), gauges.waterBilledRand, gauges.waterRecoveredRand)}
+    ${utilitySectionCard('Sewer', '', gaugeGroup('Rand (excl. VAT)', sewerRandGauges), gauges.sewerBilledRand, gauges.sewerRecoveredRand)}
   </div>`;
 }
 

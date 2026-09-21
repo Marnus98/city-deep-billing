@@ -70,25 +70,46 @@ function latestLabel(db, billingModel) {
 }
 
 // ---------------- per-billing-model totals, accumulated across 1+ periods/labels ----------------
+// Every gauge card now breaks Rand out per utility (client ask 2026-09-28: "Electricity...kWh and
+// Rand value. Water...kL and Rand value. Sewer...Rand value") instead of one combined Rand total -
+// sewer has no kL figure of its own since it's billed on the same reading as water (see
+// tenant_recovery.js/flat_site_recovery.js's own sewerKl-reuses-waterKl comments).
 function emptyTotals(hasSolar) {
   return {
     hasSolar,
     elecBilledKwh: 0, elecRecoveredKwh: 0, solarKwh: 0,
+    elecBilledRand: 0, elecRecoveredRand: 0, solarCostRand: 0,
     waterBilledKl: 0, waterRecoveredKl: 0,
-    billedRand: 0, recoveredRand: 0, solarCostRand: 0,
+    waterBilledRand: 0, waterRecoveredRand: 0,
+    sewerBilledRand: 0, sewerRecoveredRand: 0,
   };
 }
 
 function cityDeepTotalsForPeriods(db, periods) {
   let billedElecKwh = 0, billedWaterKl = 0, municElecKwh = 0, municWaterKl = 0;
-  let billedRand = 0, municipalRand = 0, solarCostRand = 0, solarKwh = 0;
+  let billedElecRand = 0, billedWaterRand = 0, billedSewerRand = 0;
+  let municElecRand = 0, municWaterRand = 0, municSewerRand = 0;
+  let solarCostRand = 0, solarKwh = 0;
   for (const period of periods) {
     for (const section of recoveryGroups.SECTIONS) {
       const tenantNames = recoveryGroups.tenantNamesForSection(db, section.key);
       const site = tenantNames.length ? tenantRecovery.siteSideForTenants(db, tenantNames, period.id) : null;
       const municipal = tenantRecovery.municipalSideFor(db, section.siteNameForMunicipal, period.start_date, period.end_date);
-      if (site) { billedElecKwh += site.elecKwh; billedWaterKl += site.waterKl; billedRand += site.elecRand + site.waterRand + site.sewerRand; }
-      if (municipal) { municElecKwh += municipal.elecKwh; municWaterKl += municipal.waterKl; municipalRand += municipal.elecRand + municipal.waterRand + municipal.sewerRand; }
+      if (site) {
+        billedElecKwh += site.elecKwh; billedWaterKl += site.waterKl;
+        billedElecRand += site.elecRand; billedWaterRand += site.waterRand; billedSewerRand += site.sewerRand;
+      }
+      if (municipal) {
+        municElecKwh += municipal.elecKwh; municWaterKl += municipal.waterKl;
+        municElecRand += municipal.elecRand; municWaterRand += municipal.waterRand; municSewerRand += municipal.sewerRand;
+      }
+      // Solar cost (the real Capital Propfund invoice, see city-deep/solar_cost.js) is a real
+      // electricity-only cost, so it's added onto the Electricity Rand "Municipality" gauge here -
+      // deliberately different from the whole-property Recovery page's own totalRecoveryRand
+      // (which keeps it out of any single utility's Rand to avoid distorting that page's
+      // meter-accuracy comparison - see tenant_recovery.js's own comment). This gauge's job is a
+      // straightforward "what did electricity really cost to supply" figure instead, so folding it
+      // into Electricity specifically is the more useful (and more literal) answer here.
       solarCostRand += solarCost.solarCostForSection(db, section.key)(period.label);
     }
     const slips = solar.getSolarSlips(db, period.id);
@@ -97,40 +118,62 @@ function cityDeepTotalsForPeriods(db, periods) {
   return {
     hasSolar: true,
     elecBilledKwh: round1(billedElecKwh - solarKwh), elecRecoveredKwh: round1(municElecKwh + solarKwh), solarKwh: round1(solarKwh),
+    elecBilledRand: round2(billedElecRand), elecRecoveredRand: round2(municElecRand + solarCostRand), solarCostRand: round2(solarCostRand),
     waterBilledKl: round1(billedWaterKl), waterRecoveredKl: round1(municWaterKl),
-    billedRand: round2(billedRand), recoveredRand: round2(municipalRand + solarCostRand), solarCostRand: round2(solarCostRand),
+    waterBilledRand: round2(billedWaterRand), waterRecoveredRand: round2(municWaterRand),
+    sewerBilledRand: round2(billedSewerRand), sewerRecoveredRand: round2(municSewerRand),
   };
 }
 
 function wingfieldTotalsForPeriods(db, periods) {
-  let billedElecKwh = 0, billedWaterKl = 0, municElecKwh = 0, municWaterKl = 0, billedRand = 0, municipalRand = 0;
+  let billedElecKwh = 0, billedWaterKl = 0, municElecKwh = 0, municWaterKl = 0;
+  let billedElecRand = 0, billedWaterRand = 0, billedSewerRand = 0;
+  let municElecRand = 0, municWaterRand = 0, municSewerRand = 0;
   for (const period of periods) {
     const site = tenantRecovery.siteSideFor(db, 'Wingfield Business Park', period.id);
     const municipal = tenantRecovery.municipalSideFor(db, 'Wingfield Business Park', period.start_date, period.end_date);
-    if (site) { billedElecKwh += site.elecKwh; billedWaterKl += site.waterKl; billedRand += site.elecRand + site.waterRand + site.sewerRand; }
-    if (municipal) { municElecKwh += municipal.elecKwh; municWaterKl += municipal.waterKl; municipalRand += municipal.elecRand + municipal.waterRand + municipal.sewerRand; }
+    if (site) {
+      billedElecKwh += site.elecKwh; billedWaterKl += site.waterKl;
+      billedElecRand += site.elecRand; billedWaterRand += site.waterRand; billedSewerRand += site.sewerRand;
+    }
+    if (municipal) {
+      municElecKwh += municipal.elecKwh; municWaterKl += municipal.waterKl;
+      municElecRand += municipal.elecRand; municWaterRand += municipal.waterRand; municSewerRand += municipal.sewerRand;
+    }
   }
   return {
     hasSolar: false,
     elecBilledKwh: round1(billedElecKwh), elecRecoveredKwh: round1(municElecKwh), solarKwh: 0,
+    elecBilledRand: round2(billedElecRand), elecRecoveredRand: round2(municElecRand), solarCostRand: 0,
     waterBilledKl: round1(billedWaterKl), waterRecoveredKl: round1(municWaterKl),
-    billedRand: round2(billedRand), recoveredRand: round2(municipalRand), solarCostRand: 0,
+    waterBilledRand: round2(billedWaterRand), waterRecoveredRand: round2(municWaterRand),
+    sewerBilledRand: round2(billedSewerRand), sewerRecoveredRand: round2(municSewerRand),
   };
 }
 
 function flatSiteTotalsForLabels(db, labels) {
-  let billedElecKwh = 0, billedWaterKl = 0, municElecKwh = 0, municWaterKl = 0, billedRand = 0, municipalRand = 0;
+  let billedElecKwh = 0, billedWaterKl = 0, municElecKwh = 0, municWaterKl = 0;
+  let billedElecRand = 0, billedWaterRand = 0, billedSewerRand = 0;
+  let municElecRand = 0, municWaterRand = 0, municSewerRand = 0;
   for (const label of labels) {
     const site = flatSiteRecovery.siteSideFor(db, label);
     const municipal = flatSiteRecovery.municipalSideFor(db, label);
-    if (site) { billedElecKwh += site.elecKwh; billedWaterKl += site.waterKl; billedRand += site.elecRand + site.waterRand + site.sewerRand; }
-    if (municipal) { municElecKwh += municipal.elecKwh; municWaterKl += municipal.waterKl; municipalRand += municipal.elecRand + municipal.waterRand + municipal.sewerRand; }
+    if (site) {
+      billedElecKwh += site.elecKwh; billedWaterKl += site.waterKl;
+      billedElecRand += site.elecRand; billedWaterRand += site.waterRand; billedSewerRand += site.sewerRand;
+    }
+    if (municipal) {
+      municElecKwh += municipal.elecKwh; municWaterKl += municipal.waterKl;
+      municElecRand += municipal.elecRand; municWaterRand += municipal.waterRand; municSewerRand += municipal.sewerRand;
+    }
   }
   return {
     hasSolar: false,
     elecBilledKwh: round1(billedElecKwh), elecRecoveredKwh: round1(municElecKwh), solarKwh: 0,
+    elecBilledRand: round2(billedElecRand), elecRecoveredRand: round2(municElecRand), solarCostRand: 0,
     waterBilledKl: round1(billedWaterKl), waterRecoveredKl: round1(municWaterKl),
-    billedRand: round2(billedRand), recoveredRand: round2(municipalRand), solarCostRand: 0,
+    waterBilledRand: round2(billedWaterRand), waterRecoveredRand: round2(municWaterRand),
+    sewerBilledRand: round2(billedSewerRand), sewerRecoveredRand: round2(municSewerRand),
   };
 }
 
