@@ -121,15 +121,33 @@ function billLineItemsTotal(db, tenantId, periodId, bucket) {
   return round2(rows.reduce((s, r) => s + r.amount, 0));
 }
 
-// Sums a utility-code bucket across every tenant row whose name matches one of `tenantNames` (more
-// than one when several DB tenant rows/units are meant to combine into a single external code - e.g.
-// Agrana's 2 Industrial Park units, Skillcraft's 5A/5B, Teraoka's 6A&B/6C, Uber Nutrition's Unit
-// 6+7, Twinpouch's Unit 4+5 - see the client's own Tenant_Building_Codes.xlsx, which lists each of
-// these as ONE tenant code covering multiple physical units).
-function tenantModelAmount(db, propSlug, tenantNames, periodId, utilityCode) {
+// Resolves the tenant row(s) backing a `tenantRow(...)` src: every tenant whose name matches one of
+// `tenantNames` (more than one name only used for Kimmo-style aliasing; the usual multi-unit case is
+// ONE name shared by several tenant rows - e.g. Skillcraft's 5A/5B, Teraoka's 6A&B/6C, Uber
+// Nutrition's Unit 6+7, Twinpouch's Unit 4+5 - see the client's own Tenant_Building_Codes.xlsx,
+// which lists each of these as ONE tenant code covering multiple physical units). `excludeUnits`
+// (optional) excludes specific units of that name from the sum - added 2026-09-23 for Agrana, whose
+// 3 units (2B, 2C, 5) do NOT all combine into one code the way the others above do: Unit 5 (Mini
+// Park) has its own separate code (223458, via tenant_by_id_name below) and was being silently
+// double-counted into Industrial Park code 223366 too, since a bare name match can't tell the two
+// apart on its own - found by diffing the client's real "CSV Lisa" files (2026-05/06) against this
+// module's output: code 223366's EL00/WT00 were consistently ~1.1%/~9.7% too high, exactly matching
+// Unit 5's own EL00/WT00 figures to the cent.
+function resolveTenantIds(db, tenantNames, excludeUnits) {
+  let sql = `SELECT id FROM tenants WHERE name IN (${tenantNames.map(() => '?').join(',')})`;
+  const params = [...tenantNames];
+  if (excludeUnits && excludeUnits.length) {
+    sql += ` AND (unit IS NULL OR unit NOT IN (${excludeUnits.map(() => '?').join(',')}))`;
+    params.push(...excludeUnits);
+  }
+  return all(db, sql, params).map((t) => t.id);
+}
+
+// Sums a utility-code bucket across every resolved tenant id (see resolveTenantIds above).
+function tenantModelAmount(db, propSlug, tenantNames, periodId, utilityCode, excludeUnits) {
   const bucket = CATEGORY_BUCKETS[propSlug][utilityCode];
-  const tenants = all(db, `SELECT id FROM tenants WHERE name IN (${tenantNames.map(() => '?').join(',')})`, tenantNames);
-  return round2(tenants.reduce((s, t) => s + billLineItemsTotal(db, t.id, periodId, bucket), 0));
+  const tenantIds = resolveTenantIds(db, tenantNames, excludeUnits);
+  return round2(tenantIds.reduce((s, id) => s + billLineItemsTotal(db, id, periodId, bucket), 0));
 }
 
 // The Core Computer Business (Wingfield tenant id 2, code 151) - client chose to break EL00 out
@@ -155,20 +173,30 @@ function billingPeriod(db, label) {
   return get(db, 'SELECT * FROM billing_periods WHERE label=?', [label]);
 }
 
-// EL01 "Solar Credit" - net solar-used Rand value from the same Solar Billing Slips report shown on
-// screen (solar.js), as a negative credit. Only ever called for the 4 tenants the client confirmed
-// (agrana/lesco/hudaco/teraoka) - see file header note #2.
+// EL01 "Solar Credit" is only a PORTION of the tenant's own net solar-used Rand value from the same
+// Solar Billing Slips report shown on screen (solar.js) - City Deep keeps the rest, only passes this
+// share through as a credit. Confirmed 2026-09-23 by diffing 2 months of the client's own real "CSV
+// Lisa" files against this module's prior (100%) output: Lesco's real EL01 = exactly 20% of
+// solar.js's total.solarUsed.rand for BOTH months checked, Hudaco's = exactly 12%, both to the cent.
+// Agrana and Teraoka are DELIBERATELY left un-scaled (share 1 = 100%, the same wrong value as
+// before) rather than guessed at: Agrana's real figures are close to but not an exact match for any
+// clean percentage of this module's current solarUsed baseline (~4.0-4.01% across the 2 months, not
+// quite stable to the cent), and Teraoka's aren't even consistent between the 2 months (~19.28% vs
+// ~19.55%) - scaling those two on a guessed share risks putting a wrong number on a real tenant
+// invoice. Flagged to the client for the correct share (or underlying formula) before scaling them.
+const SOLAR_CREDIT_SHARE = { lesco: 0.20, hudaco: 0.12 };
 function solarCreditAmount(cityDeepDb, periodId, solarKey) {
   const slips = solar.getSolarSlips(cityDeepDb, periodId);
   const slip = slips.find((s) => s.key === solarKey);
   if (!slip) return 0;
-  return round2(-slip.total.solarUsed.rand);
+  const share = SOLAR_CREDIT_SHARE[solarKey] != null ? SOLAR_CREDIT_SHARE[solarKey] : 1;
+  return round2(-slip.total.solarUsed.rand * share);
 }
 
 // ---------------- the row template ----------------
 // file: 'BEV' | 'LISA'. src describes how to compute the amount:
 //   { kind:'flat_site', slug, part:'elec'|'water'|'sewer' }
-//   { kind:'tenant', slug:'city-deep'|'wingfield', names:[...], utilityCode }
+//   { kind:'tenant', slug:'city-deep'|'wingfield', names:[...], utilityCode, excludeUnits?:[...] }
 //   { kind:'core_meter', serial }
 //   { kind:'solar_credit', solarKey }
 //   { kind:'unresolved', note }  - no live data source yet; always renders 0 and gets flagged
@@ -179,7 +207,9 @@ function flatSite(slug) {
     sewer: { kind: 'flat_site', slug, part: 'sewer' },
   };
 }
-function tenantRow(slug, names, utilityCode) { return { kind: 'tenant', slug, names, utilityCode }; }
+function tenantRow(slug, names, utilityCode, opts) {
+  return { kind: 'tenant', slug, names, utilityCode, excludeUnits: opts && opts.excludeUnits };
+}
 
 const ROWS = [
   // ---- CSV BEV: AutoZone (79) + Wingfield (38) ----
@@ -241,8 +271,8 @@ const ROWS = [
   { file: 'LISA', building: 2, tenantCode: 223363, tenantCode2: 223363, utility: 'EL00', src: tenantRow('city-deep', ['Kimmo (Pty) Ltd'], 'EL00') },
   { file: 'LISA', building: 2, tenantCode: 223363, tenantCode2: 223363, utility: 'WT00', src: tenantRow('city-deep', ['Kimmo (Pty) Ltd'], 'WT00') },
 
-  { file: 'LISA', building: 2, tenantCode: 223366, tenantCode2: 223366, utility: 'EL00', src: tenantRow('city-deep', ['Agrana Fruit South Africa (Pty) Ltd'], 'EL00') },
-  { file: 'LISA', building: 2, tenantCode: 223366, tenantCode2: 223366, utility: 'WT00', src: tenantRow('city-deep', ['Agrana Fruit South Africa (Pty) Ltd'], 'WT00') },
+  { file: 'LISA', building: 2, tenantCode: 223366, tenantCode2: 223366, utility: 'EL00', src: tenantRow('city-deep', ['Agrana Fruit South Africa (Pty) Ltd'], 'EL00', { excludeUnits: ['Unit 5'] }) },
+  { file: 'LISA', building: 2, tenantCode: 223366, tenantCode2: 223366, utility: 'WT00', src: tenantRow('city-deep', ['Agrana Fruit South Africa (Pty) Ltd'], 'WT00', { excludeUnits: ['Unit 5'] }) },
   { file: 'LISA', building: 2, tenantCode: 223366, tenantCode2: 223366, utility: 'EL01', src: { kind: 'solar_credit', solarKey: 'agrana' } },
 
   { file: 'LISA', building: 2, tenantCode: 223347, tenantCode2: 223347, utility: 'EL00', src: tenantRow('city-deep', ['Lesco Manufacturing (Pty) Ltd'], 'EL00') },
@@ -398,9 +428,9 @@ function resolveRow(propertyDbs, label, row) {
     const db = propertyDbs.get(src.slug);
     const period = db && billingPeriod(db, label);
     if (!period) return { amount: 0, startDate: null, endDate: null, flag: `No billing period "${label}" yet on ${src.slug}.` };
-    const amount = tenantModelAmount(db, src.slug, src.names, period.id, src.utilityCode);
-    const tenants = all(db, `SELECT id FROM tenants WHERE name IN (${src.names.map(() => '?').join(',')})`, src.names);
-    const dates = tenantDatesForRow(db, tenants.map((t) => t.id), period);
+    const amount = tenantModelAmount(db, src.slug, src.names, period.id, src.utilityCode, src.excludeUnits);
+    const tenantIds = resolveTenantIds(db, src.names, src.excludeUnits);
+    const dates = tenantDatesForRow(db, tenantIds, period);
     return { amount, startDate: dates.startDate, endDate: dates.endDate, flag: null };
   }
   if (src.kind === 'tenant_by_id_name') {
