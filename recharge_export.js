@@ -90,9 +90,15 @@ function flatSiteFigures(db, label) {
 // Per-property category -> utility-code bucket (see server.js research: category strings differ
 // between the two properties' calc engines even though the concepts are the same).
 const CATEGORY_BUCKETS = {
+  // City Deep's own recharge template (see file header) has no separate SE00 row per tenant, so
+  // rather than silently dropping sanitation charges from the monthly recharge, WT00 here is defined
+  // as water+sewer COMBINED (client instruction, 2026-09-22: "do the total of what WT00 and SE00
+  // would have been together under the WT00 utility code for City deep only"). SE00 is left defined
+  // below (harmless, and useful if a City Deep row ever needs the sewer-only figure directly) but no
+  // ROWS entry uses it for City Deep - Wingfield's WT00/SE00 stay genuinely split as before.
   'city-deep': {
     EL00: { utility_type: 'electricity' }, // every electricity category rolls up here
-    WT00: { categories: ['water_charge', 'water_surcharge', 'water_levy'] },
+    WT00: { categories: ['water_charge', 'water_surcharge', 'water_levy', 'sanitation', 'sanitation_surcharge'] },
     SE00: { categories: ['sanitation', 'sanitation_surcharge'] },
   },
   wingfield: {
