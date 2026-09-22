@@ -201,11 +201,15 @@ function recoveryGauge(billed, totalSupplied, formatFn, opts = {}) {
   const pct = totalSupplied !== 0 ? (billed / totalSupplied) * 100 : 0;
   const pctCapped = Math.max(0, Math.min(100, pct));
   const color = recoveryColorFor(pct);
-  const cx = 70, cy = 68, rOuter = 56, rInner = 34;
+  // cy=82/rOuter=50 (not 68/56 as before) leaves real headroom above the arc for the "50%" tick
+  // label - the old geometry put that label just 4px from the top of an 84-tall viewBox, so it
+  // clipped out of the SVG and visually collided with the tile's title text above it ("does not
+  // fit", 2026-09-30). viewBox is now 140x100 to match.
+  const cx = 70, cy = 82, rOuter = 50, rInner = 30;
   const arcPath = donutSegmentPath(cx, cy, rOuter, rInner, 180, 0);
   const needleAngle = 180 - (pctCapped / 100) * 180;
   const tip = polarToCartesian(cx, cy, rInner - 4, needleAngle);
-  const topTick = polarToCartesian(cx, cy, rOuter + 8, 90);
+  const topTick = polarToCartesian(cx, cy, rOuter + 10, 90);
   const tick25 = polarToCartesian(cx, cy, rOuter, 135);
   const tick25Out = polarToCartesian(cx, cy, rOuter + 4, 135);
   const tick75 = polarToCartesian(cx, cy, rOuter, 45);
@@ -231,7 +235,7 @@ function recoveryGauge(billed, totalSupplied, formatFn, opts = {}) {
 
   return `
   <div class="flex flex-col items-center">
-    <svg viewBox="0 0 140 84" class="w-full max-w-[130px]">
+    <svg viewBox="0 0 140 100" class="w-full max-w-[130px]">
       <path d="${arcPath}" fill="${color}"/>
       <line x1="${tick25.x.toFixed(2)}" y1="${tick25.y.toFixed(2)}" x2="${tick25Out.x.toFixed(2)}" y2="${tick25Out.y.toFixed(2)}" stroke="#cbd5e1" stroke-width="1.5"/>
       <line x1="${tick75.x.toFixed(2)}" y1="${tick75.y.toFixed(2)}" x2="${tick75Out.x.toFixed(2)}" y2="${tick75Out.y.toFixed(2)}" stroke="#cbd5e1" stroke-width="1.5"/>
