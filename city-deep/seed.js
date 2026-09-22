@@ -467,6 +467,36 @@ function seedMonth(monthData) {
       waterBlock ? waterBlock.meters : [],
       params, precinctYEnabled, unitScaleBySerial
     );
+    // One-off client correction (2026-09-22): for the 2026-08 billing month ONLY, Americandy (Unit
+    // 4) and Twinpouch (Unit 5) had their meters read on genuinely different dates than the rest of
+    // the property - Americandy's reading ran through month-end since they only vacated then (see
+    // TENANT_HANDOVERS' own Unit 4 fromLabel note above), Twinpouch's only started once they moved
+    // onto Unit 5 on 1 Aug. This overrides just the DISPLAYED "Reading Period" on these two tenants'
+    // own Aug 2026 bill (bills.override_start_date/end_date - see db.js's migrate() and server.js's
+    // /pdf/:billId route, which falls back to the shared billing_periods dates for every other
+    // tenant/month). It does NOT touch the shared billing_periods row itself (2026-07-24 to
+    // 2026-08-25), which stays correct for every other City Deep tenant, and does NOT change any
+    // dollar amount (this property's calc.js has no day-count proration - the bill total already
+    // reflects whatever the workbook's own meter readings were, unaffected either way). Matched on
+    // BOTH the raw workbook/handover name AND the final display (name, unit) - city-deep/server.js
+    // always re-runs this whole seed on every boot (see the "City Deep seed gated-behind-empty-db
+    // bug" fix), and by the SECOND pass of any given boot applyTenantDisplayOverrides() has already
+    // renamed these tenants, so getOrCreateTenant's own fallback lookup hands back the tenant with
+    // its DISPLAY name already, not the raw one - matching only the raw name silently no-ops from
+    // the second boot onward (bill.id changes every pass since generateBill() deletes/reinserts).
+    // Deliberately scoped to this one month only, not a standing per-tenant rule - a future month
+    // defaults back to the shared period like everyone else unless the client asks again.
+    if (billingPeriod.label === '2026-08') {
+      const isAmericandyUnit4 = tenant.name === 'Unit 4 Americandy Manufacturers (PTY)LTD' ||
+        tenant.name === 'Americandy Manufacturers (Pty) Ltd';
+      const isTwinpouchUnit5 = tenant.name === '__HANDOVER_TWINPOUCH_UNIT5__' ||
+        (tenant.name === 'Twinpouch (Pty) Ltd' && tenant.unit === 'Unit 5');
+      if (isAmericandyUnit4) {
+        run('UPDATE bills SET override_start_date=?, override_end_date=? WHERE id=?', ['2026-07-24', '2026-08-31', bill.id]);
+      } else if (isTwinpouchUnit5) {
+        run('UPDATE bills SET override_start_date=?, override_end_date=? WHERE id=?', ['2026-08-01', '2026-08-25', bill.id]);
+      }
+    }
     // Excel reference totals for reconciliation
     if (elecBlock && elecBlock.totals) {
       run(`INSERT OR REPLACE INTO excel_reference (tenant_id, billing_period_id, utility_type, consumption, charge_total_excl_vat)

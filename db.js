@@ -149,6 +149,8 @@ function migrate(db) {
     finalised_at TEXT,
     finalised_by INTEGER REFERENCES users(id),
     pdf_path TEXT,
+    override_start_date TEXT, -- per-bill Reading Period override - see migrate()'s own comment below
+    override_end_date TEXT,
     UNIQUE(tenant_id, billing_period_id)
   );
 
@@ -502,6 +504,19 @@ function migrate(db) {
   const mssCols = db.prepare("PRAGMA table_info(municipal_statement_slips)").all().map((c) => c.name);
   if (!mssCols.includes('water_start_date')) db.exec('ALTER TABLE municipal_statement_slips ADD COLUMN water_start_date TEXT');
   if (!mssCols.includes('water_end_date')) db.exec('ALTER TABLE municipal_statement_slips ADD COLUMN water_end_date TEXT');
+
+  // A bill's displayed "Reading Period" normally comes straight from its shared billing_periods row
+  // (every tenant in a given month shares one start/end date) - but a tenant who moved in/out
+  // mid-month sometimes has their own meter read on a genuinely different date than the rest of the
+  // property (e.g. City Deep's Aug 2026 Americandy/Twinpouch Unit 4/5 handover - Americandy's
+  // reading ran through month-end since they vacated then, Twinpouch's only started once they moved
+  // in). These two nullable columns let ONE tenant's ONE bill override the displayed period without
+  // touching the shared billing_periods row (which would wrongly shift every other tenant's slip
+  // too). Left blank for the overwhelming majority of bills, which just use the period's own dates -
+  // see server.js's /pdf/:billId route for where the fallback happens.
+  const billCols = db.prepare("PRAGMA table_info(bills)").all().map((c) => c.name);
+  if (!billCols.includes('override_start_date')) db.exec('ALTER TABLE bills ADD COLUMN override_start_date TEXT');
+  if (!billCols.includes('override_end_date')) db.exec('ALTER TABLE bills ADD COLUMN override_end_date TEXT');
 
   // One-time bridge: any flat_site data written before site_tariff_items/site_slip_readings
   // existed (8 Field Street was the only flat_site property back then, always on the Ekurhuleni E

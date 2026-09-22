@@ -1367,8 +1367,12 @@ route('GET', '/pdf/:billId', async (req, res, params) => {
   const monthlyTrend = monthlyTrendForTenant(tenant.id, period.start_date, isWingfield);
   const pdfBuf = buildBillingSlipPdf({
     tenantName: tenant.name, invoiceNumber: bill.invoice_number, unit: tenant.unit,
-    periodLabel: period.label, accountNumber: tenant.account_number, startDate: period.start_date,
-    endDate: period.end_date, dueDate: period.due_date, vatNumber: tenant.vat_number,
+    // bill.override_start_date/end_date (nullable) let ONE tenant's ONE bill show a different
+    // Reading Period than the rest of the property for that month - see db.js's migrate() comment
+    // and city-deep/seed.js's Americandy/Twinpouch Aug 2026 one-off. Falls back to the shared
+    // billing_periods dates for every bill that doesn't set them (i.e. almost all of them).
+    periodLabel: period.label, accountNumber: tenant.account_number, startDate: bill.override_start_date || period.start_date,
+    endDate: bill.override_end_date || period.end_date, dueDate: period.due_date, vatNumber: tenant.vat_number,
     elecConsumption: tenantOwnElecKwh(bill.id, tenant.id, period.start_date, isWingfield).toFixed(2), waterConsumption: bill.water_consumption_m3.toFixed(2),
     elecLineItems: elecItems, waterLineItems: waterItems, elecMeters: elecMetersForPdf, waterMeters: waterMetersForPdf,
     subtotal: bill.subtotal_excl_vat, vatRate: bill.vat_rate, vatAmount: bill.vat_amount, total: bill.total_incl_vat,
