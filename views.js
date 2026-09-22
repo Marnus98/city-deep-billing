@@ -180,67 +180,87 @@ function recoveryColorFor(pct) {
   return RECOVERY_COLOR_STOPS[RECOVERY_COLOR_STOPS.length - 1].color;
 }
 
-// `billed` = Tenants figure, `municipality` = the cost/recovered-from figure (municipal + solar for
-// City Deep electricity, same as before). Needle/arc read against a fixed 0-100% scale; a
-// period over 100% pins the needle at the end but the printed percentage keeps its true value.
-function recoveryGauge(billed, municipality, formatFn) {
-  const pct = municipality !== 0 ? (billed / municipality) * 100 : (billed === 0 ? 0 : 100);
+// `billed` = Tenants Billed figure, `totalSupplied` = everything that had to be recovered (for
+// electricity at a solar site, that's municipal + solar combined - see dashboard_gauges.js's
+// elecRecoveredKwh/elecRecoveredRand, which already sum the two). Needle/arc read against a fixed
+// 0-100% scale; a period over 100% pins the needle at the end but the printed percentage keeps its
+// true value.
+//
+// `opts.solar` (client correction, 2026-09-29: "the solar + Municipality is total supplied") - when
+// given (electricity at a solar site only), the gauge breaks the supply side into its own
+// Municipality/Solar/Total Supplied figures (Total Supplied = Municipality + Solar) instead of a
+// single combined "Municipality" figure, matching the client's own reference image exactly - 4
+// stat boxes, no separate Unrecovered figure. Every other gauge (Water, Sewer, and Electricity at
+// non-solar sites) keeps the original 3-box layout: Municipality, Tenants Billed, and
+// Unrecovered/Over-recovered.
+function recoveryGauge(billed, totalSupplied, formatFn, opts = {}) {
+  const { solar = null, metricLabel = 'Billing Recovery' } = opts;
+  // totalSupplied === 0 with real billing on the other side means there's no municipal statement
+  // for this period yet (a genuine, pre-existing gap - same one already shown as "R0 Recovered"
+  // elsewhere in this app) - reads as 0%, not a misleading 100%.
+  const pct = totalSupplied !== 0 ? (billed / totalSupplied) * 100 : 0;
   const pctCapped = Math.max(0, Math.min(100, pct));
   const color = recoveryColorFor(pct);
-  const cx = 110, cy = 105, rOuter = 95, rInner = 58;
+  const cx = 70, cy = 68, rOuter = 56, rInner = 34;
   const arcPath = donutSegmentPath(cx, cy, rOuter, rInner, 180, 0);
   const needleAngle = 180 - (pctCapped / 100) * 180;
-  const tip = polarToCartesian(cx, cy, rInner - 6, needleAngle);
-  const diff = municipality - billed;
-  const over = diff < 0;
+  const tip = polarToCartesian(cx, cy, rInner - 4, needleAngle);
+  const topTick = polarToCartesian(cx, cy, rOuter + 8, 90);
+  const tick25 = polarToCartesian(cx, cy, rOuter, 135);
+  const tick25Out = polarToCartesian(cx, cy, rOuter + 4, 135);
+  const tick75 = polarToCartesian(cx, cy, rOuter, 45);
+  const tick75Out = polarToCartesian(cx, cy, rOuter + 4, 45);
+
+  let boxes;
+  if (solar !== null) {
+    boxes = [
+      { label: 'Municipality', value: totalSupplied - solar },
+      { label: 'Solar', value: solar },
+      { label: 'Total Supplied', value: totalSupplied },
+      { label: 'Tenants Billed', value: billed },
+    ];
+  } else {
+    const diff = totalSupplied - billed;
+    const over = diff < 0;
+    boxes = [
+      { label: 'Municipality', value: totalSupplied },
+      { label: 'Tenants Billed', value: billed },
+      { label: over ? 'Over-recovered' : 'Unrecovered', value: Math.abs(diff), emphasize: over },
+    ];
+  }
+
   return `
   <div class="flex flex-col items-center">
-    <svg viewBox="0 0 220 128" class="w-full max-w-[210px]">
+    <svg viewBox="0 0 140 84" class="w-full max-w-[130px]">
       <path d="${arcPath}" fill="${color}"/>
-      <line x1="${cx}" y1="${cy}" x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="7" fill="#1e293b"/>
-      <text x="15" y="120" font-size="11" fill="#94a3b8">0%</text>
-      <text x="205" y="120" font-size="11" fill="#94a3b8" text-anchor="end">100%</text>
+      <line x1="${tick25.x.toFixed(2)}" y1="${tick25.y.toFixed(2)}" x2="${tick25Out.x.toFixed(2)}" y2="${tick25Out.y.toFixed(2)}" stroke="#cbd5e1" stroke-width="1.5"/>
+      <line x1="${tick75.x.toFixed(2)}" y1="${tick75.y.toFixed(2)}" x2="${tick75Out.x.toFixed(2)}" y2="${tick75Out.y.toFixed(2)}" stroke="#cbd5e1" stroke-width="1.5"/>
+      <line x1="${cx}" y1="${cy}" x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="#1e293b"/>
+      <text x="${(cx - rOuter - 2).toFixed(2)}" y="${(cy + 11).toFixed(2)}" font-size="7" fill="#94a3b8">0%</text>
+      <text x="${topTick.x.toFixed(2)}" y="${(topTick.y - 1).toFixed(2)}" font-size="7" fill="#94a3b8" text-anchor="middle">50%</text>
+      <text x="${(cx + rOuter + 2).toFixed(2)}" y="${(cy + 11).toFixed(2)}" font-size="7" fill="#94a3b8" text-anchor="end">100%</text>
     </svg>
-    <div class="text-xl font-bold -mt-3">${pct.toFixed(1)}%</div>
-    <div class="text-xs text-slate-500 mb-2">Billing Recovery</div>
-    <div class="grid grid-cols-3 gap-1 w-full text-center">
+    <div class="text-base font-bold -mt-2">${pct.toFixed(1)}%</div>
+    <div class="text-[10px] text-slate-500 mb-1">${esc(metricLabel)}</div>
+    <div class="grid gap-1 w-full text-center" style="grid-template-columns: repeat(${boxes.length}, minmax(0,1fr));">
+      ${boxes.map((b) => `
       <div>
-        <div class="text-[10px] uppercase text-slate-400">Municipality</div>
-        <div class="text-xs font-semibold">${formatFn(municipality)}</div>
-      </div>
-      <div>
-        <div class="text-[10px] uppercase text-slate-400">Tenants</div>
-        <div class="text-xs font-semibold">${formatFn(billed)}</div>
-      </div>
-      <div>
-        <div class="text-[10px] uppercase ${over ? 'text-emerald-500' : 'text-slate-400'}">${over ? 'Over-recovered' : 'Unrecovered'}</div>
-        <div class="text-xs font-semibold ${over ? 'text-emerald-600' : ''}">${formatFn(Math.abs(diff))}</div>
-      </div>
+        <div class="text-[7px] uppercase leading-tight ${b.emphasize ? 'text-emerald-500' : 'text-slate-400'}">${esc(b.label)}</div>
+        <div class="text-[9px] font-semibold ${b.emphasize ? 'text-emerald-600' : ''}">${formatFn(b.value)}</div>
+      </div>`).join('')}
     </div>
   </div>`;
 }
 
-// A gauge with its unit label above it (e.g. "kWh" / "Rand (excl. VAT)").
-function labeledGauge(unitLabel, gaugeHtml) {
+// A small bordered tile wrapping one gauge, titled with what it shows (e.g. "Electricity (kWh)") -
+// needed now that gauges are laid out in mixed-utility rows (by unit, not grouped per utility), so
+// each tile needs its own label for context.
+function gaugeTile(title, gaugeHtml) {
   return `
-  <div>
-    <div class="text-xs uppercase tracking-wide text-slate-400 mb-1 text-center">${esc(unitLabel)}</div>
+  <div class="bg-white rounded-lg border p-3">
+    <div class="text-xs font-semibold text-slate-600 mb-1 text-center">${esc(title)}</div>
     ${gaugeHtml}
-  </div>`;
-}
-
-// One utility's card: an optional consumption (kWh/kL) gauge and a Rand gauge, side by side. Sewer
-// has no consumption gauge of its own (client: "the kL is the same as the Water"), so
-// `unitGaugeHtml` is '' for Sewer.
-function utilitySectionCard(title, unitGaugeHtml, randGaugeHtml) {
-  return `
-  <div class="bg-white rounded-lg border p-4">
-    <div class="font-semibold mb-3">${esc(title)}</div>
-    <div class="grid grid-cols-1 ${unitGaugeHtml ? 'sm:grid-cols-2' : ''} gap-4">
-      ${unitGaugeHtml || ''}
-      ${randGaugeHtml || ''}
-    </div>
   </div>`;
 }
 
@@ -256,28 +276,47 @@ function gaugePeriodForm(gaugeOptions, gaugeSelector) {
     </select>
   </form>`;
 }
-// 3 utility sections (Electricity, Water, Sewer), each a Billing Recovery % gauge vs Municipality,
-// in the units the client asked for (2026-09-28): Electricity in kWh + Rand, Water in kL + Rand,
-// Sewer in Rand only. Electricity's kWh/Rand "Municipality" figures already include solar (Fortress
-// PV kWh / the real Capital Propfund invoice Rand) via dashboard_gauges.js, so solar is folded
-// straight into the recovery % here rather than shown as a separate figure.
+// Two rows (client ask, 2026-09-29): consumption units first - Electricity (kWh) and Water (kL)
+// side by side - then Rand underneath - Electricity, Water, and Sewer side by side. Electricity's
+// gauges break out Solar as its own figure (see recoveryGauge's `solar` option) since City Deep's
+// "Municipality" figure by itself was previously double-counting as "Municipality + Solar" without
+// showing solar separately - only sites with real solar data (gauges.hasSolar) get that breakdown;
+// everywhere else there's no solar to show, so it's omitted.
 function gaugeCardsSection(gauges) {
   if (!gauges) return '<p class="text-sm text-slate-500">No billing data yet.</p>';
   const kwhFmt = (v) => `${fmtNum(v, 0)} kWh`;
   const klFmt = (v) => `${fmtNum(v, 0)} kL`;
   const randFmt = (v) => money(v);
 
-  const elecKwhGauge = labeledGauge('kWh', recoveryGauge(gauges.elecBilledKwh, gauges.elecRecoveredKwh, kwhFmt));
-  const elecRandGauge = labeledGauge('Rand (excl. VAT)', recoveryGauge(gauges.elecBilledRand, gauges.elecRecoveredRand, randFmt));
-  const waterKlGauge = labeledGauge('kL', recoveryGauge(gauges.waterBilledKl, gauges.waterRecoveredKl, klFmt));
-  const waterRandGauge = labeledGauge('Rand (excl. VAT)', recoveryGauge(gauges.waterBilledRand, gauges.waterRecoveredRand, randFmt));
-  const sewerRandGauge = labeledGauge('Rand (excl. VAT)', recoveryGauge(gauges.sewerBilledRand, gauges.sewerRecoveredRand, randFmt));
+  const elecKwhGauge = recoveryGauge(gauges.elecBilledKwh, gauges.elecRecoveredKwh, kwhFmt, {
+    solar: gauges.hasSolar ? gauges.solarKwh : null,
+    metricLabel: 'Energy Recovery',
+  });
+  const waterKlGauge = recoveryGauge(gauges.waterBilledKl, gauges.waterRecoveredKl, klFmt, {
+    metricLabel: 'Water Recovery',
+  });
+  const elecRandGauge = recoveryGauge(gauges.elecBilledRand, gauges.elecRecoveredRand, randFmt, {
+    solar: gauges.hasSolar ? gauges.solarCostRand : null,
+    metricLabel: 'Billing Recovery',
+  });
+  const waterRandGauge = recoveryGauge(gauges.waterBilledRand, gauges.waterRecoveredRand, randFmt, {
+    metricLabel: 'Billing Recovery',
+  });
+  const sewerRandGauge = recoveryGauge(gauges.sewerBilledRand, gauges.sewerRecoveredRand, randFmt, {
+    metricLabel: 'Billing Recovery',
+  });
 
   return `
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-    ${utilitySectionCard('Electricity', elecKwhGauge, elecRandGauge)}
-    ${utilitySectionCard('Water', waterKlGauge, waterRandGauge)}
-    ${utilitySectionCard('Sewer', '', sewerRandGauge)}
+  <div class="mb-6">
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      ${gaugeTile('Electricity (kWh)', elecKwhGauge)}
+      ${gaugeTile('Water (kL)', waterKlGauge)}
+    </div>
+    <div class="grid grid-cols-3 gap-3">
+      ${gaugeTile('Electricity (R)', elecRandGauge)}
+      ${gaugeTile('Water (R)', waterRandGauge)}
+      ${gaugeTile('Sewer (R)', sewerRandGauge)}
+    </div>
   </div>`;
 }
 
