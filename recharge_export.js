@@ -363,6 +363,23 @@ function tenantByIdNameAmount(db, name, unit, periodId, propSlug, utilityCode) {
   return billLineItemsTotal(db, tenant.id, periodId, bucket);
 }
 
+// A bill's own override_start_date/override_end_date (db.js's migrate() comment; set for City
+// Deep's Aug 2026 Americandy/Twinpouch handover by city-deep/seed.js) lets ONE tenant's ONE bill
+// show a different F/G date range in this CSV than the rest of the property for that month, same as
+// it already does on that tenant's own billing-slip PDF (server.js's /pdf/:billId route) - the two
+// documents should read as a matched pair. Only applied when the row is backed by exactly one tenant
+// row (a summed multi-unit code - e.g. Agrana's 2 Industrial Park units - has no single unambiguous
+// override to apply); falls back to the shared billing_periods dates otherwise, same as always.
+function tenantDatesForRow(db, tenantIds, period) {
+  if (tenantIds.length === 1) {
+    const bill = get(db, 'SELECT override_start_date, override_end_date FROM bills WHERE tenant_id=? AND billing_period_id=?', [tenantIds[0], period.id]);
+    if (bill && (bill.override_start_date || bill.override_end_date)) {
+      return { startDate: bill.override_start_date || period.start_date, endDate: bill.override_end_date || period.end_date };
+    }
+  }
+  return { startDate: period.start_date, endDate: period.end_date };
+}
+
 // Resolves one row's amount + period start/end for a given label. `propertyDbs` is a Map of
 // slug -> DatabaseSync (every property's own db, regardless of which one is "active" in the current
 // session - this export spans every property at once). Returns { amount, startDate, endDate, flag }
@@ -382,14 +399,18 @@ function resolveRow(propertyDbs, label, row) {
     const period = db && billingPeriod(db, label);
     if (!period) return { amount: 0, startDate: null, endDate: null, flag: `No billing period "${label}" yet on ${src.slug}.` };
     const amount = tenantModelAmount(db, src.slug, src.names, period.id, src.utilityCode);
-    return { amount, startDate: period.start_date, endDate: period.end_date, flag: null };
+    const tenants = all(db, `SELECT id FROM tenants WHERE name IN (${src.names.map(() => '?').join(',')})`, src.names);
+    const dates = tenantDatesForRow(db, tenants.map((t) => t.id), period);
+    return { amount, startDate: dates.startDate, endDate: dates.endDate, flag: null };
   }
   if (src.kind === 'tenant_by_id_name') {
     const db = propertyDbs.get(src.slug);
     const period = db && billingPeriod(db, label);
     if (!period) return { amount: 0, startDate: null, endDate: null, flag: `No billing period "${label}" yet on ${src.slug}.` };
     const amount = tenantByIdNameAmount(db, src.name, src.unit, period.id, src.slug, src.utilityCode);
-    return { amount, startDate: period.start_date, endDate: period.end_date, flag: null };
+    const tenant = get(db, 'SELECT id FROM tenants WHERE name=? AND unit=?', [src.name, src.unit]);
+    const dates = tenantDatesForRow(db, tenant ? [tenant.id] : [], period);
+    return { amount, startDate: dates.startDate, endDate: dates.endDate, flag: null };
   }
   if (src.kind === 'core_meter') {
     const db = propertyDbs.get('wingfield');
