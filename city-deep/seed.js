@@ -133,11 +133,13 @@ const TENANT_DISPLAY_OVERRIDES = {
   //    Both correct to "Sanskar Trading CC".
   //  - Two Mini Park units (4 and 5, Americandy and this section's separate Agrana entity - not
   //    to be confused with the two Industrial Park Agrana units above) are noted as being taken
-  //    over by a new tenant "Twinpouch" from 1 Aug 2026. Since tenant name isn't period-specific
-  //    in this schema, renaming Americandy/Agrana here would incorrectly relabel their pre-Aug-26
-  //    history too - so this only corrects their legal names for the tenancy as it stood, and
-  //    Twinpouch itself is deliberately NOT added here (no workbook data exists for them yet -
-  //    add it as a new tenant via getOrCreateTenant when the first Twinpouch month is imported).
+  //    over by a new tenant "Twinpouch": Unit 5 (Agrana) from 1 Aug 2026, Unit 4 (Americandy) only
+  //    from 1 Sep 2026 (Americandy stayed through all of August, vacating right at month-end - see
+  //    TENANT_HANDOVERS' own fromLabel comment). Since tenant name isn't period-specific in this
+  //    schema, renaming Americandy/Agrana here would incorrectly relabel their pre-handover history
+  //    too - so this only corrects their legal names for the tenancy as it stood, and Twinpouch
+  //    itself is deliberately NOT added here (no workbook data exists for them yet - add it as a
+  //    new tenant via getOrCreateTenant when the first Twinpouch month is imported).
   //    Same reasoning applies to the Sanskar Unit 9 -> Uber Nutrition handover noted for 1 Sep 26.
   'Unit 1 Network Dynamics (PTY)LTD': { name: 'Network Dynamics (Pty) Ltd', unit: 'Unit 1' },
   'Shop 10 Unit 2 Express Chef Sauces': { name: 'Express Chef Sauces (Pty) Ltd', unit: 'Unit 2 (Shop 10)' },
@@ -186,8 +188,16 @@ function applyTenantDisplayOverrides() {
 // billing period with label >= '2026-09' has been imported, so there is nothing for it to redirect.
 // Add it here (matching rawName 'Shop 3 Unit 9 SANSKAR Trading', fromLabel '2026-09') once the
 // first September 2026 workbook is imported.
+//
+// Unit 4's fromLabel corrected 2026-09-30 (client: "Americandy only vacated end of August" - the
+// original '2026-08' guess assumed the handover took effect from the 1st of that month, which is
+// wrong). The August 2026 workbook itself backs this up: both its Electrical Billing and Water
+// Billing sheets still header Unit 4's section "Americandy Manufacturers (Pty)Ltd" for the whole
+// of August (just a near-zero, "DB Switched Off"-flagged reading, consistent with vacating right
+// at month-end) - Unit 5's workbook section, by contrast, is already headed "Twinpouch" for the
+// whole of August, so that handover's '2026-08' fromLabel is correct as-is and left unchanged.
 const TENANT_HANDOVERS = [
-  { rawName: 'Unit 4 Americandy Manufacturers (PTY)LTD', fromLabel: '2026-08', newRawName: '__HANDOVER_TWINPOUCH_UNIT4__' },
+  { rawName: 'Unit 4 Americandy Manufacturers (PTY)LTD', fromLabel: '2026-09', newRawName: '__HANDOVER_TWINPOUCH_UNIT4__' },
   { rawName: 'Unit 5 AGRANA', fromLabel: '2026-08', newRawName: '__HANDOVER_TWINPOUCH_UNIT5__' },
 ];
 function resolveTenantWorkbookName(rawName, periodLabel) {
