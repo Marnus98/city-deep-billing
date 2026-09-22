@@ -195,12 +195,20 @@ function recoveryColorFor(pct) {
 // Unrecovered/Over-recovered.
 function recoveryGauge(billed, totalSupplied, formatFn, opts = {}) {
   const { solar = null, metricLabel = 'Billing Recovery' } = opts;
-  // totalSupplied === 0 with real billing on the other side means there's no municipal statement
-  // for this period yet (a genuine, pre-existing gap - same one already shown as "R0 Recovered"
-  // elsewhere in this app) - reads as 0%, not a misleading 100%.
-  const pct = totalSupplied !== 0 ? (billed / totalSupplied) * 100 : 0;
+  // Two special (non-percentage) states, both flagged rather than fed through the normal math:
+  //  - totalSupplied === 0 with real billing on the other side: no municipal statement for this
+  //    period yet (a genuine, pre-existing gap - same one already shown as "R0 Recovered"
+  //    elsewhere in this app) - reads as a plain 0%, not a misleading 100%.
+  //  - totalSupplied < 0: a genuine net credit month (e.g. Wingfield 2026-07's water/sewer, where
+  //    a large interim-reversal credit outweighed that cycle's real usage - see the source note in
+  //    wingfield/imports/wingfield_municipal_statements.json). Dividing a positive Tenants Billed
+  //    by a negative Municipality produces a meaningless swing (-161.9% etc.), so this shows a
+  //    distinct grey "Credit Month" badge instead of a percentage/needle - the real
+  //    Municipality/Tenants Billed figures still print normally below it.
+  const isCreditMonth = totalSupplied < 0;
+  const pct = totalSupplied > 0 ? (billed / totalSupplied) * 100 : 0;
   const pctCapped = Math.max(0, Math.min(100, pct));
-  const color = recoveryColorFor(pct);
+  const color = isCreditMonth ? '#cbd5e1' : recoveryColorFor(pct);
   // cy=82/rOuter=50 (not 68/56 as before) leaves real headroom above the arc for the "50%" tick
   // label - the old geometry put that label just 4px from the top of an 84-tall viewBox, so it
   // clipped out of the SVG and visually collided with the tile's title text above it ("does not
@@ -214,6 +222,11 @@ function recoveryGauge(billed, totalSupplied, formatFn, opts = {}) {
   const tick25Out = polarToCartesian(cx, cy, rOuter + 4, 135);
   const tick75 = polarToCartesian(cx, cy, rOuter, 45);
   const tick75Out = polarToCartesian(cx, cy, rOuter + 4, 45);
+  // No needle for a credit month - a needle implies a position on a 0-100% scale that doesn't
+  // apply here.
+  const needleSvg = isCreditMonth
+    ? `<circle cx="${cx}" cy="${cy}" r="5" fill="#64748b"/>`
+    : `<line x1="${cx}" y1="${cy}" x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="5" fill="#1e293b"/>`;
 
   let boxes;
   if (solar !== null) {
@@ -239,14 +252,13 @@ function recoveryGauge(billed, totalSupplied, formatFn, opts = {}) {
       <path d="${arcPath}" fill="${color}"/>
       <line x1="${tick25.x.toFixed(2)}" y1="${tick25.y.toFixed(2)}" x2="${tick25Out.x.toFixed(2)}" y2="${tick25Out.y.toFixed(2)}" stroke="#cbd5e1" stroke-width="1.5"/>
       <line x1="${tick75.x.toFixed(2)}" y1="${tick75.y.toFixed(2)}" x2="${tick75Out.x.toFixed(2)}" y2="${tick75Out.y.toFixed(2)}" stroke="#cbd5e1" stroke-width="1.5"/>
-      <line x1="${cx}" y1="${cy}" x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="5" fill="#1e293b"/>
+      ${needleSvg}
       <text x="${(cx - rOuter - 2).toFixed(2)}" y="${(cy + 11).toFixed(2)}" font-size="7" fill="#94a3b8">0%</text>
       <text x="${topTick.x.toFixed(2)}" y="${(topTick.y - 1).toFixed(2)}" font-size="7" fill="#94a3b8" text-anchor="middle">50%</text>
       <text x="${(cx + rOuter + 2).toFixed(2)}" y="${(cy + 11).toFixed(2)}" font-size="7" fill="#94a3b8" text-anchor="end">100%</text>
     </svg>
-    <div class="text-base font-bold -mt-2">${pct.toFixed(1)}%</div>
-    <div class="text-[10px] text-slate-500 mb-1">${esc(metricLabel)}</div>
+    <div class="${isCreditMonth ? 'text-xs' : 'text-base'} font-bold -mt-2">${isCreditMonth ? 'Credit Month' : `${pct.toFixed(1)}%`}</div>
+    <div class="text-[10px] text-slate-500 mb-1">${isCreditMonth ? 'Net municipal credit' : esc(metricLabel)}</div>
     <div class="grid gap-1 w-full text-center" style="grid-template-columns: repeat(${boxes.length}, minmax(0,1fr));">
       ${boxes.map((b) => `
       <div>
