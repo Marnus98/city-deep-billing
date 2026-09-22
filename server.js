@@ -136,6 +136,15 @@ require('./loper-road/municipal_import').run('loper-road.db');
 // extraction/reconciliation notes, including the account changeover and March 2026's stretched
 // ~70-day combined statement.
 require('./cranbrook-flavours/municipal_import').run('cranbrook-flavours.db');
+// Interoll/RCL Group Services/Colorobbia's actual municipal account statements (Jul 2026 - the only
+// month provided so far) - own de-dup key (label), separate tables from the above (see db.js),
+// always safe to re-run; see each site's own municipal_import.js and flat_site_tariff_shapes.js's
+// EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE for the extraction/reconciliation notes. ADH Machine Tool/
+// Zelvio Global don't have one yet - their shared 55 Loper Street account needs a split decision
+// from the client first (see properties.js's own note on zelvio-global).
+require('./interoll/municipal_import').run('interoll.db');
+require('./rcl-group/municipal_import').run('rcl-group.db');
+require('./colorobbia/municipal_import').run('colorobbia.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {

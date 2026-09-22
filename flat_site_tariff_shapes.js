@@ -334,9 +334,52 @@ const EKURHULENI_TARIFF_B_SIMPLE = [
   ...WATER_SEWER_ITEMS,
 ];
 
+// Ekurhuleni municipal account shape (COPY TAX INVOICE) shared by 63 Loper Ave - Interoll, 65 Loper
+// Ave - RCL Group Services, and 13 Brussels Avenue - Colorobbia's real municipal statements (as
+// opposed to EKURHULENI_TARIFF_B_SIMPLE above, which is what HolmStone bills each tenant - same
+// client-billing-vs-real-municipal-bill split as every other flat_site property with a
+// municipal_import.js, see db.js's municipal_tariffs/municipal_statement_slips comment).
+//
+// Source: 3 real Aug 2026 "COPY TAX INVOICE" statements (account numbers 1702329895/1702329900/
+// 1702343564), all under municipal account holder "METBOARD PROPERTIES LTD"/"METBOARD PROP LTD.",
+// reading period 26/07/01-26/08/01. Much simpler than every other Ekurhuleni municipal shape in this
+// app: no TOU split at all (Peak/Standard/Off-Peak), just one flat "Energy" meter reading and one
+// flat "Capacity CH" line with no published kVA/Amp reading behind it (unlike e.g. Bob Martin's own
+// Network Access/Demand lines) - both fixedReading:1 here since the statement itself never prints a
+// reading for Capacity CH.
+//
+// Refuse Removal is 2 separate lines (Business + Litterpicking), same convention as
+// EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN/EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK above - "Business"
+// stays a genuinely flat R604.33 across all 3 sites regardless of the printed "units" figure (even
+// Colorobbia's own statement, which prints "x 0 units", still carries the same R604.33 charge);
+// "Litterpicking" scales with each site's own Area (m2) so its Rand figure differs per site even
+// though the line item itself is shared.
+//
+// Extraction method: every figure below read directly off each statement's own itemised PROPERTY
+// RATES/ELECTRICITY SERVICE/REFUSE REMOVAL/WATER SERVICE/SEWERAGE lines; each "rate" is cost/reading
+// (or just the flat cost itself for fixedReading:1 lines). Each site's full set of current-period
+// lines reconciles EXACTLY (to the cent) against that statement's own "TOTAL CURRENT LEVY" - the
+// "BALANCE BROUGHT FORWARD"/"SUB TOTAL" carry-forward lines above are deliberately excluded, same
+// convention as every other property's municipal import.
+//
+// NOTE: Colorobbia's registered site name in properties.js is "122 Loper - Colorobbia", but this
+// account's actual municipal invoice is billed to "13 BRUSSELS AVENUE", not any Loper address - a
+// real discrepancy between the client's own site naming and the municipal account's billing address,
+// flagged to the client but not otherwise acted on here (see colorobbia/municipal_import.js).
+const EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE = [
+  { key: 'property_rates', label: 'Property Rates (Business & Commercial)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal', vatExempt: true },
+  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'energy_charge', label: 'Energy Charge', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'refuse_business', label: 'Refuse Removal - Business', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  { key: 'refuse_litter', label: 'Refuse Removal - Litterpicking', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  ...WATER_SEWER_ITEMS,
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
   EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
+  EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE,
 };
