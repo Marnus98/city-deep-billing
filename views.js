@@ -146,14 +146,12 @@ function statCard(label, value, sub) {
   </div>`;
 }
 
-// Semi-circular "speedometer" dial gauges (client ask, 2026-09-28, with a reference image of a
-// red/orange/yellow/light-green/green "PERFORMANCE" dial): each dial's 5 colored bands are purely
-// decorative context - there's no pass/fail threshold for a Rand or kWh total - the needle just
-// points to where `value` sits against `max` (the scale shared by every dial in the same gaugeGroup,
-// so dials stay visually comparable to each other). Client's "just totals" instruction (2026-09-21)
-// still holds: the printed number under each dial is always the real total, never a percentage.
-const GAUGE_BAND_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'];
-
+// Single-arc "billing recovery %" gauge (client's own reference image, 2026-09-29, replacing the
+// earlier 5-band speedometer dial): one flat-colored semicircle (color reflects how close recovery
+// is to 100% - red poor, orange/yellow mid, green good/over) with a needle and the recovery
+// percentage in the middle, plus Municipality/Tenants/(Unrecovered or Over-recovered) figures
+// underneath. "Recovery %" = Tenants (billed) / Municipality (the cost side - municipal + solar
+// where applicable, same figure the old "Recovered" gauge used) * 100.
 function polarToCartesian(cx, cy, r, angleDeg) {
   const rad = (angleDeg * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
@@ -167,66 +165,82 @@ function donutSegmentPath(cx, cy, rOuter, rInner, angleStart, angleEnd) {
   return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${rOuter} ${rOuter} 0 0 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)} L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)} A ${rInner} ${rInner} 0 0 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)} Z`;
 }
 
-// One dial: 5 fixed 36-degree bands (red...green, left to right) plus a needle. `formatFn` renders
-// the raw total shown under the dial (money() for Rand, "1,234 kWh"/"1,234 kL" for consumption).
-function speedometerGauge(label, value, max, formatFn) {
-  const cx = 110, cy = 105, rOuter = 95, rInner = 58;
-  const bands = GAUGE_BAND_COLORS.map((color, i) => {
-    const aStart = 180 - i * 36;
-    const aEnd = 180 - (i + 1) * 36;
-    return `<path d="${donutSegmentPath(cx, cy, rOuter, rInner, aStart, aEnd)}" fill="${color}"/>`;
-  }).join('');
-  const pct = max > 0 ? Math.min(1, Math.max(0, Math.abs(value) / max)) : 0;
-  const needleAngle = 180 - pct * 180;
-  const tip = polarToCartesian(cx, cy, rInner - 6, needleAngle);
-  return `
-  <div class="flex flex-col items-center">
-    <svg viewBox="0 0 220 120" class="w-full max-w-[180px]">
-      ${bands}
-      <line x1="${cx}" y1="${cy}" x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="7" fill="#1e293b"/>
-    </svg>
-    <div class="text-sm font-bold -mt-2">${formatFn(value)}</div>
-    <div class="text-xs text-slate-500 text-center leading-tight">${esc(label)}</div>
-  </div>`;
+// Flat arc color tiers (client ask, 2026-09-28: "gauges in green red and orange"). Uses the true
+// (uncapped) percentage, so a strongly over-recovered period still reads green, not red - being
+// over 100% isn't a problem the way being far under it is.
+const RECOVERY_COLOR_STOPS = [
+  { min: 95, color: '#22c55e' },   // green
+  { min: 80, color: '#84cc16' },   // light green
+  { min: 60, color: '#eab308' },   // yellow
+  { min: 40, color: '#f97316' },   // orange
+  { min: -Infinity, color: '#ef4444' }, // red
+];
+function recoveryColorFor(pct) {
+  for (const stop of RECOVERY_COLOR_STOPS) if (pct >= stop.min) return stop.color;
+  return RECOVERY_COLOR_STOPS[RECOVERY_COLOR_STOPS.length - 1].color;
 }
 
-// A titled row of dials sharing one `max` scale (each item: {label, value, formatFn}).
-function gaugeGroup(title, gauges) {
-  if (!gauges || !gauges.length) return '';
-  const max = Math.max(1, ...gauges.map((g) => Math.abs(g.value))) * 1.05;
+// `billed` = Tenants figure, `municipality` = the cost/recovered-from figure (municipal + solar for
+// City Deep electricity, same as before). Needle/arc read against a fixed 0-100% scale; a
+// period over 100% pins the needle at the end but the printed percentage keeps its true value.
+function recoveryGauge(billed, municipality, formatFn) {
+  const pct = municipality !== 0 ? (billed / municipality) * 100 : (billed === 0 ? 0 : 100);
+  const pctCapped = Math.max(0, Math.min(100, pct));
+  const color = recoveryColorFor(pct);
+  const cx = 110, cy = 105, rOuter = 95, rInner = 58;
+  const arcPath = donutSegmentPath(cx, cy, rOuter, rInner, 180, 0);
+  const needleAngle = 180 - (pctCapped / 100) * 180;
+  const tip = polarToCartesian(cx, cy, rInner - 6, needleAngle);
+  const diff = municipality - billed;
+  const over = diff < 0;
   return `
-  <div class="mb-3 last:mb-0">
-    <div class="text-xs uppercase tracking-wide text-slate-400 mb-1">${esc(title)}</div>
-    <div class="grid gap-1" style="grid-template-columns: repeat(${gauges.length}, minmax(0,1fr));">
-      ${gauges.map((g) => speedometerGauge(g.label, g.value, max, g.formatFn)).join('')}
+  <div class="flex flex-col items-center">
+    <svg viewBox="0 0 220 128" class="w-full max-w-[210px]">
+      <path d="${arcPath}" fill="${color}"/>
+      <line x1="${cx}" y1="${cy}" x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="7" fill="#1e293b"/>
+      <text x="15" y="120" font-size="11" fill="#94a3b8">0%</text>
+      <text x="205" y="120" font-size="11" fill="#94a3b8" text-anchor="end">100%</text>
+    </svg>
+    <div class="text-xl font-bold -mt-3">${pct.toFixed(1)}%</div>
+    <div class="text-xs text-slate-500 mb-2">Billing Recovery</div>
+    <div class="grid grid-cols-3 gap-1 w-full text-center">
+      <div>
+        <div class="text-[10px] uppercase text-slate-400">Municipality</div>
+        <div class="text-xs font-semibold">${formatFn(municipality)}</div>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase text-slate-400">Tenants</div>
+        <div class="text-xs font-semibold">${formatFn(billed)}</div>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase ${over ? 'text-emerald-500' : 'text-slate-400'}">${over ? 'Over-recovered' : 'Unrecovered'}</div>
+        <div class="text-xs font-semibold ${over ? 'text-emerald-600' : ''}">${formatFn(Math.abs(diff))}</div>
+      </div>
     </div>
   </div>`;
 }
 
-// Net over/under recovery line (client ask, 2026-09-28): positive = billed more than it cost to
-// recover (over-recovered); negative = under-recovered - same sign convention
-// flat_site_recovery.js/tenant_recovery.js's own totalRecoveryRand already uses.
-function netRecoveryLine(billed, recovered) {
-  const net = billed - recovered;
-  const over = net >= 0;
+// A gauge with its unit label above it (e.g. "kWh" / "Rand (excl. VAT)").
+function labeledGauge(unitLabel, gaugeHtml) {
   return `
-  <div class="mt-2 pt-2 border-t flex justify-between items-center">
-    <span class="text-sm text-slate-500">Net ${over ? 'Over' : 'Under'}-Recovery</span>
-    <span class="font-bold ${over ? 'text-emerald-600' : 'text-red-600'}">${money(Math.abs(net))} ${over ? 'over-recovered' : 'under-recovered'}</span>
+  <div>
+    <div class="text-xs uppercase tracking-wide text-slate-400 mb-1 text-center">${esc(unitLabel)}</div>
+    ${gaugeHtml}
   </div>`;
 }
 
-// One utility's card: an optional consumption (kWh/kL) dial group, a Rand dial group, and the net
-// over/under-recovery line. Sewer has no consumption group of its own (client: "the kL is the same
-// as the Water"), so `unitGroupHtml` is '' for Sewer.
-function utilitySectionCard(title, unitGroupHtml, randGroupHtml, netBilled, netRecovered) {
+// One utility's card: an optional consumption (kWh/kL) gauge and a Rand gauge, side by side. Sewer
+// has no consumption gauge of its own (client: "the kL is the same as the Water"), so
+// `unitGaugeHtml` is '' for Sewer.
+function utilitySectionCard(title, unitGaugeHtml, randGaugeHtml) {
   return `
   <div class="bg-white rounded-lg border p-4">
-    <div class="font-semibold mb-2">${esc(title)}</div>
-    ${unitGroupHtml || ''}
-    ${randGroupHtml || ''}
-    ${netRecoveryLine(netBilled, netRecovered)}
+    <div class="font-semibold mb-3">${esc(title)}</div>
+    <div class="grid grid-cols-1 ${unitGaugeHtml ? 'sm:grid-cols-2' : ''} gap-4">
+      ${unitGaugeHtml || ''}
+      ${randGaugeHtml || ''}
+    </div>
   </div>`;
 }
 
@@ -242,43 +256,28 @@ function gaugePeriodForm(gaugeOptions, gaugeSelector) {
     </select>
   </form>`;
 }
-// 3 utility sections (Electricity, Water, Sewer), each Billed-to-Tenants vs Municipality, in the
-// units the client asked for (2026-09-28): Electricity in kWh + Rand, Water in kL + Rand, Sewer in
-// Rand only.
+// 3 utility sections (Electricity, Water, Sewer), each a Billing Recovery % gauge vs Municipality,
+// in the units the client asked for (2026-09-28): Electricity in kWh + Rand, Water in kL + Rand,
+// Sewer in Rand only. Electricity's kWh/Rand "Municipality" figures already include solar (Fortress
+// PV kWh / the real Capital Propfund invoice Rand) via dashboard_gauges.js, so solar is folded
+// straight into the recovery % here rather than shown as a separate figure.
 function gaugeCardsSection(gauges) {
   if (!gauges) return '<p class="text-sm text-slate-500">No billing data yet.</p>';
   const kwhFmt = (v) => `${fmtNum(v, 0)} kWh`;
   const klFmt = (v) => `${fmtNum(v, 0)} kL`;
   const randFmt = (v) => money(v);
 
-  const elecKwhGauges = [
-    { label: 'Billed to Tenants (net of solar)', value: gauges.elecBilledKwh, formatFn: kwhFmt },
-    ...(gauges.hasSolar ? [{ label: 'Solar (Fortress)', value: gauges.solarKwh, formatFn: kwhFmt }] : []),
-    { label: `Municipality${gauges.hasSolar ? ' + Solar' : ''}`, value: gauges.elecRecoveredKwh, formatFn: kwhFmt },
-  ];
-  const elecRandGauges = [
-    { label: 'Billed to Tenants', value: gauges.elecBilledRand, formatFn: randFmt },
-    ...(gauges.hasSolar ? [{ label: 'Solar cost (Fortress)', value: gauges.solarCostRand, formatFn: randFmt }] : []),
-    { label: `Municipality${gauges.hasSolar ? ' + Solar cost' : ''}`, value: gauges.elecRecoveredRand, formatFn: randFmt },
-  ];
-  const waterKlGauges = [
-    { label: 'Billed to Tenants', value: gauges.waterBilledKl, formatFn: klFmt },
-    { label: 'Municipality', value: gauges.waterRecoveredKl, formatFn: klFmt },
-  ];
-  const waterRandGauges = [
-    { label: 'Billed to Tenants', value: gauges.waterBilledRand, formatFn: randFmt },
-    { label: 'Municipality', value: gauges.waterRecoveredRand, formatFn: randFmt },
-  ];
-  const sewerRandGauges = [
-    { label: 'Billed to Tenants', value: gauges.sewerBilledRand, formatFn: randFmt },
-    { label: 'Municipality', value: gauges.sewerRecoveredRand, formatFn: randFmt },
-  ];
+  const elecKwhGauge = labeledGauge('kWh', recoveryGauge(gauges.elecBilledKwh, gauges.elecRecoveredKwh, kwhFmt));
+  const elecRandGauge = labeledGauge('Rand (excl. VAT)', recoveryGauge(gauges.elecBilledRand, gauges.elecRecoveredRand, randFmt));
+  const waterKlGauge = labeledGauge('kL', recoveryGauge(gauges.waterBilledKl, gauges.waterRecoveredKl, klFmt));
+  const waterRandGauge = labeledGauge('Rand (excl. VAT)', recoveryGauge(gauges.waterBilledRand, gauges.waterRecoveredRand, randFmt));
+  const sewerRandGauge = labeledGauge('Rand (excl. VAT)', recoveryGauge(gauges.sewerBilledRand, gauges.sewerRecoveredRand, randFmt));
 
   return `
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-    ${utilitySectionCard('Electricity', gaugeGroup('kWh', elecKwhGauges), gaugeGroup('Rand (excl. VAT)', elecRandGauges), gauges.elecBilledRand, gauges.elecRecoveredRand)}
-    ${utilitySectionCard('Water', gaugeGroup('kL', waterKlGauges), gaugeGroup('Rand (excl. VAT)', waterRandGauges), gauges.waterBilledRand, gauges.waterRecoveredRand)}
-    ${utilitySectionCard('Sewer', '', gaugeGroup('Rand (excl. VAT)', sewerRandGauges), gauges.sewerBilledRand, gauges.sewerRecoveredRand)}
+    ${utilitySectionCard('Electricity', elecKwhGauge, elecRandGauge)}
+    ${utilitySectionCard('Water', waterKlGauge, waterRandGauge)}
+    ${utilitySectionCard('Sewer', '', sewerRandGauge)}
   </div>`;
 }
 
