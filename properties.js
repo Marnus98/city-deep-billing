@@ -135,35 +135,32 @@ module.exports = [
     dbFile: 'adh-machine-tool.db',
     seedFile: './adh-machine-tool/import_history',
     billingModel: 'flat_site',
-    // No municipal_import.js yet - this account's real Ekurhuleni statement (55 Loper Street) is
-    // SHARED with Zelvio Global below (one physical municipal account billing both tenants) - see
-    // the 2026-09 note on Zelvio Global's own entry below for why this needs a split decision from
-    // the client before it can be imported, unlike Interoll/RCL Group/Colorobbia which each got
-    // their own straightforward single-tenant statement this same batch.
-    // Flagging still works with hasMunicipalStatements unset - flat_site_flagging_data.js just
-    // shows the client-billing side only (Municipal Accounts table stays empty) until then.
+    // Real municipal account statement received 2026-09 for 55 Loper Street (account 1702343124) -
+    // but that one account bills BOTH this site AND Zelvio Global below under one physical municipal
+    // account. Confirmed with the client 2026-09-22: import a flat 50/50 split of every line item
+    // into both sites (see adh-machine-tool/municipal_import.js and zelvio-global/municipal_import.js
+    // for the full explanation/split method).
+    hasMunicipalStatements: true,
     hasFlagging: true,
     flaggingChartLayout: true,
   },
   // The following 4 - added 2026-08-20 alongside ADH Machine Tool above, all loose-standing sites on
   // the same "Loper Ave" tenant billing template (Ekurhuleni Tariff B, <=150A) - see
   // flat_site_tariff_shapes.js's EKURHULENI_TARIFF_B/EKURHULENI_TARIFF_B_SIMPLE header comments for
-  // the shared-template formula quirks found across all 5. Interoll/RCL Group Services/Colorobbia
-  // each got their own real municipal_import.js in 2026-09 (see each site's own entry below) - ADH
-  // Machine Tool/Zelvio Global still don't, since their one shared 55 Loper Street municipal account
-  // needs a split decision from the client first (see Zelvio Global's own note below).
+  // the shared-template formula quirks found across all 5. All 5 sites now have a real
+  // municipal_import.js as of 2026-09 - Interoll/RCL Group Services/Colorobbia each got their own
+  // straightforward single-tenant statement, while ADH Machine Tool/Zelvio Global share one 55 Loper
+  // Street account, imported into both sites at a flat 50/50 split (see each site's own entry).
   {
     slug: 'zelvio-global',
     name: '55 Loper Ave - Zelvio Global', // exactly as given on the client's own workbook - no legal suffix was provided for this one
     dbFile: 'zelvio-global.db',
     seedFile: './zelvio-global/import_history',
     billingModel: 'flat_site',
-    // 2026-09: received the real Ekurhuleni municipal statement for 55 Loper Street (account
-    // 1702343124) - but it bills BOTH this site AND ADH Machine Tool above under one account (one
-    // physical building, one municipal meter set), and there's no existing data anywhere in either
-    // site's own billing history (no tracked meter serials, floor-area split, or any other
-    // convention) to derive how much of it belongs to each tenant - asked the client how to split it
-    // before writing a municipal_import.js for either site.
+    // Real municipal account statement received 2026-09 for the same shared 55 Loper Street account
+    // as ADH Machine Tool above (account 1702343124) - flat 50/50 split confirmed with the client
+    // 2026-09-22, see zelvio-global/municipal_import.js.
+    hasMunicipalStatements: true,
     hasFlagging: true,
     flaggingChartLayout: true,
   },

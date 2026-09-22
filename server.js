@@ -145,6 +145,13 @@ require('./cranbrook-flavours/municipal_import').run('cranbrook-flavours.db');
 require('./interoll/municipal_import').run('interoll.db');
 require('./rcl-group/municipal_import').run('rcl-group.db');
 require('./colorobbia/municipal_import').run('colorobbia.db');
+// ADH Machine Tool + Zelvio Global's shared 55 Loper Street municipal account (Jul 2026) - imported
+// into BOTH sites at a flat 50/50 split of every line item, confirmed with the client 2026-09-22
+// (no meter-serial mapping or floor-area split exists anywhere to derive a more accurate split) -
+// see flat_site_tariff_shapes.js's EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET and each site's own
+// municipal_import.js for the full explanation.
+require('./adh-machine-tool/municipal_import').run('adh-machine-tool.db');
+require('./zelvio-global/municipal_import').run('zelvio-global.db');
 
 function getPropertyDb(slug) { return propertyDbs.get(slug) || propertyDbs.get(DEFAULT_PROPERTY_SLUG); }
 function currentPropertyName(user) {

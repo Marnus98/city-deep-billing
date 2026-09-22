@@ -376,10 +376,54 @@ const EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE = [
   ...WATER_SEWER_ITEMS,
 ];
 
+// Ekurhuleni municipal account shape (COPY TAX INVOICE) for 55 Loper Street (account 1702343124,
+// "METBOARD PROPERTIES") - the one municipal account that bills BOTH 55 Loper Ave - ADH Machine Tool
+// South Africa (PTY) Ltd AND 55 Loper Ave - Zelvio Global under a single Ekurhuleni account (one
+// physical building, one set of municipal meters, two separate tenants in this app's own data
+// model). See adh-machine-tool/municipal_import.js and zelvio-global/municipal_import.js.
+//
+// Confirmed with the client 2026-09-22: since there's no meter-serial mapping or floor-area split
+// anywhere in either site's own billing history to derive an accurate per-tenant split, the account
+// is imported into BOTH sites at a flat 50/50 split of every line item's Rand cost - see each site's
+// own municipal_import.js for exactly how that's applied (every reading below is the real, full-
+// building meter reading straight off the statement; only the Rand cost - and therefore the
+// effective "rate" - is halved, so each site's own Municipal Account page shows the true physical
+// consumption for the building but only its assumed half-share of the actual bill).
+//
+// Structurally the most complex Ekurhuleni municipal shape in this app: a genuine Peak/Standard/
+// Off-Peak/Reactive/Demand TOU split (unlike every other "Loper Ave" statement, which has none) -
+// all 5 components share one base meter serial (021411233) with a different letter prefix per
+// component (P/S/O/R/D), almost certainly TOU/register components of one physical meter rather than
+// 5 separate meters. Two separate water meters (990229906, real reading; 66659830, INTERIM estimate)
+// each get their own line + matching sewer line, rather than combined into one WATER_SEWER_ITEMS
+// pair like every other Loper Ave shape - this statement never combines them itself.
+//
+// Extraction method: every figure read directly off the statement's own itemised PROPERTY RATES/
+// ELECTRICITY SERVICE/REFUSE REMOVAL/WATER SERVICE/SEWERAGE lines; the FULL (unsplit) set of current-
+// period lines reconciles EXACTLY (to the cent) against the statement's own "TOTAL CURRENT LEVY
+// 38841.09" before any 50/50 split is applied - the "BALANCE BROUGHT FORWARD"/"SUB TOTAL" carry-
+// forward lines above are excluded, same convention as every other property's municipal import.
+const EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET = [
+  { key: 'property_rates', label: 'Property Rates (Business & Commercial)', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal', vatExempt: true },
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'peak', label: 'Peak Energy', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard', label: 'Standard Energy', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak', label: 'Off-Peak Energy', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'reactive', label: 'Reactive Energy', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'demand', label: 'Demand', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'refuse_business', label: 'Refuse Removal - Business', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  { key: 'refuse_litter', label: 'Refuse Removal - Litterpicking', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'municipal' },
+  { key: 'water', label: 'Water Consumption (Meter 990229906)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+  { key: 'water_interim', label: 'Water Consumption (Meter 66659830, INTERIM)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: true, section: 'water' },
+  { key: 'sewer', label: 'Sewer', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
+  { key: 'sewer_interim', label: 'Sewer (Meter 66659830, INTERIM)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: true, section: 'water' },
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
   EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
-  EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE,
+  EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE, EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET,
 };
