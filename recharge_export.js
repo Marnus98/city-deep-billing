@@ -175,16 +175,14 @@ function billingPeriod(db, label) {
 
 // EL01 "Solar Credit" is only a PORTION of the tenant's own net solar-used Rand value from the same
 // Solar Billing Slips report shown on screen (solar.js) - City Deep keeps the rest, only passes this
-// share through as a credit. Confirmed 2026-09-23 by diffing 2 months of the client's own real "CSV
-// Lisa" files against this module's prior (100%) output: Lesco's real EL01 = exactly 20% of
-// solar.js's total.solarUsed.rand for BOTH months checked, Hudaco's = exactly 12%, both to the cent.
-// Agrana and Teraoka are DELIBERATELY left un-scaled (share 1 = 100%, the same wrong value as
-// before) rather than guessed at: Agrana's real figures are close to but not an exact match for any
-// clean percentage of this module's current solarUsed baseline (~4.0-4.01% across the 2 months, not
-// quite stable to the cent), and Teraoka's aren't even consistent between the 2 months (~19.28% vs
-// ~19.55%) - scaling those two on a guessed share risks putting a wrong number on a real tenant
-// invoice. Flagged to the client for the correct share (or underlying formula) before scaling them.
-const SOLAR_CREDIT_SHARE = { lesco: 0.20, hudaco: 0.12 };
+// share through as a credit. Lesco's (20%) and Hudaco's (12%) shares were confirmed 2026-09-23 by
+// diffing 2 months of the client's own real "CSV Lisa" files against this module's prior (100%)
+// output, matching to the cent both months. Agrana's real figures landed close to but not exactly
+// 4% by that same diff (~4.0-4.01% across the 2 months, not quite stable to the cent - likely just
+// upstream rounding), and Teraoka's ratio actually differed between the 2 months (~19.28% vs
+// ~19.55%), so neither was set from the diff alone; both confirmed directly by the client
+// 2026-09-23 (Agrana 4%, Teraoka 20%) instead.
+const SOLAR_CREDIT_SHARE = { lesco: 0.20, hudaco: 0.12, agrana: 0.04, teraoka: 0.20 };
 function solarCreditAmount(cityDeepDb, periodId, solarKey) {
   const slips = solar.getSolarSlips(cityDeepDb, periodId);
   const slip = slips.find((s) => s.key === solarKey);
