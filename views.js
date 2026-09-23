@@ -1386,11 +1386,12 @@ function shortQty(n, unit) {
 function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
   const maxVal = Math.max(1, ...rows.flatMap((r) => (hasData(r) ? [getA(r), getB(r)] : [])).filter((v) => v != null));
   const chartHeight = 160;
-  // Recovery (delta) row - one cell per month, all aligned on the same line inside a bordered box,
-  // rather than floating each delta directly above its own bar pair (previous layout - a short
-  // month's delta sat much lower than a tall month's, reading as inconsistent/confusing at a glance,
-  // per client feedback 2026-09-23). `flex-1`/`min-width`/`gap-2` here mirror the bar columns below
-  // exactly so each delta still lines up over its own month.
+  // Recovery (delta) row - one cell per month, all aligned on the same line, rather than floating
+  // each delta directly above its own bar pair (previous layout - a short month's delta sat much
+  // lower than a tall month's, reading as inconsistent/confusing at a glance, per client feedback
+  // 2026-09-23). `flex-1`/`min-width`/`gap-2` here mirror the bar columns below exactly so each delta
+  // still lines up over its own month. No border/box around the row - client feedback 2026-09-23
+  // ("remove the border around the over/under recover figures") after trying it with one.
   const deltaCells = rows.map((r) => {
     if (!hasData(r)) return `<div class="flex-1 text-center text-xs text-slate-400" style="min-width:64px">no data</div>`;
     const delta = getDelta(r) || 0;
@@ -1432,7 +1433,7 @@ function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 
     <span class="text-green-600 font-medium">Green</span>&nbsp;= over-recovery,
     <span class="text-red-600 font-medium">Red</span>&nbsp;= under-recovery
   </div>
-  <div class="flex gap-2 border rounded-md py-2 px-1 mb-2 overflow-x-auto">${deltaCells}</div>
+  <div class="flex gap-2 py-2 px-1 mb-2 overflow-x-auto">${deltaCells}</div>
   <div class="flex items-end gap-2 border-b pb-1 overflow-x-auto">${columns}</div>`;
 }
 

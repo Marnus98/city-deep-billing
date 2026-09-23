@@ -929,15 +929,16 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
   doc.currentOps.push('0 0 0 rg'); // rect()'s fill colour otherwise bleeds into every text() draw
   // below (rg is a persistent graphics-state param, not scoped to one shape) - reset to black.
 
-  // Recovery (delta) band: one row, in its own bordered box, with every month's over/under-recovery
-  // figure sitting on the SAME horizontal line - matches views.js's on-screen barChart, redesigned
-  // 2026-09-23 per client feedback that floating each delta directly above its own bar pair (the
-  // previous layout) put deltas at inconsistent heights depending on that month's bar size, which
-  // read as confusing at a glance. Carved out of the top of `height` (below the legend, above the
-  // bars themselves), so callers don't need their own separate allocation for it.
+  // Recovery (delta) band: one row, with every month's over/under-recovery figure sitting on the
+  // SAME horizontal line - matches views.js's on-screen barChart, redesigned 2026-09-23 per client
+  // feedback that floating each delta directly above its own bar pair (the previous layout) put
+  // deltas at inconsistent heights depending on that month's bar size, which read as confusing at a
+  // glance. Carved out of the top of `height` (below the legend, above the bars themselves), so
+  // callers don't need their own separate allocation for it. No box/border around this row - drawn
+  // briefly with one (client feedback 2026-09-23: "remove the border around the over/under recover
+  // figures") - just the aligned row of coloured figures on their own.
   const bandH = 20, bandGap = 8;
   const bandBottom = y - bandH;
-  doc.rect(x, bandBottom, width, bandH, { stroke: [0.82, 0.82, 0.82] });
   series.forEach((s, i) => {
     const colCenter = x + i * colWidth + colWidth / 2;
     const cy = bandBottom + bandH / 2 - 3;
@@ -977,6 +978,14 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
     doc.text(x - 6 - textWidth(label, { size: 6 }), ty - 3, label, { size: 6 });
   }
 
+  // Bar geometry + per-bar value labels are computed in two passes: first lay out every bar and
+  // center its label on top the way views.js's on-screen barChart does, then sweep the whole row of
+  // labels left-to-right nudging any that would overlap the previous one. The within-pair nudge
+  // (below) only ever kept a bar-pair's own 2 labels apart from EACH OTHER - on a busy 12-month chart
+  // with big Rand/kWh swings, one column's label could still collide with its NEIGHBOUR's, since
+  // that case was never checked. The sweep below fixes that cross-column case client feedback
+  // flagged (2026-09-23: "kWh consumption or kL overlap on the graphs").
+  const labelRow = [];
   series.forEach((s, i) => {
     const colCenter = x + i * colWidth + colWidth / 2;
     if (!hasData(s)) {
@@ -992,21 +1001,40 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
     doc.rect(aX, chartBottom, barWidth, aH, { fill: COLOR_A });
     doc.rect(bX, chartBottom, barWidth, bH, { fill: COLOR_B });
 
-    // Per-bar value labels directly above each bar - matches views.js's on-screen barChart. Narrow
-    // bar-pair columns (12 months on one page) mean two similarly-sized labels can be wider than the
-    // gap between them - nudge each one outward, away from the pair's shared centre, by half of
-    // whatever overlap remains after centering, so they never print on top of each other.
+    // Center each label on its own bar, then nudge the pair apart from each other (same "half the
+    // overlap" approach as before) - this still runs first so a very tight pair starts as far apart
+    // as this column alone can manage, before the cross-column sweep below gets involved.
     const aLabel = formatCompact(aVal), bLabel = formatCompact(bVal);
     const aLabelW = textWidth(aLabel, { size: 6 }), bLabelW = textWidth(bLabel, { size: 6 });
     let aLabelX = aX + barWidth / 2 - aLabelW / 2;
     let bLabelX = bX + barWidth / 2 - bLabelW / 2;
-    const overlap = (aLabelX + aLabelW) - bLabelX;
-    if (overlap > 0) { aLabelX -= overlap / 2 + 1; bLabelX += overlap / 2 + 1; }
-    doc.text(aLabelX, chartBottom + aH + 4, aLabel, { size: 6 });
-    doc.text(bLabelX, chartBottom + bH + 4, bLabel, { size: 6 });
+    const pairOverlap = (aLabelX + aLabelW) - bLabelX;
+    if (pairOverlap > 0) { aLabelX -= pairOverlap / 2 + 1; bLabelX += pairOverlap / 2 + 1; }
+    labelRow.push({ x: aLabelX, w: aLabelW, text: aLabel, y: chartBottom + aH + 4 });
+    labelRow.push({ x: bLabelX, w: bLabelW, text: bLabel, y: chartBottom + bH + 4 });
 
     doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
   });
+
+  // Cross-column sweep: labels are already in left-to-right column order (labelRow.push above
+  // preserves it). A naive "always push past the previous label's right edge" pass looked right in
+  // isolation but actually broke a different case: a short bar's label sitting right next to a much
+  // TALLER neighbouring bar got shoved sideways straight into that tall bar's own fill (the push had
+  // nothing to do with an actual text collision - the two labels were nowhere near the same height,
+  // so there was nothing to avoid). Two labels only ever visually clash when they land at roughly the
+  // same height - LABEL_ROW_TOL below is comfortably more than one line of 6pt text - so only push
+  // when the previous label is within that band; otherwise leave this label exactly where it was
+  // centred on its own bar.
+  const LABEL_ROW_TOL = 8;
+  const labelGap = 3;
+  let prev = null;
+  for (const lbl of labelRow) {
+    if (prev && Math.abs(lbl.y - prev.y) < LABEL_ROW_TOL && lbl.x < prev.x + prev.w + labelGap) {
+      lbl.x = prev.x + prev.w + labelGap;
+    }
+    prev = lbl;
+  }
+  for (const lbl of labelRow) doc.text(lbl.x, lbl.y, lbl.text, { size: 6 });
 
   doc.line(x, chartBottom, x + width, chartBottom, 0.75);
 }
@@ -1068,7 +1096,7 @@ function drawMeterAccuracyPanel(doc, { rows, left, right, y, qtyKey, qtyLabel, q
 
   const colorFor = (abs) => (abs >= 25 ? [0.75, 0.15, 0.15] : (abs >= 10 ? [0.75, 0.5, 0.05] : [0.4, 0.4, 0.4]));
   for (const r of rows) {
-    if (y < 90) { doc.newPage(); y = PAGE_H - 50; }
+    if (y < 90) { doc.newPage(); y = doc.page.height - 50; }
     const site = r.site, muni = r.municipal;
     doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
     if (!site || !muni) {
@@ -1158,7 +1186,7 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
     // side - see below) instead of the 13pt it used to, before the billing-range/day-count readout
     // was added - a full 12-month table no longer reliably fits on one page. Redraw the column
     // header (no title, avoids implying a new table) at the top of the new page and carry on.
-    if (y < 98) { doc.newPage(); y = drawHeader(PAGE_H - 50, false); }
+    if (y < 98) { doc.newPage(); y = drawHeader(doc.page.height - 50, false); }
     const site = r.site, muni = r.municipal, rec = r.recovery;
     const ourStart = site && site.startDate, ourEnd = site && site.endDate;
     const muniStart = muni && (periodField === 'water' ? (muni.waterStartDate || muni.startDate) : muni.startDate);
@@ -1224,7 +1252,7 @@ function drawSolarCostPanel(doc, { rows, left, right, y }) {
   y -= 4; doc.line(left, y, right, y); y -= 11;
   for (const r of rows) {
     if (r.solarCost == null) continue;
-    if (y < 90) { doc.newPage(); y = PAGE_H - 50; }
+    if (y < 90) { doc.newPage(); y = doc.page.height - 50; }
     doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
     if (r.solarCost === 0) {
       const str = 'no invoice yet';
@@ -1251,15 +1279,15 @@ function drawSolarCostPanel(doc, { rows, left, right, y }) {
 // a Recovery section - factored out 2026-08-08 so the Overall page and each utility's own page
 // (below) all get an identical header instead of copy-pasting it 4x.
 function drawRecoveryPageHeader(doc, { propertyName, section, left, right, subtitle }) {
-  let y = PAGE_H - 50;
-  doc.image(right - 90, PAGE_H - 32 - 90 * (LOGO.height / LOGO.width), 90, 90 * (LOGO.height / LOGO.width), 'Logo');
+  let y = doc.page.height - 50;
+  doc.image(right - 90, doc.page.height - 32 - 90 * (LOGO.height / LOGO.width), 90, 90 * (LOGO.height / LOGO.width), 'Logo');
   const logoH = 90 * (LOGO.height / LOGO.width);
   doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
   doc.text(left, y, subtitle, { size: 10 }); y -= 13;
   // 13pt line gap here (was 6pt) - too tight for a 10pt line, so a titled section (City Deep's 3
   // Recovery groups) printed its own bold section title almost on top of the subtitle line above it.
   if (section.title) { doc.text(left, y, section.title, { size: 10, bold: true }); y -= 14; }
-  y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
+  y = Math.min(y - 8, doc.page.height - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 16;
   return y;
 }
@@ -1289,7 +1317,7 @@ function drawRecoverySection(doc, { propertyName, section, left, right }) {
     // comment in views.js's solarCostPanel for why solarCost > 0 (not != null) is the right guard.
     if (rows.some((r) => r.solarCost > 0)) {
       y -= 26;
-      if (y < 160) { doc.newPage(); y = PAGE_H - 50; }
+      if (y < 160) { doc.newPage(); y = doc.page.height - 50; }
       y = drawSolarCostPanel(doc, { rows: rowsDesc, left, right, y });
     }
   } else {
@@ -1312,7 +1340,7 @@ function drawRecoverySection(doc, { propertyName, section, left, right }) {
       ty -= 6;
       // Meter-accuracy panel can land close to the bottom margin after two full-height charts -
       // give it a fresh page rather than squeezing a half-cut table onto this one.
-      if (ty < 220) { doc.newPage(); ty = PAGE_H - 50; }
+      if (ty < 220) { doc.newPage(); ty = doc.page.height - 50; }
       ty = drawMeterAccuracyPanel(doc, { rows: rowsDesc, left, right, y: ty, qtyKey: u.qtyKey, qtyLabel: u.qtyLabel, qtyDp: u.qtyDp, periodField: u.periodField });
     } else {
       doc.text(left, ty - 20, 'No overlapping billing/municipal data yet.', { size: 9 });
@@ -1320,7 +1348,7 @@ function drawRecoverySection(doc, { propertyName, section, left, right }) {
     }
     // The panel/charts above can run close to the bottom margin on a property with many months of
     // history - start the detail table fresh on the next page rather than cramming it in below.
-    if (ty < 160) { doc.newPage(); ty = PAGE_H - 50; }
+    if (ty < 160) { doc.newPage(); ty = doc.page.height - 50; }
     ty = drawRecoveryTable(doc, { title: `${u.label} (newest first)`, rows: rowsDesc, left, right, y: ty, randKey: u.randKey, qtyKey: u.qtyKey, qtyLabel: u.qtyLabel, qtyDp: u.qtyDp, periodField: u.periodField });
     lastTy = ty;
   }
@@ -1333,7 +1361,18 @@ function drawRecoverySection(doc, { propertyName, section, left, right }) {
 // section gets its own overview+detail page block, in order.
 function buildRecoveryPdf(data) {
   const doc = new PDFDoc();
-  const left = 42, right = PAGE_W - 42;
+  // Landscape, not the portrait A4 every other PDF in this file uses - per the client's own
+  // suggestion (2026-09-23: "rather do it landscape") to give the Rand/consumption charts and the
+  // wide 6-column detail tables more breathing room than portrait ever could. Safe to do only for
+  // this one PDFDoc instance: PDFDoc.build() sizes every page from `this.page` (see the constructor
+  // and build()'s own MediaBox line), and every drawing function this file's Recovery PDF calls
+  // (drawRecoveryPageHeader/drawRecoverySection/drawRecoveryTable/drawSolarCostPanel/
+  // drawMeterAccuracyPanel/drawGroupedComparisonChart and friends) reads the page size off `doc.page`
+  // rather than the module-level PAGE_W/PAGE_H - none of them are shared with the portrait-only
+  // billing-slip/municipal-statement/flagging PDF builders elsewhere in this file, so this doesn't
+  // touch anything else.
+  doc.page = { width: PAGE_H, height: PAGE_W };
+  const left = 42, right = doc.page.width - 42;
   const propertyName = (data.propertyName || '').toUpperCase();
   const sections = data.sections || [{ title: null, rows: data.rows || [] }];
 
