@@ -187,6 +187,26 @@ function qtyShort(n, unit) {
   return (neg ? '-' : '') + Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ' + unit;
 }
 
+// "R310k"-style abbreviation - mirrors views.js's on-screen shortMoney()/shortQty() exactly. Despite
+// the name, moneyShort/qtyShort above print the FULL comma-grouped number (fine for axis tick labels,
+// which have a whole margin column to themselves) - too wide once printed twice per bar-pair column
+// in drawGroupedComparisonChart's per-bar value labels below, where two of these sit side by side in
+// a ~16pt-wide bar's column. moneyCompact/qtyCompact exist specifically for that tighter spot.
+function moneyCompact(n) {
+  const v = Number(n || 0);
+  const neg = v < 0;
+  const abs = Math.abs(v);
+  const s = abs >= 1000 ? `R${(abs / 1000).toFixed(abs >= 100000 ? 0 : 1)}k` : `R${abs.toFixed(0)}`;
+  return (neg ? '-' : '') + s;
+}
+function qtyCompact(n, unit) {
+  const v = Number(n || 0);
+  const neg = v < 0;
+  const abs = Math.abs(v);
+  const s = abs >= 1000 ? `${(abs / 1000).toFixed(abs >= 100000 ? 0 : 1)}k` : abs.toFixed(abs >= 10 ? 0 : 1);
+  return (neg ? '-' : '') + s + ' ' + unit;
+}
+
 const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 function shortMonthLabel(label) {
   // "2026-04" -> "APR 26"
@@ -882,13 +902,16 @@ function buildSolarSummaryPdf({ propertyName, period, slips }) {
 // level - totalSiteRand etc.) and each utility's own Rand/consumption charts (values nested under
 // site/municipal/recovery) - generalised 2026-08-08 when the single combined chart was split into
 // one chart per utility, per Rand AND consumption, per the client's request.
-function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, getB, getDelta, hasData, formatValue = moneyShort, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
+function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, getB, getDelta, hasData, formatValue = moneyShort, formatCompact = moneyCompact, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
   const COLOR_A = [0.11, 0.16, 0.34]; // Tenant Billing - matches the Electricity navy used everywhere else
   const COLOR_B = [0.39, 0.45, 0.55]; // Municipal Statement - neutral slate, reads as "external/reference"
   const COLOR_POS = [0.05, 0.5, 0.2], COLOR_NEG = [0.75, 0.15, 0.15];
 
   const values = series.flatMap((s) => (hasData(s) ? [getA(s), getB(s)] : [])).filter((v) => v != null);
-  const maxVal = Math.max(1, ...values);
+  // 30% headroom above the tallest bar - views.js's on-screen barChart prints two lines above each
+  // bar pair (each bar's own value, then the delta above that), so the chart area needs to reserve
+  // room for both instead of just the delta that used to be drawn here alone.
+  const maxVal = Math.max(1, ...values) * 1.3;
   const chartBottom = y - height;
   const n = series.length || 1;
   const colWidth = width / n;
@@ -930,6 +953,21 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
     doc.rect(aX, chartBottom, barWidth, aH, { fill: COLOR_A });
     doc.rect(bX, chartBottom, barWidth, bH, { fill: COLOR_B });
 
+    // Per-bar value labels directly above each bar - matches views.js's on-screen barChart, which
+    // shows both bars' own totals before the delta above them (added 2026-09-23; this PDF used to
+    // show only the delta, which read as a mismatch against the on-screen page's layout). Narrow
+    // bar-pair columns (12 months on one page) mean two similarly-sized labels can be wider than the
+    // gap between them - nudge each one outward, away from the pair's shared centre, by half of
+    // whatever overlap remains after centering, so they never print on top of each other.
+    const aLabel = formatCompact(aVal), bLabel = formatCompact(bVal);
+    const aLabelW = textWidth(aLabel, { size: 6 }), bLabelW = textWidth(bLabel, { size: 6 });
+    let aLabelX = aX + barWidth / 2 - aLabelW / 2;
+    let bLabelX = bX + barWidth / 2 - bLabelW / 2;
+    const overlap = (aLabelX + aLabelW) - bLabelX;
+    if (overlap > 0) { aLabelX -= overlap / 2 + 1; bLabelX += overlap / 2 + 1; }
+    doc.text(aLabelX, chartBottom + aH + 4, aLabel, { size: 6 });
+    doc.text(bLabelX, chartBottom + bH + 4, bLabel, { size: 6 });
+
     const delta = getDelta(s) || 0;
     const recColor = delta >= 0 ? COLOR_POS : COLOR_NEG;
     const recLabel = `${delta >= 0 ? '+' : ''}${formatValue(delta)}`;
@@ -938,7 +976,9 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
     // coloured text op directly, same "rg" fill-colour operator doc.rect()'s fill uses, since Tj
     // paints with the current non-stroking (fill) colour by default.
     const recX = colCenter - textWidth(recLabel, { size: 6.5, bold: true }) / 2;
-    const recY = chartBottom + topH + 5;
+    // 14pt above the taller bar (was 5pt) - leaves room for the per-bar value label line just added
+    // above, same "delta sits above the two value labels" stacking order as the on-screen chart.
+    const recY = chartBottom + topH + 14;
     doc.currentOps.push(`${recColor[0]} ${recColor[1]} ${recColor[2]} rg BT /F2 6.5 Tf ${recX.toFixed(2)} ${recY.toFixed(2)} Td (${escapePdfText(recLabel)}) Tj ET`);
     doc.currentOps.push('0 0 0 rg'); // reset fill colour - "rg" is a persistent graphics-state
     // parameter, not scoped to the BT/ET text block above, so every doc.text() call after this
@@ -979,7 +1019,7 @@ function drawUtilityCharts(doc, { x, y, width, series, randKey, qtyKey, qtyLabel
   drawGroupedComparisonChart(doc, {
     x: x + 46, y: cy, width: width - 46, height: chartHeight, series,
     getA: (s) => s.site && s.site[qtyKey], getB: (s) => s.municipal && s.municipal[qtyKey], getDelta: (s) => s.recovery && s.recovery[qtyKey],
-    hasData: hasBothSidesPdf, formatValue: (v) => qtyShort(v, qtyLabel),
+    hasData: hasBothSidesPdf, formatValue: (v) => qtyShort(v, qtyLabel), formatCompact: (v) => qtyCompact(v, qtyLabel),
   });
   cy -= chartHeight + 14 + 26;
   return cy;
@@ -1053,8 +1093,8 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
   const sub = ['Tenant', 'Municipal', 'Recovery', 'Tenant', 'Municipal', 'Recovery'];
 
   // Draws the title + column header, returning the y just below it - factored out so a mid-table
-  // page break (see the per-row loop below, needed now each row takes ~26pt instead of 13pt once
-  // the billing-range/day-count line was added) can redraw it at the top of the new page.
+  // page break (see the per-row loop below, needed now each row takes ~34pt instead of 13pt once
+  // the billing-range/day-count lines were added) can redraw it at the top of the new page.
   const drawHeader = (yy, withTitle) => {
     if (withTitle) { doc.text(left, yy, title, { size: 11, bold: true }); yy -= 16; }
     doc.text(left, yy, 'Month / Billing Period', { bold: true, size: 7.5 });
@@ -1092,11 +1132,11 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
 
   let flaggedAny = false;
   for (const r of rows) {
-    // Page break: each row now takes ~26pt (main line + billing-range line) instead of the 13pt it
-    // used to, before the billing-range/day-count readout was added - a full 12-month table no
-    // longer reliably fits on one page. Redraw the column header (no title, avoids implying a new
-    // table) at the top of the new page and carry on.
-    if (y < 90) { doc.newPage(); y = drawHeader(PAGE_H - 50, false); }
+    // Page break: each row now takes ~34pt (main line + 2 separate billing-range lines, one per
+    // side - see below) instead of the 13pt it used to, before the billing-range/day-count readout
+    // was added - a full 12-month table no longer reliably fits on one page. Redraw the column
+    // header (no title, avoids implying a new table) at the top of the new page and carry on.
+    if (y < 98) { doc.newPage(); y = drawHeader(PAGE_H - 50, false); }
     const site = r.site, muni = r.municipal, rec = r.recovery;
     const ourStart = site && site.startDate, ourEnd = site && site.endDate;
     const muniStart = muni && (periodField === 'water' ? (muni.waterStartDate || muni.startDate) : muni.startDate);
@@ -1118,13 +1158,18 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
     doc.text(edges[4] - textWidth(muniQtyStr, { size: 7.5 }), y, muniQtyStr, { size: 7.5 });
     drawRightSigned(rec ? rec[qtyKey] : null, edges[5], y, (v, dp) => v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }), qtyDp);
     y -= 10;
-    // Exact billing range + day count for both sides, printed under the main row - see views.js's
-    // periodLine for why this was added (client over/under-recovery meeting, hard-copy handout).
+    // Exact billing range + day count for both sides, printed under the main row on its own two
+    // lines - matches views.js's on-screen periodLine() exactly (see that function's own comment
+    // for why this was added: client over/under-recovery meeting, hard-copy handout). Previously
+    // both sides were crammed onto one dense "Ours: ... | Municipal: ..." line here, which read as
+    // noticeably harder to parse than the on-screen page's clean stacked layout - split to match.
     if (site || muni) {
-      doc.text(left, y, `Ours: ${periodStr(ourStart, ourEnd)}   |   Municipal: ${periodStr(muniStart, muniEnd)}`, { size: 6.5 });
+      doc.text(left, y, `Ours: ${periodStr(ourStart, ourEnd)}`, { size: 6.5, bold: false });
+      y -= 9;
+      doc.text(left, y, `Municipal: ${periodStr(muniStart, muniEnd)}`, { size: 6.5, bold: false });
       y -= 10;
     }
-    y -= 6;
+    y -= 5;
   }
   if (flaggedAny) {
     doc.text(left, y - 2, `* period longer than ${LONG_PERIOD_DAYS} days (combined/multi-month statement)`, { size: 6.5 });
@@ -1183,7 +1228,9 @@ function drawRecoveryPageHeader(doc, { propertyName, section, left, right, subti
   doc.image(right - 90, PAGE_H - 32 - 90 * (LOGO.height / LOGO.width), 90, 90 * (LOGO.height / LOGO.width), 'Logo');
   const logoH = 90 * (LOGO.height / LOGO.width);
   doc.text(left, y, propertyName, { size: 16, bold: true }); y -= 14;
-  doc.text(left, y, subtitle, { size: 10 }); y -= 6;
+  doc.text(left, y, subtitle, { size: 10 }); y -= 13;
+  // 13pt line gap here (was 6pt) - too tight for a 10pt line, so a titled section (City Deep's 3
+  // Recovery groups) printed its own bold section title almost on top of the subtitle line above it.
   if (section.title) { doc.text(left, y, section.title, { size: 10, bold: true }); y -= 14; }
   y = Math.min(y - 8, PAGE_H - 32 - logoH - 9);
   doc.line(left, y, right, y); y -= 16;
