@@ -88,12 +88,18 @@ class PDFDoc {
     this.currentOps.push(`${colorOp}${dashOp}${width} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
     return this;
   }
-  rect(x, y, w, h, { fill } = {}) {
+  rect(x, y, w, h, { fill, stroke } = {}) {
     if (fill) {
       const [r, g, b] = fill;
       this.currentOps.push(`${r} ${g} ${b} rg ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`);
     } else {
-      this.currentOps.push(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`);
+      // `stroke` sets the border colour for this one rect and resets to black immediately after -
+      // "RG" is a persistent graphics-state param like "rg" (see every rect()/line() caller's own
+      // "reset to black" comment), so leaving it set would otherwise bleed into the next unrelated
+      // line()/rect() call.
+      const strokeOp = stroke ? `${stroke[0]} ${stroke[1]} ${stroke[2]} RG ` : '';
+      this.currentOps.push(`${strokeOp}${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`);
+      if (stroke) this.currentOps.push('0 0 0 RG');
     }
     return this;
   }
@@ -907,12 +913,6 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
   const COLOR_B = [0.39, 0.45, 0.55]; // Municipal Statement - neutral slate, reads as "external/reference"
   const COLOR_POS = [0.05, 0.5, 0.2], COLOR_NEG = [0.75, 0.15, 0.15];
 
-  const values = series.flatMap((s) => (hasData(s) ? [getA(s), getB(s)] : [])).filter((v) => v != null);
-  // 30% headroom above the tallest bar - views.js's on-screen barChart prints two lines above each
-  // bar pair (each bar's own value, then the delta above that), so the chart area needs to reserve
-  // room for both instead of just the delta that used to be drawn here alone.
-  const maxVal = Math.max(1, ...values) * 1.3;
-  const chartBottom = y - height;
   const n = series.length || 1;
   const colWidth = width / n;
   const barWidth = Math.min(16, colWidth * 0.28);
@@ -929,10 +929,49 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
   doc.currentOps.push('0 0 0 rg'); // rect()'s fill colour otherwise bleeds into every text() draw
   // below (rg is a persistent graphics-state param, not scoped to one shape) - reset to black.
 
+  // Recovery (delta) band: one row, in its own bordered box, with every month's over/under-recovery
+  // figure sitting on the SAME horizontal line - matches views.js's on-screen barChart, redesigned
+  // 2026-09-23 per client feedback that floating each delta directly above its own bar pair (the
+  // previous layout) put deltas at inconsistent heights depending on that month's bar size, which
+  // read as confusing at a glance. Carved out of the top of `height` (below the legend, above the
+  // bars themselves), so callers don't need their own separate allocation for it.
+  const bandH = 20, bandGap = 8;
+  const bandBottom = y - bandH;
+  doc.rect(x, bandBottom, width, bandH, { stroke: [0.82, 0.82, 0.82] });
+  series.forEach((s, i) => {
+    const colCenter = x + i * colWidth + colWidth / 2;
+    const cy = bandBottom + bandH / 2 - 3;
+    if (!hasData(s)) {
+      const label = 'no data';
+      doc.text(colCenter - textWidth(label, { size: 6.5 }) / 2, cy, label, { size: 6.5 });
+      return;
+    }
+    const delta = getDelta(s) || 0;
+    const recColor = delta >= 0 ? COLOR_POS : COLOR_NEG;
+    const recLabel = `${delta >= 0 ? '+' : ''}${formatValue(delta)}`;
+    const recX = colCenter - textWidth(recLabel, { size: 6.5, bold: true }) / 2;
+    // doc.text() has no colour param (every other label in this app is plain black) - push the
+    // coloured text op directly, same "rg" fill-colour operator doc.rect()'s fill uses, since Tj
+    // paints with the current non-stroking (fill) colour by default.
+    doc.currentOps.push(`${recColor[0]} ${recColor[1]} ${recColor[2]} rg BT /F2 6.5 Tf ${recX.toFixed(2)} ${cy.toFixed(2)} Td (${escapePdfText(recLabel)}) Tj ET`);
+    doc.currentOps.push('0 0 0 rg'); // reset fill colour - "rg" is a persistent graphics-state
+    // parameter, not scoped to the BT/ET text block above, so every doc.text() call after this
+    // point (which never sets its own colour) would otherwise silently inherit red/green.
+  });
+
+  const plotHeight = height - bandH - bandGap;
+  const chartTop = bandBottom - bandGap;
+  const chartBottom = chartTop - plotHeight;
+  const values = series.flatMap((s) => (hasData(s) ? [getA(s), getB(s)] : [])).filter((v) => v != null);
+  // 15% headroom above the tallest bar, just enough for the per-bar value label line below - the
+  // delta itself now lives in the fixed band above, not stacked over the bars, so this needs far
+  // less headroom than before that redesign.
+  const maxVal = Math.max(1, ...values) * 1.15;
+
   const ticks = 4;
   for (let t = 0; t <= ticks; t++) {
     const v = (maxVal * t) / ticks;
-    const ty = chartBottom + (height * t) / ticks;
+    const ty = chartBottom + (plotHeight * t) / ticks;
     doc.line(x, ty, x + width, ty, 0.4, { color: [0.85, 0.85, 0.85] });
     const label = formatValue(v);
     doc.text(x - 6 - textWidth(label, { size: 6 }), ty - 3, label, { size: 6 });
@@ -946,16 +985,14 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
       return;
     }
     const aVal = getA(s) || 0, bVal = getB(s) || 0;
-    const aH = (aVal / maxVal) * height;
-    const bH = (bVal / maxVal) * height;
+    const aH = (aVal / maxVal) * plotHeight;
+    const bH = (bVal / maxVal) * plotHeight;
     const aX = colCenter - gap / 2 - barWidth;
     const bX = colCenter + gap / 2;
     doc.rect(aX, chartBottom, barWidth, aH, { fill: COLOR_A });
     doc.rect(bX, chartBottom, barWidth, bH, { fill: COLOR_B });
 
-    // Per-bar value labels directly above each bar - matches views.js's on-screen barChart, which
-    // shows both bars' own totals before the delta above them (added 2026-09-23; this PDF used to
-    // show only the delta, which read as a mismatch against the on-screen page's layout). Narrow
+    // Per-bar value labels directly above each bar - matches views.js's on-screen barChart. Narrow
     // bar-pair columns (12 months on one page) mean two similarly-sized labels can be wider than the
     // gap between them - nudge each one outward, away from the pair's shared centre, by half of
     // whatever overlap remains after centering, so they never print on top of each other.
@@ -968,21 +1005,6 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
     doc.text(aLabelX, chartBottom + aH + 4, aLabel, { size: 6 });
     doc.text(bLabelX, chartBottom + bH + 4, bLabel, { size: 6 });
 
-    const delta = getDelta(s) || 0;
-    const recColor = delta >= 0 ? COLOR_POS : COLOR_NEG;
-    const recLabel = `${delta >= 0 ? '+' : ''}${formatValue(delta)}`;
-    const topH = Math.max(aH, bH);
-    // doc.text() has no colour param (every other label in this app is plain black) - push the
-    // coloured text op directly, same "rg" fill-colour operator doc.rect()'s fill uses, since Tj
-    // paints with the current non-stroking (fill) colour by default.
-    const recX = colCenter - textWidth(recLabel, { size: 6.5, bold: true }) / 2;
-    // 14pt above the taller bar (was 5pt) - leaves room for the per-bar value label line just added
-    // above, same "delta sits above the two value labels" stacking order as the on-screen chart.
-    const recY = chartBottom + topH + 14;
-    doc.currentOps.push(`${recColor[0]} ${recColor[1]} ${recColor[2]} rg BT /F2 6.5 Tf ${recX.toFixed(2)} ${recY.toFixed(2)} Td (${escapePdfText(recLabel)}) Tj ET`);
-    doc.currentOps.push('0 0 0 rg'); // reset fill colour - "rg" is a persistent graphics-state
-    // parameter, not scoped to the BT/ET text block above, so every doc.text() call after this
-    // point (which never sets its own colour) would otherwise silently inherit red/green.
     doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
   });
 
@@ -1170,6 +1192,11 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
       y -= 10;
     }
     y -= 5;
+    // Light-grey divider between each month's row block (client feedback 2026-09-23: "insert a
+    // light grey line between each month") - drawn even after the last row of a page, which is
+    // harmless (falls just above the flagged-note/footer or the next page's redrawn header).
+    doc.line(left, y + 2, right, y + 2, 0.4, { color: [0.85, 0.85, 0.85] });
+    y -= 4;
   }
   if (flaggedAny) {
     doc.text(left, y - 2, `* period longer than ${LONG_PERIOD_DAYS} days (combined/multi-month statement)`, { size: 6.5 });

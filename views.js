@@ -1386,10 +1386,22 @@ function shortQty(n, unit) {
 function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
   const maxVal = Math.max(1, ...rows.flatMap((r) => (hasData(r) ? [getA(r), getB(r)] : [])).filter((v) => v != null));
   const chartHeight = 160;
+  // Recovery (delta) row - one cell per month, all aligned on the same line inside a bordered box,
+  // rather than floating each delta directly above its own bar pair (previous layout - a short
+  // month's delta sat much lower than a tall month's, reading as inconsistent/confusing at a glance,
+  // per client feedback 2026-09-23). `flex-1`/`min-width`/`gap-2` here mirror the bar columns below
+  // exactly so each delta still lines up over its own month.
+  const deltaCells = rows.map((r) => {
+    if (!hasData(r)) return `<div class="flex-1 text-center text-xs text-slate-400" style="min-width:64px">no data</div>`;
+    const delta = getDelta(r) || 0;
+    const deltaCls = delta >= 0 ? 'text-green-600' : 'text-red-600';
+    const sign = delta >= 0 ? '+' : '';
+    return `<div class="flex-1 text-center text-[11px] font-semibold ${deltaCls}" style="min-width:64px">${sign}${formatValue(delta)}</div>`;
+  }).join('');
   const columns = rows.map((r) => {
     if (!hasData(r)) {
       return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:64px">
-        <div class="text-xs text-slate-400 mb-1" style="height:${chartHeight}px" >
+        <div class="text-xs text-slate-400" style="height:${chartHeight}px" >
           <div class="flex items-end justify-center h-full">no data</div>
         </div>
         <div class="text-xs text-slate-500 mt-2">${shortMonthLabel(r.label)}</div>
@@ -1398,11 +1410,7 @@ function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 
     const aVal = getA(r) || 0, bVal = getB(r) || 0;
     const aH = Math.max(1, Math.round((aVal / maxVal) * chartHeight));
     const bH = Math.max(1, Math.round((bVal / maxVal) * chartHeight));
-    const delta = getDelta(r) || 0;
-    const deltaCls = delta >= 0 ? 'text-green-600' : 'text-red-600';
-    const sign = delta >= 0 ? '+' : '';
     return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:64px">
-      <div class="text-[11px] font-semibold ${deltaCls} mb-1">${sign}${formatValue(delta)}</div>
       <div class="flex items-end gap-1.5" style="height:${chartHeight}px">
         <div class="flex flex-col items-center justify-end h-full">
           <div class="text-[9px] text-slate-500 mb-0.5">${formatValue(aVal)}</div>
@@ -1424,6 +1432,7 @@ function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 
     <span class="text-green-600 font-medium">Green</span>&nbsp;= over-recovery,
     <span class="text-red-600 font-medium">Red</span>&nbsp;= under-recovery
   </div>
+  <div class="flex gap-2 border rounded-md py-2 px-1 mb-2 overflow-x-auto">${deltaCells}</div>
   <div class="flex items-end gap-2 border-b pb-1 overflow-x-auto">${columns}</div>`;
 }
 
