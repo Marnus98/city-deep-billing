@@ -60,22 +60,28 @@ function allTenantSeries(db, utility) {
   }).filter((t) => t.series.length);
 }
 
-// This app's own tenant billing, summed across a given list of tenant names for one utility,
+// This app's own tenant billing, summed across a given list of tenant IDs for one utility,
 // ascending by billing_period.start_date - the generic "our billing" side shared by both a City
 // Deep Recovery-section grouping and Wingfield's single whole-site grouping (see
 // city-deep/recovery_groups.js's siteSectionSeries-equivalent and wingfield/flagging_data.js's
-// wholeSiteSeries, both of which just pass a different tenant-name list into this).
-function tenantGroupSeries(db, tenantNames, utility) {
-  if (!tenantNames.length) return [];
+// wholeSiteSeries, both of which just pass a different tenant-ID list into this).
+//
+// Filters by ID, not name (fixed 2026-09-25 alongside tenant_recovery.js's siteSideForTenants - see
+// city-deep/recovery_groups.js's tenantsForSection comment) - the same tenant NAME can belong to
+// more than one physical unit/section ("Agrana Fruit South Africa (Pty) Ltd" has units in both
+// Industrial Park and Mini Park), so matching by name here would double-count across sections
+// exactly like the Recovery page's own bug did.
+function tenantGroupSeries(db, tenantIds, utility) {
+  if (!tenantIds.length) return [];
   const periods = all(db, 'SELECT * FROM billing_periods ORDER BY start_date');
-  const placeholders = tenantNames.map(() => '?').join(',');
+  const placeholders = tenantIds.map(() => '?').join(',');
   const col = utility === 'water' ? 'b.water_consumption_m3' : 'b.electricity_consumption_kwh';
   return periods.map((p) => {
     const row = get(db, `
       SELECT COALESCE(SUM(${col}),0) AS consumption, COUNT(DISTINCT b.tenant_id) AS tenant_count
       FROM bills b JOIN tenants t ON t.id = b.tenant_id
-      WHERE t.name IN (${placeholders}) AND b.billing_period_id = ?
-    `, [...tenantNames, p.id]);
+      WHERE t.id IN (${placeholders}) AND b.billing_period_id = ?
+    `, [...tenantIds, p.id]);
     if (!row.tenant_count) return null;
     const billingDays = municipalCompare.daysBetween(p.start_date, p.end_date) || 0;
     return { label: p.label, consumption: row.consumption, billingDays, startDate: p.start_date, endDate: p.end_date };

@@ -102,22 +102,28 @@ function siteSideFor(db, siteName, periodId) {
   };
 }
 
-// Same as siteSideFor above, but filters by an explicit list of tenant NAMES instead of matching
+// Same as siteSideFor above, but filters by an explicit list of tenant IDs instead of matching
 // tenants.site_id via `sites.name = siteName`. Needed for City Deep's Recovery grouping, which is
 // coarser than (and in two cases diverges from) the site_id-based precinct grouping billing.js uses
 // for real bill calculation - see city-deep/recovery_groups.js's header comment for exactly why.
-// `tenantNames` is expected non-empty; an empty array would build a `NOT IN ()`-shaped broken SQL
+// `tenantIds` is expected non-empty; an empty array would build a `NOT IN ()`-shaped broken SQL
 // list, so callers (see city-deep/recovery_groups.js) should never pass one for a real section.
-function siteSideForTenants(db, tenantNames, periodId) {
-  const placeholders = tenantNames.map(() => '?').join(',');
+//
+// Filters by ID, not name (fixed 2026-09-25) - see city-deep/recovery_groups.js's tenantsForSection
+// comment for the bug this fixes: "Agrana Fruit South Africa (Pty) Ltd" is the tenant name for THREE
+// separate tenant rows (Units 2B/2C in Industrial Park, Unit 5 in Mini Park), so matching by name
+// alone pulled all three units' bills into whichever section's query ran, regardless of which one
+// the name was actually meant to represent there. IDs are unique per unit even when names collide.
+function siteSideForTenants(db, tenantIds, periodId) {
+  const placeholders = tenantIds.map(() => '?').join(',');
   const consumption = get(db, `
     SELECT COALESCE(SUM(b.electricity_consumption_kwh),0) AS elec_kwh,
       COALESCE(SUM(b.water_consumption_m3),0) AS water_kl,
       COUNT(DISTINCT b.tenant_id) AS tenant_count
     FROM bills b
     JOIN tenants t ON t.id = b.tenant_id
-    WHERE t.name IN (${placeholders}) AND b.billing_period_id = ?
-  `, [...tenantNames, periodId]);
+    WHERE t.id IN (${placeholders}) AND b.billing_period_id = ?
+  `, [...tenantIds, periodId]);
   if (!consumption.tenant_count) return null;
   const period = get(db, 'SELECT start_date, end_date FROM billing_periods WHERE id=?', [periodId]);
   const charges = get(db, `
@@ -128,8 +134,8 @@ function siteSideForTenants(db, tenantNames, periodId) {
     FROM bill_line_items bli
     JOIN bills b ON b.id = bli.bill_id
     JOIN tenants t ON t.id = b.tenant_id
-    WHERE t.name IN (${placeholders}) AND b.billing_period_id = ?
-  `, [...tenantNames, periodId]);
+    WHERE t.id IN (${placeholders}) AND b.billing_period_id = ?
+  `, [...tenantIds, periodId]);
   return {
     elecRand: charges.elec_rand, elecKwh: consumption.elec_kwh,
     waterRand: charges.water_rand, sewerRand: charges.sewer_rand,
@@ -225,7 +231,7 @@ function buildRecoveryRows(db, siteName, { limit = 12 } = {}) {
 }
 
 // Same as buildRecoveryRows above, but the site (tenant billing) side is filtered by an explicit
-// tenant-name list (siteSideForTenants) instead of a single sites.name match - the municipal side
+// tenant-ID list (siteSideForTenants) instead of a single sites.name match - the municipal side
 // still resolves via `siteNameForMunicipal` against SITE_MAP exactly as before. See
 // city-deep/recovery_groups.js for why City Deep needs this instead of plain buildRecoveryRows.
 //
@@ -238,10 +244,10 @@ function buildRecoveryRows(db, siteName, { limit = 12 } = {}) {
 // this separate real cost. When a row has one, `row.solarCost` is always present (0 if nothing was
 // invoiced that month) and totalRecoveryRand is net of it; when omitted entirely (every property
 // except City Deep), row.solarCost is undefined and nothing here changes from before.
-function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantNames, { limit = 12, solarCostForLabel } = {}) {
+function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantIds, { limit = 12, solarCostForLabel } = {}) {
   const periods = all(db, 'SELECT * FROM billing_periods ORDER BY start_date').slice(-limit);
   return periods.map((p) => {
-    const site = tenantNames.length ? siteSideForTenants(db, tenantNames, p.id) : null;
+    const site = tenantIds.length ? siteSideForTenants(db, tenantIds, p.id) : null;
     const municipal = municipalSideFor(db, siteNameForMunicipal, p.start_date, p.end_date);
     const row = { label: p.label, site, municipal, recovery: null };
     if (site && municipal) {

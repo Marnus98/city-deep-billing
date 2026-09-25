@@ -908,9 +908,15 @@ function buildSolarSummaryPdf({ propertyName, period, slips }) {
 // level - totalSiteRand etc.) and each utility's own Rand/consumption charts (values nested under
 // site/municipal/recovery) - generalised 2026-08-08 when the single combined chart was split into
 // one chart per utility, per Rand AND consumption, per the client's request.
-function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, getB, getDelta, hasData, formatValue = moneyShort, formatCompact = moneyCompact, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
+// `getExtra`/`legendExtra` (optional) - stacks a second segment on top of the B bar, e.g. City
+// Deep's solar-plant-owner cost stacked on the Municipal Statement bar on the Electricity chart -
+// see views.js's barChart, its on-screen equivalent, for why this exists (2026-09-25 client request:
+// the printed delta already nets this cost out, so the bars themselves should visually agree with it
+// rather than needing the separate Solar Cost table to explain the gap).
+function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, getB, getDelta, hasData, formatValue = moneyShort, formatCompact = moneyCompact, legendA = 'Tenant Billing', legendB = 'Municipal Statement', getExtra, legendExtra = 'Solar Cost' }) {
   const COLOR_A = [0.11, 0.16, 0.34]; // Tenant Billing - matches the Electricity navy used everywhere else
   const COLOR_B = [0.39, 0.45, 0.55]; // Municipal Statement - neutral slate, reads as "external/reference"
+  const COLOR_EXTRA = [0.85, 0.47, 0.02]; // Solar Cost - amber, matches views.js's on-screen #d97706
   const COLOR_POS = [0.05, 0.5, 0.2], COLOR_NEG = [0.75, 0.15, 0.15];
 
   const n = series.length || 1;
@@ -918,8 +924,8 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
   const barWidth = Math.min(16, colWidth * 0.28);
   const gap = 5;
 
-  const legendItems = [[legendA, COLOR_A], [legendB, COLOR_B]];
-  let lx = x + width - 210;
+  const legendItems = [[legendA, COLOR_A], [legendB, COLOR_B], ...(getExtra ? [[legendExtra, COLOR_EXTRA]] : [])];
+  let lx = x + width - legendItems.length * 105;
   const ly = y + 16;
   for (const [label, color] of legendItems) {
     doc.rect(lx, ly, 7, 7, { fill: color });
@@ -963,7 +969,7 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
   const plotHeight = height - bandH - bandGap;
   const chartTop = bandBottom - bandGap;
   const chartBottom = chartTop - plotHeight;
-  const values = series.flatMap((s) => (hasData(s) ? [getA(s), getB(s)] : [])).filter((v) => v != null);
+  const values = series.flatMap((s) => (hasData(s) ? [getA(s), getB(s) + (getExtra ? (getExtra(s) || 0) : 0)] : [])).filter((v) => v != null);
   // 15% headroom above the tallest bar, just enough for the per-bar value label line below - the
   // delta itself now lives in the fixed band above, not stacked over the bars, so this needs far
   // less headroom than before that redesign.
@@ -994,24 +1000,29 @@ function drawGroupedComparisonChart(doc, { x, y, width, height, series, getA, ge
       return;
     }
     const aVal = getA(s) || 0, bVal = getB(s) || 0;
+    const extraVal = getExtra ? (getExtra(s) || 0) : 0;
     const aH = (aVal / maxVal) * plotHeight;
     const bH = (bVal / maxVal) * plotHeight;
+    const extraH = (extraVal / maxVal) * plotHeight;
     const aX = colCenter - gap / 2 - barWidth;
     const bX = colCenter + gap / 2;
     doc.rect(aX, chartBottom, barWidth, aH, { fill: COLOR_A });
     doc.rect(bX, chartBottom, barWidth, bH, { fill: COLOR_B });
+    if (extraVal > 0) doc.rect(bX, chartBottom + bH, barWidth, extraH, { fill: COLOR_EXTRA });
 
     // Center each label on its own bar, then nudge the pair apart from each other (same "half the
     // overlap" approach as before) - this still runs first so a very tight pair starts as far apart
-    // as this column alone can manage, before the cross-column sweep below gets involved.
-    const aLabel = formatCompact(aVal), bLabel = formatCompact(bVal);
+    // as this column alone can manage, before the cross-column sweep below gets involved. When this
+    // section carries a solar-cost stack, the B label shows the combined (municipal + solar) total,
+    // matching the bar's actual drawn height and the printed delta above (both already net it out).
+    const aLabel = formatCompact(aVal), bLabel = extraVal > 0 ? formatCompact(bVal + extraVal) : formatCompact(bVal);
     const aLabelW = textWidth(aLabel, { size: 6 }), bLabelW = textWidth(bLabel, { size: 6 });
     let aLabelX = aX + barWidth / 2 - aLabelW / 2;
     let bLabelX = bX + barWidth / 2 - bLabelW / 2;
     const pairOverlap = (aLabelX + aLabelW) - bLabelX;
     if (pairOverlap > 0) { aLabelX -= pairOverlap / 2 + 1; bLabelX += pairOverlap / 2 + 1; }
     labelRow.push({ x: aLabelX, w: aLabelW, text: aLabel, y: chartBottom + aH + 4 });
-    labelRow.push({ x: bLabelX, w: bLabelW, text: bLabel, y: chartBottom + bH + 4 });
+    labelRow.push({ x: bLabelX, w: bLabelW, text: bLabel, y: chartBottom + bH + extraH + 4 });
 
     doc.text(x + i * colWidth + colWidth / 2 - 16, chartBottom - 14, shortMonthLabel(s.label), { size: 6.5 });
   });
@@ -1058,11 +1069,16 @@ function drawOverallChart(doc, { x, y, width, height, series }) {
 function drawUtilityCharts(doc, { x, y, width, series, randKey, qtyKey, qtyLabel }) {
   const chartHeight = 130;
   let cy = y;
-  doc.text(x, cy, 'Rand (Excl VAT): Tenant vs Municipal', { size: 9.5, bold: true }); cy -= 18;
+  // Stack the solar-plant-owner cost on top of the Municipal bar, Electricity only, only when this
+  // section actually carries one - see drawGroupedComparisonChart's own getExtra comment, and
+  // views.js's barChart (its on-screen equivalent) for why this needs to exist at all.
+  const hasSolar = randKey === 'elecRand' && series.some((s) => s.solarCost > 0);
+  doc.text(x, cy, 'Rand (Excl VAT): Tenant vs Municipal' + (hasSolar ? ' + Solar Cost' : ''), { size: 9.5, bold: true }); cy -= 18;
   drawGroupedComparisonChart(doc, {
     x: x + 46, y: cy, width: width - 46, height: chartHeight, series,
     getA: (s) => s.site && s.site[randKey], getB: (s) => s.municipal && s.municipal[randKey], getDelta: (s) => s.recovery && s.recovery[randKey],
     hasData: hasBothSidesPdf, formatValue: moneyShort,
+    ...(hasSolar ? { getExtra: (s) => s.solarCost } : {}),
   });
   cy -= chartHeight + 14 + 26;
   doc.text(x, cy, `Consumption (${qtyLabel}): Tenant vs Municipal`, { size: 9.5, bold: true }); cy -= 18;

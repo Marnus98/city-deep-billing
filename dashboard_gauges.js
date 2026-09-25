@@ -92,8 +92,8 @@ function cityDeepTotalsForPeriods(db, periods) {
   let solarCostRand = 0, solarKwh = 0;
   for (const period of periods) {
     for (const section of recoveryGroups.SECTIONS) {
-      const tenantNames = recoveryGroups.tenantNamesForSection(db, section.key);
-      const site = tenantNames.length ? tenantRecovery.siteSideForTenants(db, tenantNames, period.id) : null;
+      const tenantIds = recoveryGroups.tenantsForSection(db, section.key).map((t) => t.id);
+      const site = tenantIds.length ? tenantRecovery.siteSideForTenants(db, tenantIds, period.id) : null;
       const municipal = tenantRecovery.municipalSideFor(db, section.siteNameForMunicipal, period.start_date, period.end_date);
       if (site) {
         billedElecKwh += site.elecKwh; billedWaterKl += site.waterKl;

@@ -1383,8 +1383,16 @@ function shortQty(n, unit) {
 // consumption charts below (values nested under row.site/row.municipal/row.recovery) - added
 // 2026-08-08 when the single combined chart was split into one chart per utility, per Rand AND
 // consumption, per the client's request for a fuller Recovery picture.
-function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 'Tenant Billing', legendB = 'Municipal Statement' }) {
-  const maxVal = Math.max(1, ...rows.flatMap((r) => (hasData(r) ? [getA(r), getB(r)] : [])).filter((v) => v != null));
+// `getExtra`/`legendExtra` (optional) - stacks a second segment (a different colour) on top of the
+// B bar, e.g. the solar-plant-owner cost stacked on top of the Municipal Statement bar on City
+// Deep's Electricity chart, added 2026-09-25 per the client's own request: the printed delta above
+// each pair already nets this cost out (see tenant_recovery.js's recovery.elecRand), but the two
+// bars themselves used to show tenant billing against the bare municipal figure only, so `barA -
+// barB` visually didn't match the printed delta - confusing without also seeing this file's own
+// solarCostPanel table. Stacking makes the B bar's total height equal (municipal + solar), so what's
+// drawn now agrees with what's printed.
+function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 'Tenant Billing', legendB = 'Municipal Statement', getExtra, legendExtra = 'Solar Cost' }) {
+  const maxVal = Math.max(1, ...rows.flatMap((r) => (hasData(r) ? [getA(r), getB(r) + (getExtra ? (getExtra(r) || 0) : 0)] : [])).filter((v) => v != null));
   const chartHeight = 160;
   // Recovery (delta) row - one cell per month, all aligned on the same line, rather than floating
   // each delta directly above its own bar pair (previous layout - a short month's delta sat much
@@ -1409,8 +1417,17 @@ function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 
       </div>`;
     }
     const aVal = getA(r) || 0, bVal = getB(r) || 0;
+    const extraVal = getExtra ? (getExtra(r) || 0) : 0;
     const aH = Math.max(1, Math.round((aVal / maxVal) * chartHeight));
-    const bH = Math.max(1, Math.round((bVal / maxVal) * chartHeight));
+    const bH = Math.max(extraVal > 0 ? 0 : 1, Math.round((bVal / maxVal) * chartHeight));
+    const extraH = extraVal > 0 ? Math.max(1, Math.round((extraVal / maxVal) * chartHeight)) : 0;
+    const bLabel = extraVal > 0 ? formatValue(bVal + extraVal) : formatValue(bVal);
+    const bBar = extraH > 0
+      ? `<div style="width:18px;height:${bH + extraH}px" class="flex flex-col justify-end">
+          <div style="width:18px;height:${extraH}px;background:#d97706"></div>
+          <div class="rounded-t-sm" style="width:18px;height:${bH}px;background:#64748b"></div>
+        </div>`
+      : `<div class="rounded-t-sm" style="width:18px;height:${bH}px;background:#64748b"></div>`;
     return `<div class="flex-1 flex flex-col items-center justify-end" style="min-width:64px">
       <div class="flex items-end gap-1.5" style="height:${chartHeight}px">
         <div class="flex flex-col items-center justify-end h-full">
@@ -1418,8 +1435,8 @@ function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 
           <div class="rounded-t-sm" style="width:18px;height:${aH}px;background:#1c2957"></div>
         </div>
         <div class="flex flex-col items-center justify-end h-full">
-          <div class="text-[9px] text-slate-500 mb-0.5">${formatValue(bVal)}</div>
-          <div class="rounded-t-sm" style="width:18px;height:${bH}px;background:#64748b"></div>
+          <div class="text-[9px] text-slate-500 mb-0.5">${bLabel}</div>
+          ${bBar}
         </div>
       </div>
       <div class="text-xs text-slate-500 mt-2">${shortMonthLabel(r.label)}</div>
@@ -1429,6 +1446,7 @@ function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 
   <div class="flex items-center justify-end flex-wrap gap-4 text-xs text-slate-500 mb-3">
     <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#1c2957"></span>${esc(legendA)}</span>
     <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#64748b"></span>${esc(legendB)}</span>
+    ${getExtra ? `<span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:#d97706"></span>${esc(legendExtra)}</span>` : ''}
     <span class="text-slate-400">&middot;</span>
     <span class="text-green-600 font-medium">Green</span>&nbsp;= over-recovery,
     <span class="text-red-600 font-medium">Red</span>&nbsp;= under-recovery
@@ -1458,9 +1476,14 @@ function overallChart(rows) {
 // pattern pdf.js's drawTripleTrendCharts/drawConsumptionTrendCharts already use for the billing
 // slip's own trend page, reused here for consistency between the two documents).
 function utilityCharts(rows, { randKey, qtyKey, qtyLabel }) {
-  const randChart = chartCard('Rand (Excl VAT): Tenant vs Municipal', barChart(rows, {
+  // Stack the solar-plant-owner cost on top of the Municipal bar, Electricity only, and only when
+  // this section actually carries one (Rittle's rows have no `solarCost` at all) - see barChart's
+  // own getExtra comment for why this needs to exist at all.
+  const hasSolar = randKey === 'elecRand' && rows.some((r) => r.solarCost > 0);
+  const randChart = chartCard('Rand (Excl VAT): Tenant vs Municipal' + (hasSolar ? ' + Solar Cost' : ''), barChart(rows, {
     getA: (r) => r.site && r.site[randKey], getB: (r) => r.municipal && r.municipal[randKey], getDelta: (r) => r.recovery && r.recovery[randKey],
     hasData: hasBothSides, formatValue: shortMoney,
+    ...(hasSolar ? { getExtra: (r) => r.solarCost } : {}),
   }));
   const qtyChart = chartCard(`Consumption (${qtyLabel}): Tenant vs Municipal`, barChart(rows, {
     getA: (r) => r.site && r.site[qtyKey], getB: (r) => r.municipal && r.municipal[qtyKey], getDelta: (r) => r.recovery && r.recovery[qtyKey],

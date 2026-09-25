@@ -33,23 +33,38 @@ const SECTIONS = [
   { key: 'mini', title: 'Mini Park (Mini account)', siteNameForMunicipal: 'Mini Park' },
 ];
 
-// The tenant NAMES (not ids - matches tenant_recovery.js's siteSideForTenants, which filters
-// bills by t.name IN (...)) that belong in Recovery section `key`. Any tenant not explicitly
-// special-cased above falls back to its real tenants.site_id/sites.name grouping, so new tenants
-// added later to Industrial Park or Mini Park show up in the right section automatically without
-// this file needing an update - only the two special cases above need to be listed by hand.
-function tenantNamesForSection(db, key) {
-  const rows = db.prepare(`SELECT t.name AS name, s.name AS site_name FROM tenants t JOIN sites s ON s.id = t.site_id`).all();
+// Returns {id, name, unit} rows (not just names) for every tenant belonging to Recovery section
+// `key`. Any tenant not explicitly special-cased above falls back to its real tenants.site_id/
+// sites.name grouping, so new tenants added later to Industrial Park or Mini Park show up in the
+// right section automatically without this file needing an update - only the two special cases
+// above need to be listed by hand.
+//
+// Fixed 2026-09-25 (client-reported bug, City Deep Aug 2026 Mini Park example): this used to return
+// tenant NAMES, and tenant_recovery.js's siteSideForTenants/tenant_model_flagging.js's
+// tenantGroupSeries matched bills by `t.name IN (...)`. That's unsafe whenever the SAME company name
+// occupies units in more than one section - "Agrana Fruit South Africa (Pty) Ltd" leases Units 2B/2C
+// in Industrial Park AND Unit 5 in Mini Park, all three tenant rows sharing the identical name. A
+// name-only match for the Mini section pulled in ALL THREE bills (including the two big Industrial
+// units), inflating Mini's Recovery total by ~172,000 kWh/month in every month both sides had a bill
+// - confirmed against the client's own spreadsheet (Mini's real Aug 2026 total is ~97,905 kWh, not
+// the ~270,000 kWh the app was showing). Tenant IDs are unique per unit even when names collide, so
+// every caller now filters by id instead - see tenant_recovery.js/tenant_model_flagging.js's own
+// updated comments.
+function tenantsForSection(db, key) {
+  const rows = db.prepare(`SELECT t.id AS id, t.name AS name, t.unit AS unit, s.name AS site_name FROM tenants t JOIN sites s ON s.id = t.site_id`).all();
+  const pick = (list) => list.map((r) => ({ id: r.id, name: r.name, unit: r.unit }));
   if (key === 'industrial') {
-    return rows.filter((r) => r.site_name === 'Industrial Park' || EXTRA_INDUSTRIAL_TENANTS.includes(r.name)).map((r) => r.name);
+    return pick(rows.filter((r) => r.site_name === 'Industrial Park' || (EXTRA_INDUSTRIAL_TENANTS.includes(r.name) && r.site_name === 'Mini Park')));
   }
   if (key === 'rittle') {
-    return RITTLE_TENANTS;
+    return pick(rows.filter((r) => RITTLE_TENANTS.includes(r.name)));
   }
   if (key === 'mini') {
-    return rows.filter((r) => r.site_name === 'Mini Park' && !EXTRA_INDUSTRIAL_TENANTS.includes(r.name) && !RITTLE_TENANTS.includes(r.name)).map((r) => r.name);
+    return pick(rows.filter((r) => r.site_name === 'Mini Park'
+      && !(EXTRA_INDUSTRIAL_TENANTS.includes(r.name) && r.site_name === 'Mini Park')
+      && !RITTLE_TENANTS.includes(r.name)));
   }
   return [];
 }
 
-module.exports = { SECTIONS, tenantNamesForSection, EXTRA_INDUSTRIAL_TENANTS, RITTLE_TENANTS };
+module.exports = { SECTIONS, tenantsForSection, EXTRA_INDUSTRIAL_TENANTS, RITTLE_TENANTS };

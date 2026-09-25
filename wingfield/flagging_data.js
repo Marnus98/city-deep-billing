@@ -26,10 +26,10 @@ function currentPeriodLabel(db) {
 // Every tenant's billing summed together, one utility - Wingfield's own equivalent of City Deep's
 // per-Recovery-section total, just with every tenant in the one bucket since this property has no
 // sub-sections. Built on the same shared tenantGroupSeries used by City Deep's own siteSectionSeries
-// (see city-deep/flagging_data.js), just given every tenant's name instead of one section's list.
+// (see city-deep/flagging_data.js), just given every tenant's ID instead of one section's list.
 function wholeSiteSeries(db, utility) {
-  const tenantNames = all(db, 'SELECT name FROM tenants').map((r) => r.name);
-  return tenantModel.tenantGroupSeries(db, tenantNames, utility);
+  const tenantIds = all(db, 'SELECT id FROM tenants').map((r) => r.id);
+  return tenantModel.tenantGroupSeries(db, tenantIds, utility);
 }
 
 // Top-level entry point, same shape as city-deep/flagging_data.js's buildAllFlagRows - one

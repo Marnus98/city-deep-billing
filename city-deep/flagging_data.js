@@ -26,9 +26,9 @@ function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 
 // This app's own tenant billing, summed for one Recovery section, one utility - thin wrapper around
 // tenant_model_flagging.js's generic tenantGroupSeries, just resolving the section key to its own
-// tenant-name list first (see recovery_groups.js).
+// tenant-ID list first (see recovery_groups.js's tenantsForSection).
 function siteSectionSeries(db, sectionKey, utility) {
-  return tenantModel.tenantGroupSeries(db, recoveryGroups.tenantNamesForSection(db, sectionKey), utility);
+  return tenantModel.tenantGroupSeries(db, recoveryGroups.tenantsForSection(db, sectionKey).map((t) => t.id), utility);
 }
 
 // Per-tenant series within a section, one utility, ascending by billing_period.start_date - used
@@ -36,22 +36,23 @@ function siteSectionSeries(db, sectionKey, utility) {
 // section 7), not run through the full flagging.js classifier (no green/amber/red needed there,
 // just latest vs a simple trailing average). Distinct from tenant_model_flagging.js's
 // allTenantSeries (property-wide, keyed by id, always classified) - this one is scoped to a single
-// section and keyed by name purely for this drill-down's own display purposes.
+// section and keyed by tenant ID (fixed 2026-09-25 - was keyed by name, which silently dropped one
+// of two tenant rows whenever a section had two units under the same company name, e.g. "Uber
+// Nutrition (Pty) Ltd" Units 6 and 7 in Mini Park; see recovery_groups.js's tenantsForSection
+// comment for the related, more severe cross-section name-collision bug this was found alongside).
 function tenantSeriesInSection(db, sectionKey, utility) {
-  const tenantNames = recoveryGroups.tenantNamesForSection(db, sectionKey);
+  const tenants = recoveryGroups.tenantsForSection(db, sectionKey);
   const col = utility === 'water' ? 'b.water_consumption_m3' : 'b.electricity_consumption_kwh';
   const periods = all(db, 'SELECT * FROM billing_periods ORDER BY start_date');
   const byTenant = {};
-  for (const name of tenantNames) {
-    const tenant = get(db, 'SELECT * FROM tenants WHERE name=?', [name]);
-    if (!tenant) continue;
+  for (const tenant of tenants) {
     const series = periods.map((p) => {
       const row = get(db, `SELECT ${col} AS consumption FROM bills b WHERE b.tenant_id=? AND b.billing_period_id=?`, [tenant.id, p.id]);
       if (!row) return null;
       const billingDays = municipalCompare.daysBetween(p.start_date, p.end_date) || 0;
       return { label: p.label, consumption: row.consumption || 0, billingDays };
     }).filter((r) => r && r.billingDays > 0);
-    if (series.length) byTenant[name] = series;
+    if (series.length) byTenant[tenant.id] = { name: tenant.unit ? `${tenant.name} (${tenant.unit})` : tenant.name, series };
   }
   return byTenant;
 }
@@ -83,7 +84,7 @@ function currentPeriodLabel(db) {
 function buildContributingTenants(db, sectionKey, utility, latestLabel) {
   const byTenant = tenantSeriesInSection(db, sectionKey, utility);
   const rows = [];
-  for (const [name, series] of Object.entries(byTenant)) {
+  for (const { name, series } of Object.values(byTenant)) {
     const idx = series.findIndex((s) => s.label === latestLabel);
     if (idx < 1) continue; // need at least one prior month to compare against
     const latest = series[idx];
