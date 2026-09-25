@@ -1455,6 +1455,60 @@ function barChart(rows, { getA, getB, getDelta, hasData, formatValue, legendA = 
   <div class="flex items-end gap-2 border-b pb-1 overflow-x-auto">${columns}</div>`;
 }
 
+// Running statement - client-requested 2026-09-25: a single combined-Rand table (Electricity +
+// Water + Sewer together, not split per-utility like recoveryTable below) with a cumulative
+// "Balance" column, so the property's overall over/under-recovery position carries forward month to
+// month rather than resetting to zero each row - the same way a running bank statement works.
+// Iterates `rows` in ascending (oldest-first) order specifically so the running balance accumulates
+// forwards through time; every other table on this page uses rowsDesc (newest-first) for at-a-glance
+// reading, but that would make "Balance" run backwards, so this one deliberately doesn't reuse it.
+// The Solar column only appears when this section actually carries a solarCost lookup at all (every
+// City Deep section - Rittle's is always a real R0, not pending, so it still shows the column, just
+// with R0.00 rows); properties with no solarCostForLabel wired (row.solarCost undefined throughout)
+// get a 4-column table with no Solar column at all.
+function runningStatementTable(rows) {
+  if (!rows.length) return '';
+  const hasSolar = rows.some((r) => r.solarCost != null);
+  let balance = 0;
+  const trs = rows.map((r) => {
+    const noData = r.totalSiteRand == null || r.totalMunicipalRand == null;
+    if (noData) {
+      return `<tr class="border-t">
+        <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td>
+        <td class="px-3 py-1.5 text-sm text-right text-slate-400" colspan="${hasSolar ? 4 : 3}">no data</td>
+      </tr>`;
+    }
+    const overUnder = r.totalRecoveryRand;
+    balance += overUnder;
+    const ouCls = overUnder >= 0 ? 'text-green-600' : 'text-red-600';
+    const balCls = balance >= 0 ? 'text-green-600' : 'text-red-600';
+    return `<tr class="border-t">
+      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td>
+      <td class="px-3 py-1.5 text-sm text-right">${money(r.totalSiteRand)}</td>
+      <td class="px-3 py-1.5 text-sm text-right">${money(r.totalMunicipalRand)}</td>
+      ${hasSolar ? `<td class="px-3 py-1.5 text-sm text-right text-slate-500">${r.solarCost > 0 ? '-' + money(r.solarCost) : '&mdash;'}</td>` : ''}
+      <td class="px-3 py-1.5 text-sm text-right font-medium ${ouCls}">${overUnder >= 0 ? '+' : ''}${money(overUnder)}</td>
+      <td class="px-3 py-1.5 text-sm text-right font-semibold ${balCls}">${balance >= 0 ? '+' : ''}${money(balance)}</td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold text-sm">Running Statement (Electricity + Water + Sewer combined)</div>
+    <p class="px-4 pt-2 text-xs text-slate-500">Same figures as the Overall chart above, as a running statement - "Balance" carries the over/under-recovery position forward from month to month, oldest first.</p>
+    <table class="w-full mt-2">
+      <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+        <th class="px-3 py-1.5">Month</th>
+        <th class="px-3 py-1.5 text-right">Billed to Tenants</th>
+        <th class="px-3 py-1.5 text-right">Billed by Municipality</th>
+        ${hasSolar ? '<th class="px-3 py-1.5 text-right">Solar</th>' : ''}
+        <th class="px-3 py-1.5 text-right">Over/Under</th>
+        <th class="px-3 py-1.5 text-right">Balance</th>
+      </tr></thead>
+      <tbody>${trs}</tbody>
+    </table>
+  </div>`;
+}
+
 function chartCard(titleText, chartHtml) {
   return `
   <div class="bg-white rounded-lg border p-4 mb-4">
@@ -1701,6 +1755,7 @@ function recoverySectionBlock({ title, rows }) {
   ${title ? `<h2 class="text-xl font-bold mt-8 mb-3 first:mt-0">${esc(title)}</h2>` : ''}
   <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-2 first:mt-0">Overall</h3>
   ${overallChart(rows)}
+  ${runningStatementTable(rows)}
   ${solarCostPanel(rowsDesc)}
   ${utilities.map((u) => `
   <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-6">${esc(u.label)}</h3>

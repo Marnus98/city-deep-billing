@@ -1254,6 +1254,76 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
   return y;
 }
 
+// Running statement - PDF mirror of views.js's runningStatementTable, added 2026-09-25 per client
+// request: a single combined-Rand table (not split per-utility) with a cumulative "Balance" column
+// that carries the over/under-recovery position forward month to month, like a bank statement.
+// `rows` must be ascending (oldest first) - the caller passes the section's own `rows` (not
+// `rowsDesc`) specifically so Balance accumulates forwards through time, same reasoning as the
+// on-screen version. The Solar column only appears when at least one row actually carries a
+// `solarCost` value at all (every City Deep section, including Rittle, whose solarCost is always a
+// real R0 rather than absent); properties with no solarCostForLabel wired get a narrower 4-column
+// table.
+function drawRunningStatementTable(doc, { rows, left, right, y }) {
+  doc.text(left, y, 'Running Statement (Electricity + Water + Sewer combined)', { size: 9.5, bold: true }); y -= 12;
+  doc.text(left, y, 'Same figures as the Overall chart above, as a running statement - "Balance" carries the over/under-', { size: 7 }); y -= 9;
+  doc.text(left, y, 'recovery position forward from month to month, oldest first.', { size: 7 }); y -= 14;
+
+  const hasSolar = rows.some((r) => r.solarCost != null);
+  const headers = hasSolar
+    ? ['Billed to Tenants', 'Billed by Municipality', 'Solar', 'Over/Under', 'Balance']
+    : ['Billed to Tenants', 'Billed by Municipality', 'Over/Under', 'Balance'];
+  const numW = (right - left - 62) / headers.length;
+  const edges = headers.map((_, i) => left + 62 + numW * (i + 1));
+  doc.text(left, y, 'Month', { bold: true, size: 7.5 });
+  headers.forEach((label, i) => {
+    doc.text(edges[i] - textWidth(label, { bold: true, size: 7.5 }), y, label, { bold: true, size: 7.5 });
+  });
+  y -= 4; doc.line(left, y, right, y); y -= 11;
+
+  const colorFor = (v) => (v > 0.005 ? [0.05, 0.5, 0.2] : (v < -0.005 ? [0.75, 0.15, 0.15] : [0.4, 0.4, 0.4]));
+  const drawSigned = (val, ex, yy) => {
+    const str = `${val > 0.005 ? '+' : ''}${money(val)}`;
+    const w = textWidth(str, { size: 7.5, bold: true });
+    const c = colorFor(val);
+    doc.currentOps.push(`${c[0]} ${c[1]} ${c[2]} rg BT /F2 7.5 Tf ${(ex - w).toFixed(2)} ${yy.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
+    doc.currentOps.push('0 0 0 rg');
+  };
+
+  let balance = 0;
+  for (const r of rows) {
+    if (y < 90) { doc.newPage(); y = doc.page.height - 50; }
+    doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
+    const noData = r.totalSiteRand == null || r.totalMunicipalRand == null;
+    if (noData) {
+      doc.text(left + 70, y, 'no data', { size: 7.5 });
+      y -= 13;
+      continue;
+    }
+    let i = 0;
+    const billedStr = money(r.totalSiteRand);
+    doc.text(edges[i] - textWidth(billedStr, { size: 7.5 }), y, billedStr, { size: 7.5 }); i++;
+    const muniStr = money(r.totalMunicipalRand);
+    doc.text(edges[i] - textWidth(muniStr, { size: 7.5 }), y, muniStr, { size: 7.5 }); i++;
+    if (hasSolar) {
+      const solarStr = r.solarCost > 0 ? `-${money(r.solarCost)}` : '—';
+      const sw = textWidth(solarStr, { size: 7.5 });
+      doc.currentOps.push(`0.4 0.4 0.4 rg BT /F1 7.5 Tf ${(edges[i] - sw).toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(solarStr)}) Tj ET`);
+      doc.currentOps.push('0 0 0 rg');
+      i++;
+    }
+    const overUnder = r.totalRecoveryRand;
+    balance += overUnder;
+    drawSigned(overUnder, edges[i], y); i++;
+    const balStr = `${balance > 0.005 ? '+' : ''}${money(balance)}`;
+    const w = textWidth(balStr, { size: 7.5, bold: true });
+    const c = colorFor(balance);
+    doc.currentOps.push(`${c[0]} ${c[1]} ${c[2]} rg BT /F2 7.5 Tf ${(edges[i] - w).toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(balStr)}) Tj ET`);
+    doc.currentOps.push('0 0 0 rg');
+    y -= 13;
+  }
+  return y - 8;
+}
+
 // Solar plant owner cost panel - PDF mirror of views.js's solarCostPanel, City Deep's Industrial
 // Park and Mini Park sections only (see city-deep/solar_cost.js). Purely informational - the Overall
 // Recovery total above it is already net of this cost (see tenant_recovery.js's
@@ -1343,6 +1413,12 @@ function drawRecoverySection(doc, { propertyName, section, left, right }) {
   if (rows.length) {
     drawOverallChart(doc, { x: left + 46, y, width: right - left - 46, height: 220, series: rows });
     y -= 220;
+    // Running statement gets its own fresh page - the chart above already fills most of this one,
+    // and up to 12 months of statement rows need the room (see drawRunningStatementTable).
+    doc.newPage();
+    y = drawRecoveryPageHeader(doc, { propertyName, section, left, right, subtitle: 'Recovery - Overall (Electricity + Water + Sewer)' });
+    y -= 12;
+    y = drawRunningStatementTable(doc, { rows, left, right, y });
     // Only show this panel where at least one month has an actual invoiced amount - see the matching
     // comment in views.js's solarCostPanel for why solarCost > 0 (not != null) is the right guard.
     if (rows.some((r) => r.solarCost > 0)) {
