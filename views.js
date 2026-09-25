@@ -1485,9 +1485,16 @@ function utilityCharts(rows, { randKey, qtyKey, qtyLabel }) {
     hasData: hasBothSides, formatValue: shortMoney,
     ...(hasSolar ? { getExtra: (r) => r.solarCost } : {}),
   }));
-  const qtyChart = chartCard(`Consumption (${qtyLabel}): Tenant vs Municipal`, barChart(rows, {
+  // Same idea for the consumption chart: stack net solar kWh (production - export, see
+  // city-deep/solar_cost.js's solarKwhForSection) on top of the Municipal bar, Electricity only,
+  // added 2026-09-25 alongside the Rand-side solar deduction so the kWh chart's own Tenant-vs-
+  // Municipal comparison reads accurately too - Municipal alone was never going to include kWh the
+  // solar plant delivered directly on-site.
+  const hasSolarKwh = qtyKey === 'elecKwh' && rows.some((r) => r.solarKwh > 0);
+  const qtyChart = chartCard(`Consumption (${qtyLabel}): Tenant vs Municipal` + (hasSolarKwh ? ' + Solar' : ''), barChart(rows, {
     getA: (r) => r.site && r.site[qtyKey], getB: (r) => r.municipal && r.municipal[qtyKey], getDelta: (r) => r.recovery && r.recovery[qtyKey],
     hasData: hasBothSides, formatValue: (v) => shortQty(v, qtyLabel),
+    ...(hasSolarKwh ? { getExtra: (r) => r.solarKwh, legendExtra: 'Solar kWh' } : {}),
   }));
   return randChart + qtyChart;
 }
@@ -1640,21 +1647,27 @@ function solarCostPanel(rowsDesc) {
   // solar installation (e.g. Rittle) resolve solarCost to a constant 0 for every row, which would
   // otherwise render an all-"no invoice yet" panel implying solar cost is merely pending there.
   if (!rowsDesc.some((r) => r.solarCost > 0)) return '';
+  // Solar kWh (production - export, see city-deep/solar_cost.js's solarKwhForSection) shown
+  // alongside the Rand column added 2026-09-25 - the same worked-example month (Feb 2026, INV2600)
+  // that has no kWh workbook still shows a Rand figure but no kWh one, so the two columns can
+  // legitimately disagree on which months have data; that's expected, not a bug.
   const trs = rowsDesc.map((r) => {
     if (r.solarCost == null) return '';
     const noInvoice = r.solarCost === 0;
+    const hasKwh = r.solarKwh != null && r.solarKwh > 0;
     return `<tr class="border-t">
       <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}</td>
       <td class="px-3 py-1.5 text-sm text-right ${noInvoice ? 'text-slate-400' : 'text-red-600 font-medium'}">${noInvoice ? 'no invoice yet' : '-' + money(r.solarCost)}</td>
+      <td class="px-3 py-1.5 text-sm text-right ${hasKwh ? 'text-slate-700' : 'text-slate-400'}">${hasKwh ? fmtNum(r.solarKwh, 2) + ' kWh' : '&mdash;'}</td>
     </tr>`;
   }).join('');
   return `
   <div class="bg-white rounded-lg border mb-4 overflow-hidden">
     <div class="px-4 py-2 border-b font-semibold text-sm">Solar Cost (paid to the solar plant owner)</div>
-    <p class="px-4 pt-2 text-xs text-slate-500">Tenants are already billed for solar-sourced electricity as part of their normal charge, but the property separately pays the solar plant owner for that same energy each month - this cost is deducted from the Overall Recovery total above (not shown separately anywhere else on this page).</p>
+    <p class="px-4 pt-2 text-xs text-slate-500">Tenants are already billed for solar-sourced electricity as part of their normal charge, but the property separately pays the solar plant owner for that same energy each month - this Rand cost is deducted from the Overall Recovery total above, and the net kWh (production minus what the plant exported back to the grid) is deducted from the Electricity consumption chart's recovery figure above, so both read accurately.</p>
     <table class="w-full mt-2">
       <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
-        <th class="px-3 py-1.5">Month</th><th class="px-3 py-1.5 text-right">Solar Cost (Excl VAT)</th>
+        <th class="px-3 py-1.5">Month</th><th class="px-3 py-1.5 text-right">Solar Cost (Excl VAT)</th><th class="px-3 py-1.5 text-right">Net Solar kWh</th>
       </tr></thead>
       <tbody>${trs}</tbody>
     </table>

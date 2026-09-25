@@ -949,7 +949,11 @@ function currentPropRecoverySections(user) {
       // Rittle's own solarCostForSection resolves to an always-0 function, so this is harmless there.
       rows: tenantRecovery.buildRecoveryRowsForTenants(
         db, sec.siteNameForMunicipal, cityDeepRecoveryGroups.tenantsForSection(db, sec.key).map((t) => t.id),
-        { limit: 12, solarCostForLabel: solarCost.solarCostForSection(db, sec.key) },
+        {
+          limit: 12,
+          solarCostForLabel: solarCost.solarCostForSection(db, sec.key),
+          solarKwhForLabel: solarCost.solarKwhForSection(db, sec.key),
+        },
       ),
     }));
   }

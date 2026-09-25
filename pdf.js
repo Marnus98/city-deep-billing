@@ -1081,11 +1081,16 @@ function drawUtilityCharts(doc, { x, y, width, series, randKey, qtyKey, qtyLabel
     ...(hasSolar ? { getExtra: (s) => s.solarCost } : {}),
   });
   cy -= chartHeight + 14 + 26;
-  doc.text(x, cy, `Consumption (${qtyLabel}): Tenant vs Municipal`, { size: 9.5, bold: true }); cy -= 18;
+  // Same solar stacking on the consumption chart - net solar kWh (production - export), Electricity
+  // only, added 2026-09-25 alongside the Rand-side deduction above. See views.js's utilityCharts and
+  // city-deep/solar_cost.js's solarKwhForSection for the full explanation.
+  const hasSolarKwh = qtyKey === 'elecKwh' && series.some((s) => s.solarKwh > 0);
+  doc.text(x, cy, `Consumption (${qtyLabel}): Tenant vs Municipal` + (hasSolarKwh ? ' + Solar' : ''), { size: 9.5, bold: true }); cy -= 18;
   drawGroupedComparisonChart(doc, {
     x: x + 46, y: cy, width: width - 46, height: chartHeight, series,
     getA: (s) => s.site && s.site[qtyKey], getB: (s) => s.municipal && s.municipal[qtyKey], getDelta: (s) => s.recovery && s.recovery[qtyKey],
     hasData: hasBothSidesPdf, formatValue: (v) => qtyShort(v, qtyLabel), formatCompact: (v) => qtyCompact(v, qtyLabel),
+    ...(hasSolarKwh ? { getExtra: (s) => s.solarKwh, legendExtra: 'Solar kWh' } : {}),
   });
   cy -= chartHeight + 14 + 26;
   return cy;
@@ -1258,13 +1263,19 @@ function drawRecoveryTable(doc, { title, rows, left, right, y, randKey, qtyKey, 
 function drawSolarCostPanel(doc, { rows, left, right, y }) {
   doc.text(left, y, 'Solar Cost (paid to the solar plant owner)', { size: 9.5, bold: true }); y -= 12;
   doc.text(left, y, 'Tenants are already billed for solar-sourced electricity as part of their normal charge, but the', { size: 7 }); y -= 9;
-  doc.text(left, y, 'property separately pays the solar plant owner for that same energy - this is deducted from the', { size: 7 }); y -= 9;
-  doc.text(left, y, 'Overall Recovery total above, not shown separately anywhere else in this document.', { size: 7 }); y -= 14;
+  doc.text(left, y, 'property separately pays the solar plant owner for that same energy - this Rand cost is deducted from the', { size: 7 }); y -= 9;
+  doc.text(left, y, 'Overall Recovery total above, and the net kWh from the Electricity consumption chart\'s recovery figure.', { size: 7 }); y -= 14;
 
-  const widths = [1500, 3560];
-  const edges = [left + 62 + widths[0], right];
+  // Net Solar kWh column added 2026-09-25 alongside the existing Rand column - see
+  // city-deep/solar_cost.js's solarKwhForSection and views.js's solarCostPanel for the full
+  // explanation of what "net" means here (production minus export).
+  const kwhColLabel = 'Net Solar kWh';
+  const randColLabel = 'Solar Cost (Excl VAT)';
+  const kwhColW = textWidth(kwhColLabel, { bold: true, size: 7.5 }) + 20;
+  const randColRight = right - kwhColW - 16;
   doc.text(left, y, 'Month', { bold: true, size: 7.5 });
-  doc.text(edges[1] - textWidth('Solar Cost (Excl VAT)', { bold: true, size: 7.5 }), y, 'Solar Cost (Excl VAT)', { bold: true, size: 7.5 });
+  doc.text(randColRight - textWidth(randColLabel, { bold: true, size: 7.5 }), y, randColLabel, { bold: true, size: 7.5 });
+  doc.text(right - textWidth(kwhColLabel, { bold: true, size: 7.5 }), y, kwhColLabel, { bold: true, size: 7.5 });
   y -= 4; doc.line(left, y, right, y); y -= 11;
   for (const r of rows) {
     if (r.solarCost == null) continue;
@@ -1272,13 +1283,16 @@ function drawSolarCostPanel(doc, { rows, left, right, y }) {
     doc.text(left, y, shortMonthLabel(r.label), { size: 7.5, bold: true });
     if (r.solarCost === 0) {
       const str = 'no invoice yet';
-      doc.text(right - textWidth(str, { size: 7.5 }), y, str, { size: 7.5 });
+      doc.text(randColRight - textWidth(str, { size: 7.5 }), y, str, { size: 7.5 });
     } else {
       const str = `-${money(r.solarCost)}`;
       const w = textWidth(str, { size: 7.5, bold: true });
-      doc.currentOps.push(`0.75 0.15 0.15 rg BT /F2 7.5 Tf ${(right - w).toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
+      doc.currentOps.push(`0.75 0.15 0.15 rg BT /F2 7.5 Tf ${(randColRight - w).toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(str)}) Tj ET`);
       doc.currentOps.push('0 0 0 rg');
     }
+    const hasKwh = r.solarKwh != null && r.solarKwh > 0;
+    const kwhStr = hasKwh ? `${qtyShort(r.solarKwh, 'kWh')}` : '—';
+    doc.text(right - textWidth(kwhStr, { size: 7.5 }), y, kwhStr, { size: 7.5 });
     y -= 13;
   }
   return y - 8;

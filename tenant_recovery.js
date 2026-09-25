@@ -244,7 +244,18 @@ function buildRecoveryRows(db, siteName, { limit = 12 } = {}) {
 // this separate real cost. When a row has one, `row.solarCost` is always present (0 if nothing was
 // invoiced that month) and totalRecoveryRand is net of it; when omitted entirely (every property
 // except City Deep), row.solarCost is undefined and nothing here changes from before.
-function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantIds, { limit = 12, solarCostForLabel } = {}) {
+//
+// `solarKwhForLabel` (optional) - a (periodLabel) => kWh function, see city-deep/solar_cost.js's
+// solarKwhForSection - added 2026-09-25, the kWh counterpart of solarCostForLabel above, for the
+// same reason: the solar plant delivered kWh directly on-site (net of what it exported back to the
+// grid) that tenants were billed for but that never passed through the municipal meter, so it needs
+// to come off row.recovery.elecKwh the same way row.solarCost comes off row.recovery.elecRand -
+// otherwise Electricity's kWh delta looks like a meter-accuracy problem when it's really just solar
+// kWh the municipal side was never going to see. Client-requested 2026-09-25 so over/under recovery
+// reads accurately in consumption terms, not just Rand. Like row.solarCost, row.solarKwh is always
+// present (0 if no workbook was supplied for that month) when solarKwhForLabel is passed, and
+// undefined otherwise.
+function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantIds, { limit = 12, solarCostForLabel, solarKwhForLabel } = {}) {
   const periods = all(db, 'SELECT * FROM billing_periods ORDER BY start_date').slice(-limit);
   return periods.map((p) => {
     const site = tenantIds.length ? siteSideForTenants(db, tenantIds, p.id) : null;
@@ -273,6 +284,10 @@ function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantIds, { limi
         row.recovery.elecRand -= row.solarCost;
       } else {
         row.totalRecoveryRand = row.totalSiteRand - row.totalMunicipalRand;
+      }
+      if (solarKwhForLabel) {
+        row.solarKwh = solarKwhForLabel(p.label) || 0;
+        row.recovery.elecKwh -= row.solarKwh;
       }
     }
     return row;

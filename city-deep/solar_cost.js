@@ -27,19 +27,52 @@
 // DB before wiring this in - see tenant_recovery.js's consumptionMonthLabel for the same convention
 // used elsewhere), so matching by label alone is safe here - no date-overlap logic needed, unlike
 // the municipal side.
+//
+// kWh figures added 2026-09-25 (client request, so Recovery reflects over/under-recovery "as
+// accurate as possible" in consumption terms too, not just Rand): each Fortress/Capital Propfund
+// invoice is backed by a per-sub-site "Report Data" workbook (PV Production / Bulk Check for
+// Export / TOU sheets) whose Summary tab breaks the invoice into Production kWh (what the plant
+// generated, billed to the property) and Export kWh (what was fed back to the grid, credited back
+// at the same invoice). productionKwh - exportKwh is the net kWh the plant actually delivered
+// on-site that HolmStone's tenants were billed for (via their normal electricity charge, same as
+// solar.js's existing Rand-vs-source breakdown) but that never passed through the municipal meter -
+// so it's the kWh-side counterpart to the amount_excl_vat Rand deduction already netted into
+// elecRand. Confirmed each workbook's own "Total Due" cell matches the amount already hard-coded
+// below to the cent (e.g. Mini Aug26: R73,829.8624668 in both), so the two sources agree and the
+// productionKwh/exportKwh figures are safe to trust.
 const INVOICES = [
   { invoiceNumber: 'INV2600', invoiceDate: '2026-03-18', periodLabel: '2026-02', startDate: '2026-02-01', endDate: '2026-02-28',
-    lines: { south: 168096.02, north: 196156.04, mini: 84670.93 } },
+    lines: { south: { amount: 168096.02 }, north: { amount: 196156.04 }, mini: { amount: 84670.93 } } },
   { invoiceNumber: 'INV2657', invoiceDate: '2026-05-15', periodLabel: '2026-04', startDate: '2026-04-01', endDate: '2026-04-30',
-    lines: { south: 118776.81, north: 141904.16, mini: 55822.40 } },
+    lines: {
+      south: { amount: 118776.81, productionKwh: 65737.38, exportKwh: 14000.92 },
+      north: { amount: 141904.16, productionKwh: 64477.30, exportKwh: 1131.03 },
+      mini: { amount: 55822.40, productionKwh: 30761.09, exportKwh: 6406.96 },
+    } },
   { invoiceNumber: 'INV2684', invoiceDate: '2026-06-05', periodLabel: '2026-05', startDate: '2026-05-01', endDate: '2026-05-31',
-    lines: { south: 130061.13, north: 149344.90, mini: 53604.97 } },
+    lines: {
+      south: { amount: 130061.13, productionKwh: 69188.83, exportKwh: 10413.04 },
+      north: { amount: 149344.90, productionKwh: 68104.27, exportKwh: 111.15 },
+      mini: { amount: 53604.97, productionKwh: 27279.43, exportKwh: 3473.55 },
+    } },
   { invoiceNumber: 'INV2735', invoiceDate: '2026-07-24', periodLabel: '2026-06', startDate: '2026-06-01', endDate: '2026-06-30',
-    lines: { south: 157687.13, north: 164401.47, mini: 42082.03 } },
+    lines: {
+      south: { amount: 157687.13, productionKwh: 53619.46, exportKwh: 4717.30 },
+      north: { amount: 164401.47, productionKwh: 52980.69, exportKwh: 395.21 },
+      mini: { amount: 42082.03, productionKwh: 13248.25, exportKwh: 69.47 },
+    } },
   { invoiceNumber: 'INV2756', invoiceDate: '2026-08-07', periodLabel: '2026-07', startDate: '2026-07-01', endDate: '2026-07-31',
-    lines: { south: 194781.07, north: 202714.50, mini: 52060.61 } },
+    lines: {
+      south: { amount: 194781.07, productionKwh: 60517.82, exportKwh: 3801.40 },
+      north: { amount: 202714.50, productionKwh: 60648.06, exportKwh: 0 },
+      mini: { amount: 52060.61, productionKwh: 15362.31, exportKwh: 180.18 },
+    } },
   { invoiceNumber: 'INV2788', invoiceDate: '2026-09-14', periodLabel: '2026-08', startDate: '2026-08-01', endDate: '2026-08-31',
-    lines: { south: 216422.12, north: 225659.92, mini: 73829.86 } },
+    lines: {
+      south: { amount: 216422.12, productionKwh: 71750.82, exportKwh: 8621.33 },
+      north: { amount: 225659.92, productionKwh: 70635.16, exportKwh: 3052.35 },
+      mini: { amount: 73829.86, productionKwh: 23483.26, exportKwh: 1545.07 },
+    } },
 ];
 
 // sub_site is one of 'south'/'north'/'mini' (short internal key, not the full "City Deep South"
@@ -61,6 +94,13 @@ function migrateSolarCost(db) {
       UNIQUE(sub_site, period_label)
     );
   `);
+  // Added 2026-09-25: production_kwh/export_kwh back up amount_excl_vat from the Fortress "Report
+  // Data" workbooks (see INVOICES comment above). NULL for the one invoice (Feb 2026) whose workbook
+  // wasn't supplied, so solarKwhForSection below simply nets 0 kWh for that month - the existing R
+  // deduction for Feb is untouched either way.
+  const cols = db.prepare("PRAGMA table_info(solar_cost_invoices)").all().map((c) => c.name);
+  if (!cols.includes('production_kwh')) db.exec('ALTER TABLE solar_cost_invoices ADD COLUMN production_kwh REAL');
+  if (!cols.includes('export_kwh')) db.exec('ALTER TABLE solar_cost_invoices ADD COLUMN export_kwh REAL');
 }
 
 // Safe to re-run on every boot, same convention as every other import script in this app - keyed by
@@ -70,16 +110,18 @@ function run(dbFile = 'city-deep.db') {
   const { open } = require('../db');
   const db = open(dbFile);
   migrateSolarCost(db);
-  const stmt = db.prepare(`INSERT INTO solar_cost_invoices (invoice_number, invoice_date, sub_site, period_label, start_date, end_date, amount_excl_vat)
-    VALUES (?,?,?,?,?,?,?)
+  const stmt = db.prepare(`INSERT INTO solar_cost_invoices (invoice_number, invoice_date, sub_site, period_label, start_date, end_date, amount_excl_vat, production_kwh, export_kwh)
+    VALUES (?,?,?,?,?,?,?,?,?)
     ON CONFLICT(sub_site, period_label) DO UPDATE SET
       invoice_number=excluded.invoice_number, invoice_date=excluded.invoice_date,
-      start_date=excluded.start_date, end_date=excluded.end_date, amount_excl_vat=excluded.amount_excl_vat`);
+      start_date=excluded.start_date, end_date=excluded.end_date, amount_excl_vat=excluded.amount_excl_vat,
+      production_kwh=excluded.production_kwh, export_kwh=excluded.export_kwh`);
   let created = 0;
   for (const inv of INVOICES) {
-    for (const [subSite, amount] of Object.entries(inv.lines)) {
+    for (const [subSite, line] of Object.entries(inv.lines)) {
       const before = db.prepare('SELECT id FROM solar_cost_invoices WHERE sub_site=? AND period_label=?').get(subSite, inv.periodLabel);
-      stmt.run(inv.invoiceNumber, inv.invoiceDate, subSite, inv.periodLabel, inv.startDate, inv.endDate, amount);
+      stmt.run(inv.invoiceNumber, inv.invoiceDate, subSite, inv.periodLabel, inv.startDate, inv.endDate, line.amount,
+        line.productionKwh != null ? line.productionKwh : null, line.exportKwh != null ? line.exportKwh : null);
       if (!before) created++;
     }
   }
@@ -105,4 +147,23 @@ function solarCostForSection(db, sectionKey) {
   return (label) => byLabel[label] || 0;
 }
 
-module.exports = { run, solarCostForSection, SECTION_SUB_SITES };
+// Same idea as solarCostForSection but for kWh: returns a function (periodLabel) => net kWh
+// (production - export, summed across the section's sub-sites), or 0 if no workbook was supplied
+// for that month/sub-site (production_kwh IS NULL, e.g. Feb 2026's INV2600). See the INVOICES
+// comment above for why production-minus-export is the right quantity to net against tenant-billed
+// elecKwh - it's the kWh counterpart of the amount_excl_vat Rand deduction.
+function solarKwhForSection(db, sectionKey) {
+  const subSites = SECTION_SUB_SITES[sectionKey] || [];
+  if (!subSites.length) return () => 0;
+  migrateSolarCost(db);
+  const rows = db.prepare(`SELECT period_label, production_kwh, export_kwh FROM solar_cost_invoices WHERE sub_site IN (${subSites.map(() => '?').join(',')})`).all(...subSites);
+  const byLabel = {};
+  for (const r of rows) {
+    if (r.production_kwh == null) continue;
+    const net = r.production_kwh - (r.export_kwh || 0);
+    byLabel[r.period_label] = (byLabel[r.period_label] || 0) + net;
+  }
+  return (label) => byLabel[label] || 0;
+}
+
+module.exports = { run, solarCostForSection, solarKwhForSection, SECTION_SUB_SITES };
