@@ -1502,17 +1502,23 @@ function recoveryTable(title, badgeClass, rows, { randKey, qtyKey, qtyLabel, qty
     const flagStart = (muniStart && daysBetween(muniStart, muniEnd) > LONG_PERIOD_DAYS) ? muniStart
       : (ourStart && daysBetween(ourStart, ourEnd) > LONG_PERIOD_DAYS) ? ourStart : null;
     const flagEnd = flagStart === muniStart ? muniEnd : ourEnd;
+    // Extra top padding (pt-3, was the same py-1.5 every cell used) vs bottom (pb-2) - purely
+    // cosmetic per client feedback 2026-09-23 ("lines between months look unprofessional... need to
+    // move up a bit"): each row's border-t sat right against the 3-line Month/Ours/Municipal block
+    // with equal 6px padding both sides, which read as cramped given how much taller this cell is
+    // than a single-line numeric cell. More room below the divider (relative to above it) reads as
+    // the line sitting higher/cleaner against the block it introduces, instead of squeezed onto it.
     return `<tr class="border-t align-top">
-      <td class="px-3 py-1.5 text-sm font-medium">${shortMonthLabel(r.label)}${flagStart ? periodBadge(flagStart, flagEnd) : ''}
+      <td class="px-3 pt-3 pb-2 text-sm font-medium">${shortMonthLabel(r.label)}${flagStart ? periodBadge(flagStart, flagEnd) : ''}
         ${site ? periodLine('Ours', ourStart, ourEnd) : ''}
         ${muni ? periodLine('Municipal', muniStart, muniEnd) : ''}
       </td>
-      <td class="px-3 py-1.5 text-sm text-right">${site ? money(site[randKey]) : '<span class="text-slate-400">no bill</span>'}</td>
-      <td class="px-3 py-1.5 text-sm text-right">${muni ? money(muni[randKey]) : '<span class="text-slate-400">no statement</span>'}</td>
-      <td class="px-3 py-1.5 text-sm text-right">${recoveryCell(rec ? rec[randKey] : null)}</td>
-      <td class="px-3 py-1.5 text-sm text-right text-slate-500">${site ? fmtNum(site[qtyKey], qtyDp) : '&mdash;'}</td>
-      <td class="px-3 py-1.5 text-sm text-right text-slate-500">${muni ? fmtNum(muni[qtyKey], qtyDp) : '&mdash;'}</td>
-      <td class="px-3 py-1.5 text-sm text-right">${recoveryQtyCell(rec ? rec[qtyKey] : null, qtyDp)}</td>
+      <td class="px-3 pt-3 pb-2 text-sm text-right">${site ? money(site[randKey]) : '<span class="text-slate-400">no bill</span>'}</td>
+      <td class="px-3 pt-3 pb-2 text-sm text-right">${muni ? money(muni[randKey]) : '<span class="text-slate-400">no statement</span>'}</td>
+      <td class="px-3 pt-3 pb-2 text-sm text-right">${recoveryCell(rec ? rec[randKey] : null)}</td>
+      <td class="px-3 pt-3 pb-2 text-sm text-right text-slate-500">${site ? fmtNum(site[qtyKey], qtyDp) : '&mdash;'}</td>
+      <td class="px-3 pt-3 pb-2 text-sm text-right text-slate-500">${muni ? fmtNum(muni[qtyKey], qtyDp) : '&mdash;'}</td>
+      <td class="px-3 pt-3 pb-2 text-sm text-right">${recoveryQtyCell(rec ? rec[qtyKey] : null, qtyDp)}</td>
     </tr>`;
   }).join('');
   return `

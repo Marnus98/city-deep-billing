@@ -13,7 +13,7 @@ const DEMO_USERS = [
   ['admin', 'admin123', 'admin', 'System Administrator'],
   ['billing', 'billing123', 'billing', 'Billing Clerk'],
   ['reviewer', 'reviewer123', 'reviewer', 'Billing Reviewer'],
-  ['viewer', 'viewer123', 'readonly', 'Read Only User'],
+  ['viewer', 'Meterwise2026!', 'readonly', 'Client Viewer'],
 ];
 
 function hashPassword(password) {

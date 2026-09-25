@@ -380,6 +380,48 @@ This sandbox can't expose a public URL itself. To get a working `https://...` li
    portable SQL and maps over directly) and swap the hand-rolled PDF/HTTP layer for
    pdfkit/Express once you have normal package access on the deploy target (most hosts do).
 
+### Going live on Render: stop the free tier from spinning down and losing data
+
+Render's **Free** web-service plan does two things that matter here:
+
+- It spins the service down after 15 minutes of no traffic, and the next visitor waits ~1 minute
+  for it to wake back up.
+- Its filesystem is **ephemeral** - every restart, spin-down, or redeploy wipes anything written
+  to disk, which for this app means every property's `.db` file under `data/` *and* every uploaded
+  meter photo under `public/meter-photos/`.
+
+Neither is fixable from the Free plan; both go away on a paid instance with a persistent disk
+attached:
+
+1. In the Render dashboard, upgrade the service to the **Starter** instance type (~$7/month,
+   September 2026 pricing) - this alone removes the 15-minute spin-down.
+2. On that service, add a **Disk** (Render dashboard → your service → Disks → Add Disk). Give it a
+   mount path, e.g. `/var/data`, and a size (1 GB is overkill for years of this data).
+3. Add an environment variable **`DATA_DIR`** = `/var/data` on the service. `db.js` and `server.js`
+   both already read this (falling back to the local `./data` / `./public/meter-photos` folders
+   when it's unset, so local dev is unaffected) - every property's SQLite file and every uploaded
+   meter photo will be written under that mounted disk instead, so they survive restarts and
+   redeploys.
+4. Redeploy once after adding the disk + env var so the app creates its files on the new path
+   (first boot will reseed the demo data there, same as any fresh `data/` folder does today).
+
+### Monthly billing, photo proof, and sharing with clients as a read-only viewer
+
+These three don't need new building - they're already in the app:
+
+- **Add each new month's billing**: open a property, go to its billing-period list, and use Add
+  Period (or `import_history.js`/`seed.js` under that property's own folder if you're bulk-loading
+  a whole workbook at once, the same way every existing month was loaded).
+- **Photos as proof**: on the readings page for a period, each manual reading has a photo capture
+  field - the photo is stored alongside the reading and shown on that period's detail view (see
+  `saveMeterPhoto` in `server.js`).
+- **Share it live, read-only**: the login system already has a `readonly` role that can view
+  everything but can't add, edit, delete, or finalise anything (blocked server-side, see
+  `requireRole` in `server.js`). A demo account for it already exists - username `viewer`,
+  password `viewer123` (see `shared_seed_users.js`) - **change that password before handing the
+  login to a real client**, since it's currently the same demo credential documented in this
+  README.
+
 ## Assumptions & open items carried over from Phase 1
 
 See `City_Deep_Workbook_Analysis_Phase1.docx` Section 12 for the full list. Still open:

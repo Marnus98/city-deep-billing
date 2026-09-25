@@ -1626,18 +1626,26 @@ const MIME = {
   '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.heic': 'image/heic', '.svg': 'image/svg+xml',
 };
 
-// Saves an uploaded meter-photo file (see readMultipartBody) under public/meter-photos/<property
-// slug>/ - inside PUBLIC_DIR so tryServeStatic() below already knows how to serve it back out,
-// with no extra route needed. Namespaced by property slug purely so City Deep's and Wingfield's
-// photos don't land in the same folder; not a security boundary (nothing here is served
-// selectively by login). Returns the web path to store in meter_readings.photo_path, or null if
-// there's nothing usable to save (empty part, non-image content-type).
+// Meter photos live under their own root, separate from PUBLIC_DIR's static assets, so that root
+// alone can be pointed at a mounted persistent disk in production via the same DATA_DIR env var
+// db.js uses (see db.js's own DATA_DIR comment) - falls back to public/meter-photos, matching this
+// app's previous behaviour exactly, when DATA_DIR isn't set (i.e. local dev).
+const PHOTOS_DIR = process.env.DATA_DIR
+  ? path.join(path.resolve(process.env.DATA_DIR), 'meter-photos')
+  : path.join(PUBLIC_DIR, 'meter-photos');
+
+// Saves an uploaded meter-photo file (see readMultipartBody) under PHOTOS_DIR/<property slug>/ -
+// served back out at /meter-photos/... by the dedicated branch in tryServeStatic() below.
+// Namespaced by property slug purely so City Deep's and Wingfield's photos don't land in the same
+// folder; not a security boundary (nothing here is served selectively by login). Returns the web
+// path to store in meter_readings.photo_path, or null if there's nothing usable to save (empty
+// part, non-image content-type).
 function saveMeterPhoto(propertySlug, meterId, periodId, file) {
   if (!file || !file.data || !file.data.length) return null;
   if (file.contentType && !file.contentType.startsWith('image/')) return null;
   const extMatch = /\.[a-zA-Z0-9]+$/.exec(file.filename || '');
   const ext = (extMatch ? extMatch[0] : '.jpg').toLowerCase();
-  const dir = path.join(PUBLIC_DIR, 'meter-photos', propertySlug);
+  const dir = path.join(PHOTOS_DIR, propertySlug);
   fs.mkdirSync(dir, { recursive: true });
   const name = `meter-${meterId}-period-${periodId}-${Date.now()}${ext}`;
   fs.writeFileSync(path.join(dir, name), file.data);
@@ -1646,17 +1654,25 @@ function saveMeterPhoto(propertySlug, meterId, periodId, file) {
 
 // Best-effort delete of a previously-saved meter photo (used when a manual reading is deleted).
 // Never throws - a missing file (already cleaned up, or a path that turns out to be outside
-// PUBLIC_DIR for any reason) just means there's nothing to remove.
+// PHOTOS_DIR for any reason) just means there's nothing to remove.
 function deleteMeterPhoto(webPath) {
-  if (!webPath) return;
-  const filePath = path.join(PUBLIC_DIR, webPath.replace(/^\/+/, ''));
-  if (!filePath.startsWith(PUBLIC_DIR)) return;
+  if (!webPath || !webPath.startsWith('/meter-photos/')) return;
+  const rel = path.normalize(webPath.slice('/meter-photos/'.length)).replace(/^(\.\.[/\\])+/, '');
+  const filePath = path.join(PHOTOS_DIR, rel);
+  if (!filePath.startsWith(PHOTOS_DIR)) return;
   try { fs.unlinkSync(filePath); } catch (err) { /* already gone - fine */ }
 }
 function tryServeStatic(pathname, res) {
-  const safe = path.normalize(pathname).replace(/^(\.\.[/\\])+/, '');
-  const filePath = path.join(PUBLIC_DIR, safe);
-  if (!filePath.startsWith(PUBLIC_DIR)) return false;
+  let filePath;
+  if (pathname.startsWith('/meter-photos/')) {
+    const rel = path.normalize(pathname.slice('/meter-photos/'.length)).replace(/^(\.\.[/\\])+/, '');
+    filePath = path.join(PHOTOS_DIR, rel);
+    if (!filePath.startsWith(PHOTOS_DIR)) return false;
+  } else {
+    const safe = path.normalize(pathname).replace(/^(\.\.[/\\])+/, '');
+    filePath = path.join(PUBLIC_DIR, safe);
+    if (!filePath.startsWith(PUBLIC_DIR)) return false;
+  }
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
   const ext = path.extname(filePath);
   res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=300' });

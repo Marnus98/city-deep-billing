@@ -255,6 +255,16 @@ function buildRecoveryRowsForTenants(db, siteNameForMunicipal, tenantNames, { li
       if (solarCostForLabel) {
         row.solarCost = solarCostForLabel(p.label) || 0;
         row.totalRecoveryRand = row.totalSiteRand - row.totalMunicipalRand - row.solarCost;
+        // Net the same solar-plant-owner cost off the Electricity-specific recovery figure too (not
+        // water/sewer - the solar cost is purely an electricity cost), so the Electricity chart's own
+        // delta and its table's Recovery column read as the real Rand recovered, not just "billed
+        // minus COJ" - confirmed with the client 2026-09-25 using August 2026 Mini Park as the worked
+        // example: COJ billed R554,060.97 + Fortress/Capital Propfund solar invoice R73,829.86 =
+        // R627,890.83 actually paid out, which is what Electricity recovery should net against, not
+        // the COJ figure alone. This only touches the per-utility Electricity number - totalRecoveryRand
+        // above is computed independently (from totalSiteRand/totalMunicipalRand directly) so it isn't
+        // double-deducted by this.
+        row.recovery.elecRand -= row.solarCost;
       } else {
         row.totalRecoveryRand = row.totalSiteRand - row.totalMunicipalRand;
       }

@@ -11,7 +11,11 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-const DATA_DIR = path.join(__dirname, 'data');
+// DATA_DIR is overridable via the DATA_DIR env var so it can be pointed at a mounted persistent
+// disk in production (Render's free/ephemeral filesystem wipes ./data on every restart, redeploy,
+// or spin-down - see the README's "Going live" section). Every property db and auth.db all funnel
+// through open() below, so setting this one env var covers all of them.
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'billing.db'); // legacy default, kept for any script still calling open() with no args
 
 function open(fileName = 'billing.db') {
