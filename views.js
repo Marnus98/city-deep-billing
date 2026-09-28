@@ -1376,7 +1376,20 @@ function siteBillingListPage({ user, rows, basePath = '/site-billing', pageTitle
   return layout({ title: pageTitle, user, active: basePath, body });
 }
 
-function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, error, basePath = '/site-billing', pageTitle = 'billing slip', backLabel = 'Billing Slips', helpText }) {
+// item_keys in this list are never typed in directly on the *client-facing site billing* form
+// (autoComputedKeys is only ever passed non-empty from the /site-billing routes, never from
+// /municipal-billing - see server.js) - their reading is instead the live sum of the site's own
+// TOU electricity readings (peak/standard/off-peak, high+low), recalculated in the browser as those
+// six fields change (AUTO_COMPUTED_SUM_SOURCE_KEYS below) and re-verified/overwritten server-side
+// in saveSiteBillingSlip() as the source of truth (so a disabled JS or tampered field can't submit
+// a stale number). This exists because AutoZone's "Network Surcharge (City Power)" genuinely isn't
+// an independent meter reading - City Power bills it as a flat 0.06 x that month's total metered
+// kWh (see flat_site_tariff_shapes.js's AUTOZONE_COJ_MUNICIPAL comment for the same fact confirmed
+// against the real municipal statement) - so relying on someone to hand-add six numbers every month
+// is exactly what silently dropped this line to R0 for Jul/Aug 2026 before this fix.
+const AUTO_COMPUTED_SUM_SOURCE_KEYS = ['peak_high', 'peak_low', 'standard_high', 'standard_low', 'offpeak_high', 'offpeak_low'];
+
+function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, error, basePath = '/site-billing', pageTitle = 'billing slip', backLabel = 'Billing Slips', helpText, autoComputedKeys = [] }) {
   const isEdit = !!(slip && slip.id);
   const t = tariff || {};
   const s = slip || {};
@@ -1401,7 +1414,9 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
       <td class="px-3 py-1.5 text-sm text-slate-500">${esc(it.unit)}</td>
       <td class="px-3 py-1.5 w-32">${it.fixed_reading != null
         ? `<span class="text-slate-400 text-sm">${esc(it.fixed_reading)} (fixed)</span>`
-        : `<input name="reading__${it.item_key}" type="number" step="0.01" value="${reading != null ? esc(reading) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>`}</td>
+        : autoComputedKeys.includes(it.item_key)
+          ? `<input name="reading__${it.item_key}" data-auto-computed="1" type="number" step="0.01" value="${reading != null ? esc(reading) : ''}" readonly class="w-full border rounded px-2 py-1.5 text-sm bg-slate-50 text-slate-500"/>`
+          : `<input name="reading__${it.item_key}" type="number" step="0.01" value="${reading != null ? esc(reading) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>`}</td>
       <td class="px-3 py-1.5 w-44">${it.has_comment ? `<input name="comment__${it.item_key}" placeholder="e.g. 2026/07/15 22:00" value="${esc(comment || '')}" class="w-full border rounded px-2 py-1.5 text-sm"/>` : ''}</td>
     </tr>`;
   };
@@ -1477,8 +1492,23 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
       </div>
     </details>
 
+    ${autoComputedKeys.length ? `<p class="text-xs text-slate-500 mb-3">Fields shown greyed-out (e.g. Network Surcharge) are calculated automatically from the Peak/Standard/Off-Peak readings above and can't be typed into directly.</p>` : ''}
     <button class="bg-slate-900 text-white rounded px-6 py-2 font-medium">Save</button>
-  </form>`;
+  </form>
+  ${autoComputedKeys.length ? `<script>
+    (function() {
+      var sourceKeys = ${JSON.stringify(AUTO_COMPUTED_SUM_SOURCE_KEYS)};
+      var targetKeys = ${JSON.stringify(autoComputedKeys)};
+      var sources = sourceKeys.map(function(k) { return document.querySelector('input[name="reading__' + k + '"]'); }).filter(Boolean);
+      var targets = targetKeys.map(function(k) { return document.querySelector('input[name="reading__' + k + '"]'); }).filter(Boolean);
+      function recompute() {
+        var total = sources.reduce(function(sum, el) { return sum + (parseFloat(el.value) || 0); }, 0);
+        targets.forEach(function(el) { el.value = total; });
+      }
+      sources.forEach(function(el) { el.addEventListener('input', recompute); });
+      recompute();
+    })();
+  </script>` : ''}`;
   return layout({ title: isEdit ? `Edit ${s.label}` : `New ${pageTitle}`, user, active: basePath, body });
 }
 

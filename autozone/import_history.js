@@ -54,6 +54,10 @@ const RATES_C = { // Jul 2026: Network Surcharge absent from the statement (see 
   peak_high: 7.6624, peak_low: 3.22, standard_high: 2.9256, standard_low: 2.4242,
   offpeak_high: 2.0044, offpeak_low: 1.8635, network_surcharge: 0, water: 0, sewer: 0,
 };
+// NOTE (2026-09-28): network_surcharge stays 0 here deliberately - RATES_C is specifically for Jul
+// 2026, whose real municipal statement genuinely had no Network Surcharge line that month (see the
+// comment above). Don't "fix" this to 0.06 - see RATES_AUG26 below and the correction block near the
+// bottom of this file for where the real fix (Aug 2026 onward) lives.
 
 // label, start_date, end_date, effective_from, rates, demand_kva, comment, excess_reactive,
 // peak_high, peak_low, standard_high, standard_low, offpeak_high, offpeak_low, network_surcharge,
@@ -219,10 +223,16 @@ function main(dbFile = 'autozone.db') {
   // workbook, let the client correct via the Edit page" convention used throughout this file)
   // but flagged here and in the delivery summary - worth the client double-checking the actual
   // August water meter reading.
+  // 2026-08 Network Surcharge (see the correction block below for the full explanation): City
+  // Power's real 0.06 x total-metered-kWh surcharge applies again from August 2026 (unlike July,
+  // which genuinely had none - see RATES_C's note above), so it's included here for a brand-new
+  // database's initial seed. AUG26_TOU_KWH is the same six TOU readings already listed below,
+  // summed once so the reading here can never drift out of sync with them.
+  const AUG26_TOU_KWH = 12417.02 + 0 + 29014.395 + 0 + 12028.74 + 0;
   const RATES_AUG26 = {
     service_charge: 4629.64, capacity_charge: 0, demand_charge: 461.28, excess_reactive: 0.4625,
     peak_high: 7.6624, peak_low: 3.22, standard_high: 2.9256, standard_low: 2.4242,
-    offpeak_high: 2.0044, offpeak_low: 1.8635, network_surcharge: 0,
+    offpeak_high: 2.0044, offpeak_low: 1.8635, network_surcharge: 0.06,
     water: 58454.78404 / 762.052, sewer: 58.66,
   };
   const aug26TariffId = seedTariff(db, {
@@ -230,7 +240,9 @@ function main(dbFile = 'autozone.db') {
     notes: 'Real statement from "AutoZone Slips Aug 2026.xlsx", uploaded 2026-09-01 - rate*reading'
       + '=cost verified exactly for every electrical line, no correction factor. Water/Sewer '
       + 'reading (762.052 kL) is identical to July 2026\'s - possibly a stale/carried-forward '
-      + 'workbook figure rather than a fresh August reading; flagged for the client to confirm.',
+      + 'workbook figure rather than a fresh August reading; flagged for the client to confirm. '
+      + 'Network Surcharge (0.06 x total TOU kWh) restored from Sep 2026 onward per the client\'s '
+      + 'Tariff tab request - see the correction block below for why July stays surcharge-free.',
   });
   const aug26SlipId = seedSlip(db, aug26TariffId, {
     label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', applyCorrectionFactor: 0,
@@ -241,11 +253,35 @@ function main(dbFile = 'autozone.db') {
       peak_high: 12417.02, peak_low: 0,
       standard_high: 29014.395, standard_low: 0,
       offpeak_high: 12028.74, offpeak_low: 0,
-      network_surcharge: 0,
+      network_surcharge: AUG26_TOU_KWH,
       water: 762.052, sewer: 762.052,
     },
   });
   if (aug26SlipId) console.log('AutoZone: August 2026 slip added.');
+
+  // 2026-09-28 fix: the client confirmed City Power's Network Surcharge is a real, ongoing charge
+  // of 0.06 x that month's total metered kWh (peak+standard+off-peak, high+low) - see the new
+  // Tariff tab feature commit for the full investigation. July 2026 genuinely had none (see RATES_C
+  // above, kept as-is), but August 2026 was found to have been seeded with rate 0/reading 0 too -
+  // seemingly just carried over from July's setup rather than independently checked against
+  // August's own statement, since nothing here explicitly confirms City Power dropped the charge
+  // that month. seedTariff()/seedSlip() are idempotent by (name, effective_from)/label and never
+  // touch an already-seeded row's numbers, so simply fixing RATES_AUG26/the readings object above
+  // only takes effect on a brand-new database - this block is what actually corrects a database
+  // (including production's) that already seeded the old, wrong values before this fix shipped.
+  // Safe to re-run every boot: it always sets the same correct rate/reading, so it's a no-op once
+  // already fixed. site-billing's own save route now also auto-computes this reading going forward
+  // for any new slip (see server.js's SITE_BILLING_AUTO_COMPUTED_KEYS), so this one-off correction
+  // is only needed for the two already-captured months (Jul 2026 stays untouched - see above).
+  const aug26Slip = db.prepare("SELECT id, tariff_id FROM site_billing_slips WHERE label='2026-08'").get();
+  if (aug26Slip) {
+    db.prepare("UPDATE site_tariff_items SET rate=0.06 WHERE tariff_id=? AND item_key='network_surcharge'").run(aug26Slip.tariff_id);
+    const touKeys = ['peak_high', 'peak_low', 'standard_high', 'standard_low', 'offpeak_high', 'offpeak_low'];
+    const rs = db.prepare('SELECT item_key, reading FROM site_slip_readings WHERE slip_id=?').all(aug26Slip.id);
+    const map = {}; rs.forEach((r) => { map[r.item_key] = r.reading; });
+    const touSum = touKeys.reduce((s, k) => s + (map[k] || 0), 0);
+    db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key='network_surcharge'").run(touSum, aug26Slip.id);
+  }
 
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via

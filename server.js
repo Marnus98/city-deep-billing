@@ -896,7 +896,7 @@ route('GET', '/site-billing/new', async (req, res) => {
   if (!latestTariff) return send(res, 400, 'This property has no tariff yet - it needs an initial seed/import script before slips can be added.');
   const latestSlip = get('SELECT * FROM site_billing_slips ORDER BY start_date DESC LIMIT 1');
   const items = getTariffItems(latestTariff.id);
-  send(res, 200, views.siteBillingFormPage({ user, tariff: latestTariff, items, readings: {}, slip: null, latestSlip }));
+  send(res, 200, views.siteBillingFormPage({ user, tariff: latestTariff, items, readings: {}, slip: null, latestSlip, autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS }));
 });
 
 route('GET', '/site-billing/:id/edit', async (req, res, params) => {
@@ -907,8 +907,15 @@ route('GET', '/site-billing/:id/edit', async (req, res, params) => {
   const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
   const items = getTariffItems(slip.tariff_id);
   const readings = getSlipReadings(slip.id);
-  send(res, 200, views.siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip: null }));
+  send(res, 200, views.siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip: null, autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS }));
 });
+
+// See views.js's own comment above AUTO_COMPUTED_SUM_SOURCE_KEYS for the full reasoning. Only ever
+// passed to the /site-billing (client-facing) form/save path, never to /municipal-billing's shared
+// siteBillingFormPage()/save function - a municipal statement's network_surcharge reading is the
+// municipality's own already-reconciled figure from the real invoice, not something to recompute.
+const SITE_BILLING_AUTO_COMPUTED_KEYS = ['network_surcharge'];
+const SITE_BILLING_AUTO_COMPUTED_SOURCE_KEYS = ['peak_high', 'peak_low', 'standard_high', 'standard_low', 'offpeak_high', 'offpeak_low'];
 
 async function saveSiteBillingSlip(req, res, existingId) {
   const user = requireLogin(req, res); if (!user) return;
@@ -927,8 +934,16 @@ async function saveSiteBillingSlip(req, res, existingId) {
   if (!label || !startDate || !endDate) {
     return send(res, 400, views.siteBillingFormPage({
       user, tariff: { ...body }, items: template, readings: {}, slip: { ...body, id: existingId }, latestSlip: null,
-      error: 'Label, start date and end date are all required.',
+      error: 'Label, start date and end date are all required.', autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS,
     }));
+  }
+  // Overwrite whatever was submitted for an auto-computed item (network_surcharge) with the live
+  // sum of this same submission's TOU readings - the form field is readonly/JS-computed already,
+  // but re-deriving it here server-side means a disabled/bypassed script can never save a stale or
+  // tampered number. See views.js's AUTO_COMPUTED_SUM_SOURCE_KEYS comment for the full reasoning.
+  if (template.some((it) => SITE_BILLING_AUTO_COMPUTED_KEYS.includes(it.item_key))) {
+    const touSum = SITE_BILLING_AUTO_COMPUTED_SOURCE_KEYS.reduce((s, k) => s + (Number(body[`reading__${k}`]) || 0), 0);
+    for (const key of SITE_BILLING_AUTO_COMPUTED_KEYS) body[`reading__${key}`] = String(touSum);
   }
   const tariffId = findOrCreateSiteTariff(templateTariff, template, body, startDate);
   // Checkboxes only appear in the POST body at all when checked ("apply_correction_factor=1"); an
