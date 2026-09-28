@@ -37,7 +37,7 @@ function layout({ title, user, active, body }) {
   // simply don't get this tab.
   const nav = isFlatSite
     ? [
-      ['/dashboard', 'Dashboard'], ['/site-billing', 'Billing Slips'], ['/municipal-billing', 'Municipal Account'],
+      ['/dashboard', 'Dashboard'], ['/site-billing', 'Billing Slips'], ['/site-tariff', 'Tariff'], ['/municipal-billing', 'Municipal Account'],
       ...(currentProp.hasMunicipalStatements ? [['/recovery', 'Recovery']] : []),
       // Same Flagging gate as the tenant-model branch below (see its own comment) - missed in the
       // initial all-properties rollout (2026-08-25), since every flat_site property also got
@@ -1123,6 +1123,224 @@ function flatSiteDashboardPage({ user, propertyName, gaugeOptions, gaugeSelector
   ${gaugeCardsSection(gauges)}
   `;
   return layout({ title: `Dashboard - ${propertyName}`, user, active: '/dashboard', body });
+}
+
+// ---------------- flat_site Tariff tab ----------------
+// See server.js's /site-tariff routes for the full explanation of why this exists alongside the
+// Billing Slip form's own inline rate editing. FACTOR_LABELS/SECTION_LABELS are shared display
+// strings between the overview, edit-rates and builder pages below.
+const FACTOR_LABELS = { kva: 'kVA', peak: 'Peak', standard: 'Standard', offpeak: 'Off-Peak' };
+const SECTION_LABELS = { electricity: 'Electricity', water: 'Water', municipal: 'Municipal' };
+
+function siteTariffPage({ user, tariff, items, versions, propertyName }) {
+  if (!tariff) {
+    const body = `
+    <h1 class="text-2xl font-bold mb-4">Tariff</h1>
+    <div class="bg-white rounded-lg border p-6 text-slate-400 text-sm">
+      No tariff set up yet for ${esc(propertyName)}. <a href="/site-tariff/new" class="text-blue-600 hover:underline">Build one</a> to get started.
+    </div>`;
+    return layout({ title: 'Tariff', user, active: '/site-tariff', body });
+  }
+  const factorRow = (key, label) => {
+    const v = tariff[`${key}_factor`];
+    if (v == null || Math.abs(v - 1) < 1e-9) return '';
+    return `<div><span class="text-slate-500">${esc(label)} correction factor:</span> <span class="font-medium">${esc(v)}&times;</span></div>`;
+  };
+  const factorsHtml = ['kva', 'peak', 'standard', 'offpeak'].map((k) => factorRow(k, FACTOR_LABELS[k])).join('');
+  const itemRow = (it) => `
+    <tr class="border-t">
+      <td class="px-3 py-1.5 text-sm">${esc(it.label)}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${esc(SECTION_LABELS[it.section] || it.section)}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${esc(it.unit)}</td>
+      <td class="px-3 py-1.5 text-sm text-right font-medium">${fmtNum(it.rate, 4)}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${it.factor_type ? esc(FACTOR_LABELS[it.factor_type] || it.factor_type) : '&mdash;'}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${it.fixed_reading != null ? `Flat &times;${esc(it.fixed_reading)}` : 'Metered'}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${it.has_comment ? 'Yes' : ''}</td>
+    </tr>`;
+  const versionRows = versions.map((v) => `
+    <tr class="border-t">
+      <td class="px-3 py-1.5 text-sm font-medium">${esc(v.effective_from)}</td>
+      <td class="px-3 py-1.5 text-sm">${esc(v.tariff_name || '&mdash;')}</td>
+      <td class="px-3 py-1.5 text-sm ${v.id === tariff.id ? 'text-green-600 font-medium' : 'text-slate-400'}">${v.id === tariff.id ? 'Current' : ''}</td>
+    </tr>`).join('');
+  const body = `
+  <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="text-2xl font-bold">Tariff</h1>
+      <p class="text-sm text-slate-500 mt-1">${esc(propertyName)}'s current billing tariff - ${esc(tariff.tariff_name || 'unnamed')}, effective from ${esc(tariff.effective_from)}.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/site-tariff/new" class="border border-slate-300 text-slate-700 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50">+ New Structure</a>
+      <a href="/site-tariff/edit" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Edit Rates</a>
+    </div>
+  </div>
+  ${factorsHtml ? `<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm flex gap-6">${factorsHtml}</div>` : ''}
+  <div class="bg-white rounded-lg border mb-6 overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold text-sm">Current Line Items</div>
+    <table class="w-full">
+      <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+        <th class="px-3 py-1.5">Item</th><th class="px-3 py-1.5">Section</th><th class="px-3 py-1.5">Unit</th>
+        <th class="px-3 py-1.5 text-right">Rate</th><th class="px-3 py-1.5">Correction Factor</th>
+        <th class="px-3 py-1.5">Reading</th><th class="px-3 py-1.5">Comment Field</th>
+      </tr></thead>
+      <tbody>${items.map(itemRow).join('')}</tbody>
+    </table>
+  </div>
+  <div class="bg-white rounded-lg border overflow-hidden">
+    <div class="px-4 py-2 border-b font-semibold text-sm">Tariff Version History</div>
+    <p class="px-4 pt-2 text-xs text-slate-500">Every rate/structure change ever saved for this site - existing billing slips always keep whichever version they were captured with, so past months never change.</p>
+    <table class="w-full mt-2">
+      <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+        <th class="px-3 py-1.5">Effective From</th><th class="px-3 py-1.5">Name</th><th class="px-3 py-1.5"></th>
+      </tr></thead>
+      <tbody>${versionRows}</tbody>
+    </table>
+  </div>`;
+  return layout({ title: 'Tariff', user, active: '/site-tariff', body });
+}
+
+function siteTariffEditPage({ user, tariff, items, error }) {
+  const t = tariff || {};
+  const factorInput = (key) => `
+    <div><label class="text-xs text-slate-500">${esc(FACTOR_LABELS[key])} factor</label>
+      <input name="${key}_factor" type="number" step="0.0001" value="${esc(t[`${key}_factor`] != null ? t[`${key}_factor`] : 1)}" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/></div>`;
+  const itemRow = (it) => `
+    <tr class="border-t">
+      <td class="px-3 py-1.5 text-sm">${esc(it.label)}</td>
+      <td class="px-3 py-1.5 text-sm text-slate-500">${esc(it.unit)}</td>
+      <td class="px-3 py-1.5 w-32">
+        <input name="rate__${it.item_key}" type="number" step="0.0001" value="${esc(it.rate)}" class="w-full border rounded px-2 py-1.5 text-sm" required/>
+      </td>
+    </tr>`;
+  const body = `
+  <a href="/site-tariff" class="text-sm text-blue-600 hover:underline">&larr; Tariff</a>
+  <h1 class="text-2xl font-bold mt-2 mb-1">Edit Rates</h1>
+  <p class="text-sm text-slate-500 mb-4">Changes save as a new tariff version effective from the date below - every billing slip already captured keeps its own rates, unaffected. Line items themselves (what's billed, in what order) aren't editable here - use "+ New Structure" from the Tariff page for that.</p>
+  ${error ? `<div class="bg-red-50 text-red-700 text-sm rounded p-2 mb-4">${esc(error)}</div>` : ''}
+  <form method="post" action="/site-tariff/edit">
+    <div class="bg-white rounded-lg border p-4 mb-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-500">Tariff name</label>
+          <input name="tariff_name" value="${esc(t.tariff_name || '')}" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/></div>
+        <div><label class="text-xs text-slate-500">Effective from</label>
+          <input name="effective_from" type="date" value="" class="w-full border rounded px-2 py-1.5 text-sm mt-1" required/></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-lg border p-4 mb-4">
+      <div class="font-semibold mb-3 text-sm">Correction Factors</div>
+      <div class="grid grid-cols-4 gap-3">
+        ${['kva', 'peak', 'standard', 'offpeak'].map(factorInput).join('')}
+      </div>
+      <p class="text-xs text-slate-400 mt-2">Grosses up the matching line items' readings before the rate is applied, when a billing slip has its correction-factor switch on. Leave at 1 for no adjustment.</p>
+    </div>
+    <div class="bg-white rounded-lg border mb-4 overflow-hidden">
+      <div class="px-4 py-2 border-b font-semibold text-sm">Rates</div>
+      <table class="w-full">
+        <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+          <th class="px-3 py-1.5">Item</th><th class="px-3 py-1.5">Unit</th><th class="px-3 py-1.5">Rate</th>
+        </tr></thead>
+        <tbody>${items.map(itemRow).join('')}</tbody>
+      </table>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Save New Version</button>
+      <a href="/site-tariff" class="border border-slate-300 text-slate-700 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50">Cancel</a>
+    </div>
+  </form>`;
+  return layout({ title: 'Edit Rates', user, active: '/site-tariff', body });
+}
+
+// Free-form line-item builder - the only way to give a site a genuinely different tariff
+// STRUCTURE (not just new rates) without a code change. Pre-filled from the site's current items
+// as a convenient starting point (edit/remove/reorder/add freely) when one exists; a brand-new
+// property gets a single blank row. Rows are added/removed client-side with plain JS (no framework
+// anywhere else in this app, so none introduced here either) - each row's inputs share one numeric
+// id suffix (see the `rowSeq` counter below) so removing a row never has to renumber the ones after
+// it; see server.js's POST handler for why that matters.
+function siteTariffBuilderPage({ user, items = [], tariffName = '', effectiveFrom = '', error }) {
+  const factorOptions = (selected) => ['none', 'kva', 'peak', 'standard', 'offpeak']
+    .map((v) => `<option value="${v}" ${selected === v ? 'selected' : ''}>${v === 'none' ? 'None' : FACTOR_LABELS[v]}</option>`).join('');
+  const sectionOptions = (selected) => ['electricity', 'water', 'municipal']
+    .map((v) => `<option value="${v}" ${selected === v ? 'selected' : ''}>${SECTION_LABELS[v]}</option>`).join('');
+  // Row markup is emitted from ONE place (this template literal, used both for server-rendered
+  // starter rows below and as the client-side "Add Row" template via a small inline script) so the
+  // two never drift out of sync with each other.
+  const rowHtml = (id, it = {}) => `
+  <tr class="border-t" data-row="${id}">
+    <td class="px-2 py-1.5 w-32"><input name="item_key__${id}" value="${esc(it.item_key || '')}" placeholder="e.g. energy_high" class="w-full border rounded px-2 py-1 text-xs font-mono"/></td>
+    <td class="px-2 py-1.5 w-44"><input name="label__${id}" value="${esc(it.label || '')}" placeholder="e.g. Energy - High Demand" class="w-full border rounded px-2 py-1 text-sm"/></td>
+    <td class="px-2 py-1.5 w-24"><input name="unit__${id}" value="${esc(it.unit || '')}" placeholder="R/kWh" class="w-full border rounded px-2 py-1 text-sm"/></td>
+    <td class="px-2 py-1.5 w-28"><select name="section__${id}" class="w-full border rounded px-2 py-1 text-sm">${sectionOptions(it.section || 'electricity')}</select></td>
+    <td class="px-2 py-1.5 w-28"><select name="factor_type__${id}" class="w-full border rounded px-2 py-1 text-sm">${factorOptions(it.factor_type || 'none')}</select></td>
+    <td class="px-2 py-1.5 w-24"><input name="rate__${id}" type="number" step="0.0001" value="${it.rate != null ? esc(it.rate) : ''}" class="w-full border rounded px-2 py-1 text-sm"/></td>
+    <td class="px-2 py-1.5 text-center"><input name="fixed_charge__${id}" type="checkbox" ${it.fixed_reading != null ? 'checked' : ''}/></td>
+    <td class="px-2 py-1.5 text-center"><input name="has_comment__${id}" type="checkbox" ${it.has_comment ? 'checked' : ''}/></td>
+    <td class="px-2 py-1.5 text-center"><button type="button" onclick="this.closest('tr').remove()" class="text-red-600 hover:underline text-xs">Remove</button></td>
+  </tr>`;
+  const starterRows = (items.length ? items : [{}]).map((it, i) => rowHtml(i, it)).join('');
+  const nextRowSeq = Math.max(items.length, 1);
+  const body = `
+  <a href="/site-tariff" class="text-sm text-blue-600 hover:underline">&larr; Tariff</a>
+  <h1 class="text-2xl font-bold mt-2 mb-1">New Tariff Structure</h1>
+  <p class="text-sm text-slate-500 mb-1">Build the full line-item list from scratch - add, rename, reorder (drag isn't supported, just remove and re-add in the order you want) or remove rows freely. Pre-filled from the current tariff as a starting point.</p>
+  <p class="text-xs text-slate-400 mb-4">Conventions the rest of the app relies on: give every electricity consumption row a unit of exactly <code class="bg-slate-100 px-1 rounded">R/kWh</code> so the Recovery page can total them, and use the item keys <code class="bg-slate-100 px-1 rounded">water</code> / <code class="bg-slate-100 px-1 rounded">sewer</code> for the main water/sewer consumption rows. Correction factors (kVA/Peak/Standard/Off-Peak) all start at 1&times; (no adjustment) for a new structure - adjust them afterward from the Tariff page's "Edit Rates" screen if needed.</p>
+  ${error ? `<div class="bg-red-50 text-red-700 text-sm rounded p-2 mb-4">${esc(error)}</div>` : ''}
+  <form method="post" action="/site-tariff/new">
+    <div class="bg-white rounded-lg border p-4 mb-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-500">Tariff name</label>
+          <input name="tariff_name" value="${esc(tariffName)}" placeholder="e.g. Ekurhuleni_Tariff_E_Bob_Martin" class="w-full border rounded px-2 py-1.5 text-sm mt-1" required/></div>
+        <div><label class="text-xs text-slate-500">Effective from</label>
+          <input name="effective_from" type="date" value="${esc(effectiveFrom)}" class="w-full border rounded px-2 py-1.5 text-sm mt-1" required/></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-lg border mb-2 overflow-hidden">
+      <table class="w-full" id="tariff-items-table">
+        <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
+          <th class="px-2 py-1.5">Key</th><th class="px-2 py-1.5">Label</th><th class="px-2 py-1.5">Unit</th>
+          <th class="px-2 py-1.5">Section</th><th class="px-2 py-1.5">Correction Factor</th><th class="px-2 py-1.5">Rate</th>
+          <th class="px-2 py-1.5">Flat Charge</th><th class="px-2 py-1.5">Comment Field</th><th class="px-2 py-1.5"></th>
+        </tr></thead>
+        <tbody id="tariff-items-body">${starterRows}</tbody>
+      </table>
+    </div>
+    <button type="button" id="add-row-btn" class="text-sm text-blue-600 hover:underline mb-4">+ Add row</button>
+    <div class="flex gap-2">
+      <button type="submit" class="bg-slate-900 text-white rounded px-4 py-2 text-sm font-medium">Save Tariff Structure</button>
+      <a href="/site-tariff" class="border border-slate-300 text-slate-700 rounded px-4 py-2 text-sm font-medium hover:bg-slate-50">Cancel</a>
+    </div>
+  </form>
+  <script>
+    (function () {
+      var seq = ${nextRowSeq};
+      var sectionOpts = ${JSON.stringify(['electricity', 'water', 'municipal'])};
+      var sectionLabels = ${JSON.stringify(SECTION_LABELS)};
+      var factorOpts = ${JSON.stringify(['none', 'kva', 'peak', 'standard', 'offpeak'])};
+      var factorLabels = ${JSON.stringify(Object.assign({ none: 'None' }, FACTOR_LABELS))};
+      function rowHtml(id) {
+        var sectionSel = sectionOpts.map(function (v) { return '<option value="' + v + '">' + sectionLabels[v] + '</option>'; }).join('');
+        var factorSel = factorOpts.map(function (v) { return '<option value="' + v + '">' + factorLabels[v] + '</option>'; }).join('');
+        return '<tr class="border-t" data-row="' + id + '">' +
+          '<td class="px-2 py-1.5 w-32"><input name="item_key__' + id + '" placeholder="e.g. energy_high" class="w-full border rounded px-2 py-1 text-xs font-mono"/></td>' +
+          '<td class="px-2 py-1.5 w-44"><input name="label__' + id + '" placeholder="e.g. Energy - High Demand" class="w-full border rounded px-2 py-1 text-sm"/></td>' +
+          '<td class="px-2 py-1.5 w-24"><input name="unit__' + id + '" placeholder="R/kWh" class="w-full border rounded px-2 py-1 text-sm"/></td>' +
+          '<td class="px-2 py-1.5 w-28"><select name="section__' + id + '" class="w-full border rounded px-2 py-1 text-sm">' + sectionSel + '</select></td>' +
+          '<td class="px-2 py-1.5 w-28"><select name="factor_type__' + id + '" class="w-full border rounded px-2 py-1 text-sm">' + factorSel + '</select></td>' +
+          '<td class="px-2 py-1.5 w-24"><input name="rate__' + id + '" type="number" step="0.0001" class="w-full border rounded px-2 py-1 text-sm"/></td>' +
+          '<td class="px-2 py-1.5 text-center"><input name="fixed_charge__' + id + '" type="checkbox"/></td>' +
+          '<td class="px-2 py-1.5 text-center"><input name="has_comment__' + id + '" type="checkbox"/></td>' +
+          '<td class="px-2 py-1.5 text-center"><button type="button" onclick="this.closest(\\'tr\\').remove()" class="text-red-600 hover:underline text-xs">Remove</button></td>' +
+        '</tr>';
+      }
+      document.getElementById('add-row-btn').addEventListener('click', function () {
+        var tbody = document.getElementById('tariff-items-body');
+        var tr = document.createElement('tbody');
+        tr.innerHTML = rowHtml(seq++);
+        tbody.appendChild(tr.firstElementChild);
+      });
+    })();
+  </script>`;
+  return layout({ title: 'New Tariff Structure', user, active: '/site-tariff', body });
 }
 
 function siteBillingListPage({ user, rows, basePath = '/site-billing', pageTitle = 'Billing Slips', newLabel = '+ New billing slip', emptyLabel = '"+ New billing slip"' }) {
@@ -2266,6 +2484,7 @@ module.exports = {
   solarBillingSlipsPage, municipalAccountsPage,
   reconciliationPage, auditLogPage, statusColor,
   siteBillingListPage, siteBillingFormPage, siteBillingDetailPage,
+  siteTariffPage, siteTariffEditPage, siteTariffBuilderPage,
   recoveryPage,
   flaggingPage, flaggingSettingsPage,
   rechargeExportPage,

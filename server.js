@@ -764,6 +764,119 @@ function combinedAxisMax(seriesA, seriesB, keys) {
   return overrides;
 }
 
+// ---------------- flat_site: Tariff tab (view/edit rates, or define a brand-new structure) ----------------
+// Client-requested 2026-09-28, starting with Bob Martin (Ekurhuleni Tariff E) - a dedicated tab to
+// manage a flat_site property's own tariff (site_tariffs/site_tariff_items) directly, separate from
+// the Add/Edit Billing Slip form's own inline rate fields (that flow is untouched - saving a slip
+// with different rates still auto-versions via findOrCreateSiteTariff above, exactly as before).
+// This tab covers two things that flow doesn't: reviewing/updating the CURRENT rate structure
+// without opening a billing slip at all, and defining a genuinely new line-item structure from
+// scratch when a site's tariff changes shape, not just its rates (e.g. moving tariff class).
+//
+// Editing rates here always creates a NEW site_tariffs version effective from a date you choose
+// (confirmed with the client 2026-09-28: future-only, never rewrites history) - existing billing
+// slips keep whatever tariff_id they were saved with, so past months' totals never change under
+// you. The new version becomes "current" simply by being the highest tariff_id (same "latest
+// tariff" convention findOrCreateSiteTariff and every /site-billing/new route already use), so the
+// very next new billing slip automatically starts from it - no other code needed to change.
+route('GET', '/site-tariff', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const versions = all('SELECT * FROM site_tariffs ORDER BY id DESC');
+  const tariff = versions[0] || null;
+  const items = tariff ? getTariffItems(tariff.id) : [];
+  send(res, 200, views.siteTariffPage({ user, tariff, items, versions, propertyName: currentPropertyName(user) }));
+});
+
+route('GET', '/site-tariff/edit', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const tariff = get('SELECT * FROM site_tariffs ORDER BY id DESC LIMIT 1');
+  if (!tariff) return redirect(res, '/site-tariff/new');
+  const items = getTariffItems(tariff.id);
+  send(res, 200, views.siteTariffEditPage({ user, tariff, items }));
+});
+
+route('POST', '/site-tariff/edit', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const body = await readBody(req);
+  const tariff = get('SELECT * FROM site_tariffs ORDER BY id DESC LIMIT 1');
+  const items = getTariffItems(tariff.id);
+  const effectiveFrom = (body.effective_from || '').trim();
+  if (!effectiveFrom) {
+    return send(res, 400, views.siteTariffEditPage({ user, tariff: { ...tariff, ...body }, items, error: 'Effective date is required.' }));
+  }
+  // findOrCreateSiteTariff needs a "templateTariff" object for its tariff_name fallback and a
+  // "template" item list (label/unit/section/factor_type/fixed_reading/has_comment) to pair each
+  // rate__<key> field against - both come straight from the current tariff's own items here, since
+  // this form only ever edits rates/factors, never the item set itself (that's /site-tariff/new).
+  const templateTariff = { tariff_name: (body.tariff_name || '').trim() || tariff.tariff_name };
+  const tariffId = findOrCreateSiteTariff(templateTariff, items, body, effectiveFrom);
+  audit(user.userId, 'update', 'site_tariff', tariffId, null, null, `new rates effective ${effectiveFrom}`, null);
+  redirect(res, '/site-tariff');
+});
+
+route('GET', '/site-tariff/new', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const tariff = get('SELECT * FROM site_tariffs ORDER BY id DESC LIMIT 1');
+  const items = tariff ? getTariffItems(tariff.id) : [];
+  send(res, 200, views.siteTariffBuilderPage({ user, items, tariffName: tariff ? tariff.tariff_name : '' }));
+});
+
+route('POST', '/site-tariff/new', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const body = await readBody(req);
+  // Each row's fields share one <rowId> suffix (see views.siteTariffBuilderPage) rather than being
+  // positional arrays, specifically so the client-side Add/Remove Row buttons never need to
+  // renumber existing rows - a removed row's fields just don't appear in the POST body at all, and
+  // an unchecked checkbox (has_comment__<id>/fixed_charge__<id>) doesn't break alignment with its
+  // row's other fields the way a positional array would. Row order is taken from the order each
+  // item_key__<id> key appears in the submitted body, which matches DOM order since form fields
+  // always serialize in document order - no separate hidden "sort order" field needed.
+  const rowIds = Object.keys(body).filter((k) => k.startsWith('item_key__')).map((k) => k.slice('item_key__'.length));
+  const rows = rowIds.map((id, i) => {
+    const key = (body[`item_key__${id}`] || '').trim();
+    const label = (body[`label__${id}`] || '').trim();
+    const unit = (body[`unit__${id}`] || '').trim();
+    const section = body[`section__${id}`] || 'electricity';
+    const factorType = body[`factor_type__${id}`];
+    return {
+      item_key: key, label, unit, section,
+      factor_type: factorType && factorType !== 'none' ? factorType : null,
+      fixed_reading: body[`fixed_charge__${id}`] ? 1 : null,
+      has_comment: body[`has_comment__${id}`] ? 1 : 0,
+      rate: Number(body[`rate__${id}`]) || 0,
+      sort_order: i,
+    };
+  }).filter((r) => r.item_key && r.label && r.unit);
+
+  const tariffName = (body.tariff_name || '').trim();
+  const effectiveFrom = (body.effective_from || '').trim();
+  const dupKeys = rows.map((r) => r.item_key).filter((k, i, arr) => arr.indexOf(k) !== i);
+  let error = null;
+  if (!tariffName) error = 'Tariff name is required.';
+  else if (!effectiveFrom) error = 'Effective date is required.';
+  else if (!rows.length) error = 'Add at least one line item.';
+  else if (dupKeys.length) error = `Duplicate item key: "${dupKeys[0]}" - every row needs a unique key.`;
+
+  if (error) {
+    return send(res, 400, views.siteTariffBuilderPage({
+      user, items: rows.map((r) => ({ ...r, rate: r.rate })), tariffName, effectiveFrom, error,
+    }));
+  }
+
+  run(`INSERT INTO site_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,?,?,?,?)`,
+    [tariffName, effectiveFrom, 1, 1, 1, 1]);
+  const tariffId = get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
+  for (const r of rows) {
+    run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [tariffId, r.sort_order, r.section, r.item_key, r.label, r.unit, r.rate, r.factor_type, r.fixed_reading, r.has_comment]);
+  }
+  audit(user.userId, 'create', 'site_tariff', tariffId, null, null, `${tariffName} effective ${effectiveFrom}`, null);
+  redirect(res, '/site-tariff');
+});
+
 route('GET', '/site-billing', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
   const slips = all('SELECT * FROM site_billing_slips ORDER BY start_date DESC');
