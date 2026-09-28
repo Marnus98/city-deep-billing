@@ -112,11 +112,17 @@ function billLineItemsTotal(db, tenantId, periodId, bucket) {
   const bill = get(db, 'SELECT id FROM bills WHERE tenant_id=? AND billing_period_id=?', [tenantId, periodId]);
   if (!bill) return 0;
   let rows;
+  // Always excludes category='solar_rebate' - it has utility_type='electricity' (see
+  // billing.js's applySolarRebates) so the EL00 bucket's "every electricity category rolls up
+  // here" would otherwise silently absorb it too, on top of it already being shown on its own
+  // EL01 row via solarCreditAmount() below - double-crediting the tenant in this export. Caught
+  // by the client 2026-09-28 comparing Lesco's EL00 (should stay 423,357.69) against the CSV,
+  // which had dropped to 411,312.73 - exactly EL01's -12,044.96 short.
   if (bucket.utility_type) {
-    rows = all(db, 'SELECT amount FROM bill_line_items WHERE bill_id=? AND utility_type=?', [bill.id, bucket.utility_type]);
+    rows = all(db, "SELECT amount FROM bill_line_items WHERE bill_id=? AND utility_type=? AND category!='solar_rebate'", [bill.id, bucket.utility_type]);
   } else {
     const placeholders = bucket.categories.map(() => '?').join(',');
-    rows = all(db, `SELECT amount FROM bill_line_items WHERE bill_id=? AND category IN (${placeholders})`, [bill.id, ...bucket.categories]);
+    rows = all(db, `SELECT amount FROM bill_line_items WHERE bill_id=? AND category IN (${placeholders}) AND category!='solar_rebate'`, [bill.id, ...bucket.categories]);
   }
   return round2(rows.reduce((s, r) => s + r.amount, 0));
 }
