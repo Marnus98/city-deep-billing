@@ -30,35 +30,26 @@ list in `seed.js`, committing, and letting Render redeploy.
 
 ## Notes on persistence (read this if you're relying on the live site day to day)
 
-`render.yaml` is currently on `plan: free`, which means Render's filesystem - including the SQLite
-files under `data/` - is **ephemeral**: it resets on every deploy, *and* separately whenever a free
-service spins down from 15 minutes of inactivity and wakes back up. So anything typed into the live
-app (readings, edited water/sewer values, new billing slips) beyond what a seed/import script
-reproduces can vanish at any time, not just when I push an update. The seed/import scripts
-(`seed.js`, `import_history.js`, etc.) are the safety net in the meantime - whenever you tell me
-about data you've entered manually, I fold it back into one of those scripts so a filesystem reset
-regenerates it instead of losing it, but that only works for what you've told me about.
+**Update 2026-09-28: this is now live.** The service is on `plan: starter` with a 2GB persistent
+disk mounted at `/var/data` (added via the Render dashboard's Disks tab, since Render doesn't offer
+disks below Starter), and a `DATA_DIR=/var/data` environment variable so the app actually writes its
+SQLite files there instead of its own ephemeral folder - `db.js` defaults to `./data` (reset on every
+deploy and spin-down) unless `DATA_DIR` is set. Both are reflected in `render.yaml` now, so a fresh
+Blueprint deploy reproduces the same setup.
 
-**When you're ready to go live for real, switch to a persistent disk:**
+Render doesn't allow changing a disk's mount path after creation (only its size), which is why
+`DATA_DIR` points at `/var/data` specifically rather than the app's own `data/` folder path - no
+need to delete and recreate the disk, the env var does the job either way.
 
-1. In `render.yaml`, change `plan: free` to `plan: starter`, and add this block at the same
-   indentation level as `plan:` (right before `envVars:`):
-   ```yaml
-   disk:
-     name: holmstone-data
-     mountPath: /opt/render/project/src/data
-     sizeGB: 1
-   ```
-2. Push to GitHub as usual.
-3. Render usually needs a manual nudge for plan/billing changes on an existing service - open the
-   service in the Render dashboard. If the Starter plan + disk aren't picked up automatically from
-   the Blueprint sync, go to **Settings → Instance Type** and switch to **Starter**, then
-   **Disks → Add Disk** with mount path `/opt/render/project/src/data` and size `1 GB`.
-4. Redeploy. From this point on, the `data/` folder survives deploys and spin-downs - only a full
-   disk delete (not something you'd do by accident) wipes it.
+One consequence worth knowing: the disk started out empty, so the very first boot after this change
+re-ran every property's initial seed from scratch (expected, one-time). From here on, the `data/`
+folder equivalent (`/var/data`) survives deploys and spin-downs - only a full disk delete (not
+something you'd do by accident) wipes it. Anything typed into the live app from now on (readings,
+edited tariffs, new billing slips) sticks.
 
-Cost: Starter is ~$7/month, the 1GB disk is ~$0.25/month. Just ask and I'll make this change for
-you when you're ready - it's a 5-minute edit.
+If you ever need to bump the disk size, that's **Disks → Edit** in the Render dashboard (disks can
+only grow, never shrink) - update the `sizeGB` in `render.yaml` to match afterward so they don't
+drift apart.
 
 If you outgrow SQLite (e.g. once several people are using this at once), Render also offers a
 free PostgreSQL instance you can switch to later — ask me and I'll wire it up.
