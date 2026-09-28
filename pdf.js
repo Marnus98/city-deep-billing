@@ -853,8 +853,10 @@ function drawSolarSummaryPage(doc, { propertyName, period, slip }) {
   const row = (label, kwh, tariff, charge, { bold = false, serials = [] } = {}) => {
     const opts = { size: 9.5, bold };
     doc.text(col1, y, label, opts);
-    const kwhStr = numFmt(kwh, 2);
-    doc.text(col2 - textWidth(kwhStr, opts), y, kwhStr, opts);
+    if (kwh != null) {
+      const kwhStr = numFmt(kwh, 2);
+      doc.text(col2 - textWidth(kwhStr, opts), y, kwhStr, opts);
+    }
     if (tariff != null) {
       const tStr = String(tariff);
       doc.text(col3 - textWidth(tStr, opts), y, tStr, opts);
@@ -874,6 +876,11 @@ function drawSolarSummaryPage(doc, { propertyName, period, slip }) {
   row('Solar Used', slip.total.solarUsed.kwh, 1, slip.total.solarUsed.rand, { serials: slip.solarSerials || [] });
   doc.line(left, y + 6, right, y + 6); y -= 4;
   row('Total Due', slip.total.due.kwh, null, slip.total.due.rand, { bold: true });
+  if (slip.total.rebate) {
+    row('Solar Rebate', null, null, slip.total.rebate.rand, {});
+    doc.line(left, y + 6, right, y + 6); y -= 4;
+    row('Total Due (after rebate)', slip.total.dueAfterRebate.kwh, null, slip.total.dueAfterRebate.rand, { bold: true });
+  }
 }
 
 // One page per solar-connected tenant, in `slips`' own order (solar.getSolarSlips()'s fixed

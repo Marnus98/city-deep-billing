@@ -13,6 +13,7 @@ const path = require('path');
 const { open, migrate } = require('../db');
 const calc = require('../calc');
 const { seedUsers: seedUsersShared } = require('../shared_seed_users');
+const { applySolarRebates } = require('../billing');
 
 let db;
 
@@ -515,6 +516,11 @@ function seedMonth(monthData) {
     count++;
   }
   seedSolarBulkMeters(monthData, billingPeriod);
+  // Must run after seedSolarBulkMeters (solar.js's getSolarSlips needs those bulk-export meter
+  // readings) and after every tenant in this month has its bill_line_items written above (solar.js
+  // cross-references other tenants' own energy_charge rows for this same period) - see
+  // billing.js's applySolarRebates() for the full explanation of why this can't run per-tenant.
+  applySolarRebates(db, billingPeriod.id);
   console.log(`Seeded ${count} tenants for period ${monthData.label} (${billingPeriod.start_date} - ${billingPeriod.end_date})`);
 }
 

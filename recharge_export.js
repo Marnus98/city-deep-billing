@@ -181,14 +181,24 @@ function billingPeriod(db, label) {
 // 4% by that same diff (~4.0-4.01% across the 2 months, not quite stable to the cent - likely just
 // upstream rounding), and Teraoka's ratio actually differed between the 2 months (~19.28% vs
 // ~19.55%), so neither was set from the diff alone; both confirmed directly by the client
-// 2026-09-23 (Agrana 4%, Teraoka 20%) instead.
-const SOLAR_CREDIT_SHARE = { lesco: 0.20, hudaco: 0.12, agrana: 0.04, teraoka: 0.20 };
+// 2026-09-23 (Agrana 4%, Teraoka 20%) instead. SOLAR_CREDIT_SHARE itself now lives in solar.js
+// (single source of truth, see its own comment there) since 2026-09-28, the same day this same
+// 20%/12%/4% rebate became a real bill_line_items credit on the tenant's own invoice (see
+// billing.js's applySolarRebates()) rather than existing only in this export. This function used to
+// recompute the credit independently via solar.getSolarSlips()/SOLAR_CREDIT_SHARE - now it reads the
+// already-billed 'solar_rebate' line item directly (same pattern as billLineItemsTotal above), so
+// there's exactly one number and the tenant can never be credited twice (once on their real invoice,
+// once again here).
 function solarCreditAmount(cityDeepDb, periodId, solarKey) {
-  const slips = solar.getSolarSlips(cityDeepDb, periodId);
-  const slip = slips.find((s) => s.key === solarKey);
-  if (!slip) return 0;
-  const share = SOLAR_CREDIT_SHARE[solarKey] != null ? SOLAR_CREDIT_SHARE[solarKey] : 1;
-  return round2(-slip.total.solarUsed.rand * share);
+  const tenantName = solar.SOLAR_TENANT_NAME[solarKey];
+  if (!tenantName) return 0;
+  const tenantIds = all(cityDeepDb, 'SELECT id FROM tenants WHERE name=?', [tenantName]).map((t) => t.id);
+  return round2(tenantIds.reduce((s, id) => {
+    const bill = get(cityDeepDb, 'SELECT id FROM bills WHERE tenant_id=? AND billing_period_id=?', [id, periodId]);
+    if (!bill) return s;
+    const row = get(cityDeepDb, "SELECT amount FROM bill_line_items WHERE bill_id=? AND category='solar_rebate'", [bill.id]);
+    return s + (row ? row.amount : 0);
+  }, 0));
 }
 
 // ---------------- the row template ----------------

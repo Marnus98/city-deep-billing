@@ -754,12 +754,15 @@ function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
       <tbody>${s.rows.map(rowHtml).join('')}</tbody>
     </table>`;
 
-  const slipHtml = (slip) => `
+  const slipHtml = (slip) => {
+    const hasRebate = !!slip.total.rebate;
+    const headerDue = hasRebate ? slip.total.dueAfterRebate : slip.total.due;
+    return `
   <div class="bg-white rounded-lg border mb-6">
     <div class="px-4 py-3 border-b font-semibold flex justify-between items-baseline flex-wrap gap-2">
       <span>${esc(slip.title)}</span>
       <span class="flex items-center gap-3">
-        <span class="text-slate-500 text-sm font-normal">Total Due: ${kwh(slip.total.due.kwh)} &middot; ${money(slip.total.due.rand)}</span>
+        <span class="text-slate-500 text-sm font-normal">Total Due: ${kwh(headerDue.kwh)} &middot; ${money(headerDue.rand)}</span>
         ${period ? `<a href="/solar-billing-slips-pdf?periodId=${period.id}&slipKey=${slip.key}" class="border border-slate-300 rounded px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Download PDF</a>` : ''}
       </span>
     </div>
@@ -771,11 +774,15 @@ function solarBillingSlipsPage({ user, period, allPeriods, slips }) {
             <tr class="border-t"><td class="py-1 pl-2 font-medium">Tenant Munic Usage (total)</td><td class="py-1 text-right">${kwh(slip.total.muniUsage.kwh)}</td><td class="py-1 text-right">${money(slip.total.muniUsage.rand)}</td></tr>
             <tr class="border-t"><td class="py-1 pl-2 font-medium">Solar Used (total)</td><td class="py-1 text-right">${kwh(slip.total.solarUsed.kwh)}</td><td class="py-1 text-right">${money(slip.total.solarUsed.rand)}</td></tr>
             <tr class="border-t font-semibold bg-slate-50"><td class="py-1 pl-2">Total Due</td><td class="py-1 text-right">${kwh(slip.total.due.kwh)}</td><td class="py-1 text-right">${money(slip.total.due.rand)}</td></tr>
+            ${hasRebate ? `
+            <tr class="border-t"><td class="py-1 pl-2 font-medium text-emerald-700">Solar Rebate</td><td class="py-1 text-right text-emerald-700">&mdash;</td><td class="py-1 text-right text-emerald-700">${money(slip.total.rebate.rand)}</td></tr>
+            <tr class="border-t font-semibold bg-slate-50"><td class="py-1 pl-2">Total Due (after rebate)</td><td class="py-1 text-right">${kwh(slip.total.dueAfterRebate.kwh)}</td><td class="py-1 text-right">${money(slip.total.dueAfterRebate.rand)}</td></tr>` : ''}
           </tbody>
         </table>
       </div>
     </div>
   </div>`;
+  };
 
   const parkTotal = slips.reduce((s, sl) => ({ kwh: s.kwh + sl.total.due.kwh, rand: s.rand + sl.total.due.rand }), { kwh: 0, rand: 0 });
   const parkSolar = slips.reduce((s, sl) => ({ kwh: s.kwh + sl.total.solarUsed.kwh, rand: s.rand + sl.total.solarUsed.rand }), { kwh: 0, rand: 0 });

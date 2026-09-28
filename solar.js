@@ -394,7 +394,36 @@ const SOLAR_TENANT_NAME = {
   jcbakery: 'JC Bakeries (Pty) Ltd',
 };
 
+// Only 4 of the 7 solar-connected tenants get an actual Solar Rebate credit - City Deep keeps a
+// tenant's full solar-used value by default and only passes through this share as a credit for the
+// tenants listed here. Confirmed with the client 2026-09-23 (see recharge_export.js's own history
+// of this constant, moved here 2026-09-28 so both the real billing engine (billing.js) and the
+// recharge CSV export (recharge_export.js) share one source of truth instead of recomputing the
+// same percentages independently - see billing.js's applySolarRebates()).
+const SOLAR_CREDIT_SHARE = { lesco: 0.20, hudaco: 0.12, agrana: 0.04, teraoka: 0.20 };
+
 function allRows(db, sql, params = []) { return db.prepare(sql).all(...params); }
+function round2(n) { return Math.round(((n || 0) + Number.EPSILON) * 100) / 100; }
+
+// Adds `total.rebate`/`total.dueAfterRebate` to a slip for the 4 tenants in SOLAR_CREDIT_SHARE,
+// without touching the existing `total.due`/`total.muniUsage`/`total.solarUsed` fields, since other
+// code (dashboard park-wide totals, recharge_export.js before its own 2026-09-28 update) reads those
+// directly and shouldn't have their meaning silently change. `rebate.kwh` is always 0 - the rebate is
+// a pure Rand credit against the tenant's already-billed energy charge, not a separate consumption
+// figure, so there's no kWh value that means anything here.
+function withRebate(slip) {
+  const share = SOLAR_CREDIT_SHARE[slip.key];
+  if (share == null) return slip;
+  const rebateRand = round2(-slip.total.solarUsed.rand * share);
+  return {
+    ...slip,
+    total: {
+      ...slip.total,
+      rebate: { kwh: 0, rand: rebateRand },
+      dueAfterRebate: { kwh: slip.total.due.kwh, rand: round2(slip.total.due.rand + rebateRand) },
+    },
+  };
+}
 
 // Looks up the tenant name/unit(s)/id(s) for one slip and builds a "Billing Reference" in the same
 // `CD-<period label>-<tenant id>` shape billing.js's own invoice_number uses (see billing.js line
@@ -433,7 +462,7 @@ function getSolarSlips(db, periodId) {
   ];
   // Tenant/Unit/Billing Reference header fields (see getTenantHeaderInfo above) - only consumed by
   // the Summary PDF (pdf.js's drawSolarSummaryPage), not the on-screen page or any of the maths.
-  return slips.map((slip) => ({ ...slip, ...getTenantHeaderInfo(db, slip.key, period.label) }));
+  return slips.map((slip) => withRebate({ ...slip, ...getTenantHeaderInfo(db, slip.key, period.label) }));
 }
 
-module.exports = { getSolarSlips };
+module.exports = { getSolarSlips, SOLAR_TENANT_NAME, SOLAR_CREDIT_SHARE };

@@ -134,7 +134,87 @@ function generateBillsForPeriod(db, periodId) {
     billsCreated++;
   }
 
+  applySolarRebates(db, periodId);
+
   return { billsCreated, missing };
 }
 
-module.exports = { generateBillsForPeriod, activeTariffParams };
+// Adds (or refreshes) a "Solar Rebate" bill_line_items credit for the 4 tenants in
+// solar.js's SOLAR_CREDIT_SHARE (Lesco 20%, Hudaco 12%, Agrana 4%, Teraoka 20%) - a genuine,
+// VAT-affecting reduction of that tenant's own invoice, not just a reporting figure. Previously
+// this same 20%/12%/4% share only existed inside recharge_export.js, purely for the monthly
+// recharge CSV sent to the client's accounting system - the tenant's real invoice (this file) never
+// reflected it at all, which is what a tenant's query about a "missing" solar charge surfaced
+// (2026-09-28). recharge_export.js now reads this same bill_line_items row instead of recomputing
+// the rebate independently, so there's exactly one source of truth and no risk of a tenant being
+// credited twice.
+//
+// Deliberately a SECOND PASS, run only after every tenant's bill_line_items for this period are
+// already committed above: the rebate amount depends on solar.js's getSolarSlips(), which itself
+// reads OTHER tenants' already-billed energy_charge rows for this same period (e.g. Agrana's slip
+// needs Lesco's export meter, Teraoka's needs the SA Wireless shared-meter line) - computing it
+// inline inside the per-tenant loop above would race against those rows being deleted/rewritten.
+//
+// require('./solar') is deliberately lazy (inside the function, not a top-of-file require) because
+// solar.js itself does `require('./billing')` at its own top level for activeTariffParams - a
+// top-level require here would create a circular require that resolves before either file has
+// finished exporting, leaving solar.js's activeTariffParams undefined. Requiring lazily, inside a
+// function that only ever runs after server.js's startup require chain has already fully resolved
+// both modules, sidesteps that entirely (Node's require cache serves the complete module either way).
+function applySolarRebates(db, periodId) {
+  const solar = require('./solar');
+  const slips = solar.getSolarSlips(db, periodId);
+  for (const slip of slips) {
+    if (!slip.total.rebate) continue; // not one of the 4 rebate-eligible tenants
+    const tenantName = solar.SOLAR_TENANT_NAME[slip.key];
+    const tenants = all(db, 'SELECT id FROM tenants WHERE name=?', [tenantName]);
+
+    // Two of the four rebate-eligible tenants (Agrana, Teraoka) are split across TWO separately
+    // invoiced real units sharing one tenant name (Agrana: Unit 2B + Unit 2C; Teraoka: Unit 6A&B +
+    // Unit 6C) - solar.js's slip.total.rebate is a single combined figure for the tenant as a whole
+    // (computed from a combined muniUsage/solarUsed across both units - see computeAgrana/
+    // computeTeraoka), not a per-bill figure. Applying the full amount to each matching bill (as an
+    // earlier version of this function did) double-credited those two tenants. Instead, gather every
+    // bill for this tenant name this period first and split the one slip-level rebate proportionally
+    // across them by each bill's own electricity subtotal, so the sum credited across all of the
+    // tenant's real invoices always equals the slip's rebate figure exactly.
+    const bills = [];
+    for (const t of tenants) {
+      const bill = get(db, 'SELECT * FROM bills WHERE tenant_id=? AND billing_period_id=?', [t.id, periodId]);
+      if (bill) bills.push(bill);
+    }
+    if (bills.length === 0) continue;
+
+    const elecSubtotals = bills.map((bill) => {
+      const rows = all(db, "SELECT amount FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' AND category!='solar_rebate'", [bill.id]);
+      return rows.reduce((s, li) => s + li.amount, 0);
+    });
+    const elecTotal = elecSubtotals.reduce((s, n) => s + n, 0);
+    const share = solar.SOLAR_CREDIT_SHARE[slip.key];
+    const rebateTotal = slip.total.rebate.rand;
+
+    bills.forEach((bill, i) => {
+      run(db, "DELETE FROM bill_line_items WHERE bill_id=? AND category='solar_rebate'", [bill.id]);
+      // Proportional split by electricity subtotal; if a bill has no electricity charges at all
+      // (elecTotal is 0, e.g. every matching bill is water-only), split evenly instead so no share
+      // of the rebate is silently dropped.
+      const weight = elecTotal !== 0 ? elecSubtotals[i] / elecTotal : 1 / bills.length;
+      // Last bill takes the rounding remainder so the per-bill amounts always sum exactly to
+      // rebateTotal (rather than each independently-rounded share drifting a cent off).
+      const isLast = i === bills.length - 1;
+      const allocated = isLast
+        ? calc.round2(rebateTotal - bills.slice(0, i).reduce((s, _, j) => s + calc.round2(rebateTotal * (elecTotal !== 0 ? elecSubtotals[j] / elecTotal : 1 / bills.length)), 0))
+        : calc.round2(rebateTotal * weight);
+      run(db, `INSERT INTO bill_line_items (bill_id, meter_id, utility_type, category, description, quantity, rate, amount)
+        VALUES (?,?,?,?,?,?,?,?)`,
+        [bill.id, null, 'electricity', 'solar_rebate', `Solar Rebate (${Math.round(share * 100)}% of solar-sourced energy)`, null, null, allocated]);
+      const lineItems = all(db, 'SELECT amount FROM bill_line_items WHERE bill_id=?', [bill.id]);
+      const subtotal = calc.round2(lineItems.reduce((s, li) => s + li.amount, 0));
+      const vatAmount = calc.round2(subtotal * bill.vat_rate);
+      const total = calc.round2(subtotal + vatAmount);
+      run(db, 'UPDATE bills SET subtotal_excl_vat=?, vat_amount=?, total_incl_vat=? WHERE id=?', [subtotal, vatAmount, total, bill.id]);
+    });
+  }
+}
+
+module.exports = { generateBillsForPeriod, activeTariffParams, applySolarRebates };
