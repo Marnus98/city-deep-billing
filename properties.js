@@ -242,6 +242,20 @@ module.exports = [
     flaggingChartLayout: true,
   },
   {
+    // 5th RS-Farm site, added 2026-09-29 - genuinely different tariff from the other 4
+    // (MALAN_SEUNS_COT_TARIFF_B in flat_site_tariff_shapes.js: no TOU split, just Basic Charge +
+    // Energy Consumption billed across 3 separate meters). Client uploaded the August 2026
+    // workbook but asked for this one seeded BLANK (tariff/rates only, no billing slip) - they'll
+    // add readings themselves through the Add Billing Slip form. No municipal statement yet.
+    slug: 'rs-farm-malan-seuns',
+    name: 'RS-Farm - Malan Seuns',
+    dbFile: 'rs-farm-malan-seuns.db',
+    seedFile: './rs-farm-malan-seuns/import_history',
+    billingModel: 'flat_site',
+    hasFlagging: true,
+    flaggingChartLayout: true,
+  },
+  {
     slug: 'colorobbia',
     name: '122 Loper - Colorobbia', // exactly as given on the client's own workbook (not "122 Loper Ave") - NOTE: its actual municipal account is billed to "13 Brussels Avenue", not any Loper address, see colorobbia/municipal_import.js
     dbFile: 'colorobbia.db',

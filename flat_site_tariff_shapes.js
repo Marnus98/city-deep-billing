@@ -486,9 +486,28 @@ const TSHWANE_LV_TOU = [
   { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
 ];
 
+// City of Tshwane Tariff B (<=150A) - RS-Farm's 5th site, Malan Seuns, added 2026-09-29. A
+// genuinely different (and much simpler) tariff than the other 4 RS-Farm sites' TSHWANE_LV_TOU:
+// no TOU split at all, just a flat Basic Charge (R/Ampere) + single Energy Consumption rate - but
+// billed across 3 SEPARATE physical meters (client's own "Billing Slip" tab has 3 repeated
+// Basic+Energy blocks, one per meter, summed to one grand total), not one shared set of line items
+// like every other flat_site property. So this shape repeats the same 2-line pattern 3 times with
+// distinct keys, one pair per meter, labelled with each meter's own identity (name + serial, taken
+// straight from the client's own "Hand readings - Electrical" tab) so they stay distinguishable on
+// the bill. Electricity-only, like the other 4 RS-Farm sites - no water/sewer.
+const MALAN_SEUNS_COT_TARIFF_B = [
+  { key: 'basic_charge_m1', label: 'Basic Charge - Meter 1 (Pomp, DEM4B409)', unit: 'R/A', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'energy_m1', label: 'Energy Consumption - High Demand - Meter 1 (Pomp, DEM4B409)', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'basic_charge_m2', label: 'Basic Charge - Meter 2 (Pomp, 70388)', unit: 'R/A', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'energy_m2', label: 'Energy Consumption - High Demand - Meter 2 (Pomp, 70388)', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'basic_charge_m3', label: 'Basic Charge - Meter 3 (Grondsif, LEAR)', unit: 'R/A', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'energy_m3', label: 'Energy Consumption - High Demand - Meter 3 (Grondsif, LEAR)', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
   EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE, A_SHACK_EKURHULENI_TARIFF_B_MIX, TSHWANE_LV_TOU,
+  MALAN_SEUNS_COT_TARIFF_B,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
   EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE, EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET,
