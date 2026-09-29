@@ -188,6 +188,19 @@ module.exports = [
     flaggingChartLayout: true,
   },
   {
+    slug: 'a-shack',
+    name: 'A-Shack',
+    dbFile: 'a-shack.db',
+    seedFile: './a-shack/import_history',
+    billingModel: 'flat_site',
+    // Added 2026-09-29 - own tariff shape (A_SHACK_EKURHULENI_TARIFF_B_MIX in
+    // flat_site_tariff_shapes.js) with a standalone Solar charge line, a first for a flat_site
+    // property. No real municipal account statement yet, so no hasMunicipalStatements/Recovery tab
+    // for now (add once one's provided, same as every other site's own history).
+    hasFlagging: true,
+    flaggingChartLayout: true,
+  },
+  {
     slug: 'colorobbia',
     name: '122 Loper - Colorobbia', // exactly as given on the client's own workbook (not "122 Loper Ave") - NOTE: its actual municipal account is billed to "13 Brussels Avenue", not any Loper address, see colorobbia/municipal_import.js
     dbFile: 'colorobbia.db',

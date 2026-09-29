@@ -334,6 +334,42 @@ const EKURHULENI_TARIFF_B_SIMPLE = [
   ...WATER_SEWER_ITEMS,
 ];
 
+// A-Shack - a standalone (flat_site) property with its own solar setup, added 2026-09-29. Its own
+// "A Shack Main Incomer" monthly slip (client's own internal name: "A_Shack_Ekurhuleni_Tariff_B_Mix")
+// has the same 4 electricity lines as EKURHULENI_TARIFF_B_SIMPLE above (Fixed/Capacity/High/Low
+// Season Energy), but under different labels ("Fixed Charge" not "Basic Charge", "High/Low Season
+// Energy Charge" not "Energy Consumption - High/Low Demand") and Capacity Charge here is a flat
+// R/c figure (fixedReading: 1, factorType: null) rather than a per-kVA/Amp R/A reading, unlike every
+// Loper Ave site - the client's own workbook always shows a reading of 1 against it, and its Rate
+// column already holds the full monthly rand amount.
+//
+// solar_charge is new: no other flat_site property has billed solar as its own line before (City
+// Deep is the only site with solar at all, and bills it as a per-tenant credit against a shared
+// plant, a completely different mechanism - see solar.js). Client confirmed 2026-09-29: A-Shack's
+// solar should be its own separate charge line, not a credit - mirrors the client's own "A Shack
+// Main Solar" block, which is a second one-line billing table (own reading, in kWh) alongside the
+// main incomer's. Its own *rate*, unusually, isn't fixed like every other line here - the client's
+// workbook always prices it at whichever of energy_high/energy_low is that month's ACTIVE season
+// rate (confirmed across all 8 months seen: Jan-May priced solar at that period's Low Season rate,
+// Jun-Aug at that period's High Season rate, always matching to the cent) - so unlike a normal rate
+// that's fixed for a whole tariff version, solar_charge's rate is set per month in
+// a-shack/import_history.js's own MONTHS table rather than living in one shared RATES_* constant,
+// and a season flip (even with every other rate unchanged) gets its own tariff version so it's
+// captured correctly.
+//
+// Water/Sewer: not billed by the client yet (rate 0, unused) - same WATER_SEWER_ITEMS 2-line
+// template as every other site, added now per the client's 2026-09-29 request so the Tariff tab and
+// Edit Rates flow are ready whenever real water rates/readings are provided, same pattern Loper Road
+// already uses.
+const A_SHACK_EKURHULENI_TARIFF_B_MIX = [
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
+  { key: 'energy_high', label: 'High Season Energy Charge', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'energy_low', label: 'Low Season Energy Charge', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'solar_charge', label: 'Solar Energy Charge', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  ...WATER_SEWER_ITEMS,
+];
+
 // Ekurhuleni municipal account shape (COPY TAX INVOICE) shared by 63 Loper Ave - Interoll, 65 Loper
 // Ave - RCL Group Services, and 13 Brussels Avenue - Colorobbia's real municipal statements (as
 // opposed to EKURHULENI_TARIFF_B_SIMPLE above, which is what HolmStone bills each tenant - same
@@ -422,7 +458,7 @@ const EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET = [
 
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
-  EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE,
+  EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE, A_SHACK_EKURHULENI_TARIFF_B_MIX,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
   EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE, EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET,

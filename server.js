@@ -117,6 +117,10 @@ require('./zelvio-global/import_history').run('zelvio-global.db');
 require('./interoll/import_history').run('interoll.db');
 require('./rcl-group/import_history').run('rcl-group.db');
 require('./colorobbia/import_history').run('colorobbia.db');
+// A-Shack - own tariff shape (A_SHACK_EKURHULENI_TARIFF_B_MIX), added 2026-09-29 with a full
+// 8-month history from the start rather than a single-month seed.js, so it's registered here
+// alongside its own seedFile from day one (own de-dup key: slip label, always safe to re-run).
+require('./a-shack/import_history').run('a-shack.db');
 // Bob Martin's actual municipal account statements (Dec 2025, Jan/Feb/Mar/May 2026 - Apr 2026
 // missing, no statement provided for it) - own de-dup key (label), separate tables from the above
 // (see db.js), always safe to re-run; see bob-martin/municipal_import.js for extraction notes.
