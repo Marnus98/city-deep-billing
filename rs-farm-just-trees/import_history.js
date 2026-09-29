@@ -30,13 +30,11 @@ const TARIFF_NAME = 'Tshwane_LV_TOU_RS-Farm';
 const RATES_A = {
   fixed_charge: 4992.88, network_demand: 359.17, peak_high: 7.1816, peak_low: 2.9499,
   standard_high: 2.7523, standard_low: 1.8577, offpeak_high: 1.5758, offpeak_low: 1.3155,
-  water: 0, sewer: 0,
 };
 // Jul 2026 - Aug 2026
 const RATES_B = {
   fixed_charge: 5432.25, network_demand: 390.78, peak_high: 7.8136, peak_low: 3.21,
   standard_high: 2.9945, standard_low: 2.02, offpeak_high: 1.7145, offpeak_low: 1.43,
-  water: 0, sewer: 0,
 };
 
 // label, start_date, end_date, effective_from, rates, demandKva, demandComment,

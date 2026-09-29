@@ -345,14 +345,19 @@ function drawSingleSeriesChart(doc, { x, y, width, height, series, seriesKey, co
 // swatch + label as a mini-heading and its own Y-axis scale - replaces the single combined
 // stacked-bar chart so each utility's trend is legible on its own terms instead of all three
 // competing for the same axis.
-function drawTripleTrendCharts(doc, { x, y, width, series, maxOverrides }) {
+function drawTripleTrendCharts(doc, { x, y, width, series, maxOverrides, hasWater = true }) {
   const COLOR_ELEC = [0.11, 0.16, 0.34];
   const COLOR_WATER = [0.13, 0.62, 0.35];
   const COLOR_SAN = [0.93, 0.55, 0.09];
+  // hasWater=false (RS-Farm's 4 sites, electricity-only - see flat_site_tariff_shapes.js's
+  // TSHWANE_LV_TOU) skips both the Water and Sanitation series rather than drawing an empty chart
+  // with no bars at all.
   const defs = [
     { key: 'elec', label: 'Electricity', color: COLOR_ELEC },
-    { key: 'water', label: 'Water', color: COLOR_WATER },
-    { key: 'sanitation', label: 'Sanitation', color: COLOR_SAN },
+    ...(hasWater ? [
+      { key: 'water', label: 'Water', color: COLOR_WATER },
+      { key: 'sanitation', label: 'Sanitation', color: COLOR_SAN },
+    ] : []),
   ];
   const chartHeight = 150;
   let cy = y;
@@ -372,12 +377,14 @@ function drawTripleTrendCharts(doc, { x, y, width, series, maxOverrides }) {
 // drawTripleTrendCharts but for physical consumption instead of Rand cost, so a tenant can see
 // usage trends independent of tariff changes. Water consumption is stored in m3 in the schema,
 // which is numerically identical to kL (1 m3 = 1 kL), so waterM3 is simply labelled "kL".
-function drawConsumptionTrendCharts(doc, { x, y, width, series, maxOverrides }) {
+function drawConsumptionTrendCharts(doc, { x, y, width, series, maxOverrides, hasWater = true }) {
   const COLOR_ELEC = [0.11, 0.16, 0.34];
   const COLOR_WATER = [0.13, 0.62, 0.35];
+  // hasWater=false (RS-Farm's 4 sites, electricity-only) skips the Water series rather than
+  // drawing an empty chart with no bars at all - see drawTripleTrendCharts's own comment.
   const defs = [
     { key: 'elecKwh', label: 'Electricity (kWh)', color: COLOR_ELEC, unit: 'kWh' },
-    { key: 'waterM3', label: 'Water (kL)', color: COLOR_WATER, unit: 'kL' },
+    ...(hasWater ? [{ key: 'waterM3', label: 'Water (kL)', color: COLOR_WATER, unit: 'kL' }] : []),
   ];
   const chartHeight = 170;
   let cy = y;
@@ -734,12 +741,18 @@ function drawSiteBillingSummaryPage(doc, data) {
   doc.text(left, y, 'Total (Excl VAT)', { bold: true, size: 9.5 });
   doc.text(right - textWidth(elecTotalStr, { size: 9.5, bold: true }), y, elecTotalStr, { bold: true, size: 9.5 }); y -= 22;
 
-  doc.text(left, y, 'WATER & SANITATION', { size: 12, bold: true }); y -= 16;
-  ({ y } = drawSiteLineItemsTable(doc, data.calc.waterItems, left, right, y, { noComment: true }));
-  y -= 4; doc.line(left, y, right, y); y -= 16;
-  const waterTotalStr = money(data.calc.waterTotal);
-  doc.text(left, y, 'Total (Ex VAT)', { bold: true, size: 9.5 });
-  doc.text(right - textWidth(waterTotalStr, { size: 9.5, bold: true }), y, waterTotalStr, { bold: true, size: 9.5 }); y -= 24;
+  // Skipped entirely (rather than rendering an empty section) for sites whose tariff shape has no
+  // water/sewer line items at all - RS-Farm's 4 sites (electricity-only, client confirmed
+  // 2026-09-29) are the first case of this; every other flat_site property still has the standard
+  // WATER_SEWER_ITEMS pair (even if unused at rate 0), so this only ever hides for RS-Farm.
+  if (data.calc.waterItems && data.calc.waterItems.length) {
+    doc.text(left, y, 'WATER & SANITATION', { size: 12, bold: true }); y -= 16;
+    ({ y } = drawSiteLineItemsTable(doc, data.calc.waterItems, left, right, y, { noComment: true }));
+    y -= 4; doc.line(left, y, right, y); y -= 16;
+    const waterTotalStr = money(data.calc.waterTotal);
+    doc.text(left, y, 'Total (Ex VAT)', { bold: true, size: 9.5 });
+    doc.text(right - textWidth(waterTotalStr, { size: 9.5, bold: true }), y, waterTotalStr, { bold: true, size: 9.5 }); y -= 24;
+  }
 
   doc.line(left, y, right, y); y -= 16;
   const subtotalStr = money(data.calc.subtotal);
@@ -763,19 +776,24 @@ function buildSiteBillingSlipPdf(data) {
   drawSiteBillingSummaryPage(doc, data);
 
   if (data.monthlyTrend && data.monthlyTrend.length > 1) {
+    // RS-Farm's 4 sites (electricity-only, client confirmed 2026-09-29) have no waterItems at all -
+    // skip the Water/Sanitation series on both trend pages rather than drawing empty charts. See the
+    // matching hasWater handling in drawTripleTrendCharts/drawConsumptionTrendCharts.
+    const hasWater = !!(data.calc.waterItems && data.calc.waterItems.length);
+
     doc.newPage();
     let ty = PAGE_H - 50;
     doc.text(left, ty, propertyName, { size: 16, bold: true }); ty -= 14;
     doc.text(left, ty, 'Utility Cost Excluding VAT', { size: 11, bold: true }); ty -= 8;
     doc.line(left, ty, right, ty); ty -= 30;
-    drawTripleTrendCharts(doc, { x: left + 46, y: ty, width: right - left - 46, series: data.monthlyTrend, maxOverrides: data.axisMaxOverrides && data.axisMaxOverrides.cost });
+    drawTripleTrendCharts(doc, { x: left + 46, y: ty, width: right - left - 46, series: data.monthlyTrend, maxOverrides: data.axisMaxOverrides && data.axisMaxOverrides.cost, hasWater });
 
     doc.newPage();
     let cy = PAGE_H - 50;
     doc.text(left, cy, propertyName, { size: 16, bold: true }); cy -= 14;
     doc.text(left, cy, 'Consumption Trend', { size: 11, bold: true }); cy -= 8;
     doc.line(left, cy, right, cy); cy -= 30;
-    drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend, maxOverrides: data.axisMaxOverrides && data.axisMaxOverrides.consumption });
+    drawConsumptionTrendCharts(doc, { x: left + 46, y: cy, width: right - left - 46, series: data.monthlyTrend, maxOverrides: data.axisMaxOverrides && data.axisMaxOverrides.consumption, hasWater });
   }
 
   return doc.build();

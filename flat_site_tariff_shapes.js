@@ -472,8 +472,9 @@ const EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET = [
 // unlike A-Shack's or every Loper Ave site's Fixed/Basic Charge, this one is a real per-month
 // reading value taken straight from each site's own workbook, not a constant.
 //
-// Water/Sewer: not billed by the client yet (rate 0, unused) - same WATER_SEWER_ITEMS 2-line
-// template as every other flat_site shape, ready for whenever real rates are provided.
+// Water/Sewer: deliberately NOT included, unlike every other flat_site shape (client confirmed
+// 2026-09-29: these 4 sites are electricity-only, no water billed through this app at all) - so no
+// ...WATER_SEWER_ITEMS spread here.
 const TSHWANE_LV_TOU = [
   { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'network_demand', label: 'Network Demand', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
@@ -483,7 +484,6 @@ const TSHWANE_LV_TOU = [
   { key: 'standard_low', label: 'Standard Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'offpeak_high', label: 'Off-Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
-  ...WATER_SEWER_ITEMS,
 ];
 
 module.exports = {
