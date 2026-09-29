@@ -41,4 +41,19 @@ function seedSlip(db, tariffId, { label, startDate, endDate, readings, applyCorr
   return slipId;
 }
 
-module.exports = { seedTariff, seedSlip };
+// One-time cleanup for a shape correction: seedTariff is idempotent by (tariff_name,
+// effective_from), so if a tariff row was already seeded on a live deploy (e.g. Render's
+// persistent disk) BEFORE a line item was removed from that shape in code, re-running the seed
+// script never touches the already-inserted site_tariff_items rows - the stale item just sits
+// there forever. Call this once, after seedTariff, with the keys that should no longer exist for
+// a given tariff_name; it's a plain DELETE so it's automatically idempotent (does nothing once
+// the stale rows are gone) and safe to leave in the seed script permanently.
+function pruneTariffItemKeys(db, { tariffName, keys }) {
+  if (!keys || !keys.length) return 0;
+  const placeholders = keys.map(() => '?').join(',');
+  const result = run(db, `DELETE FROM site_tariff_items WHERE item_key IN (${placeholders})
+    AND tariff_id IN (SELECT id FROM site_tariffs WHERE tariff_name=?)`, [...keys, tariffName]);
+  return result.changes;
+}
+
+module.exports = { seedTariff, seedSlip, pruneTariffItemKeys };

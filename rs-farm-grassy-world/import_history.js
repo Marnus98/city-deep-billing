@@ -17,7 +17,7 @@
 const { open, migrate } = require('../db');
 const { seedUsers: seedUsersShared } = require('../shared_seed_users');
 const { TSHWANE_LV_TOU } = require('../flat_site_tariff_shapes');
-const { seedTariff, seedSlip } = require('../flat_site_seed_helpers');
+const { seedTariff, seedSlip, pruneTariffItemKeys } = require('../flat_site_seed_helpers');
 
 // No correction-factor system applies here (every line item's factorType is null - see the shape's
 // own comment) - kept at 1 purely so seedTariff has something to store in site_tariffs' NOT NULL
@@ -59,6 +59,12 @@ function main(dbFile = 'rs-farm-grassy-world.db') {
     if (slipId) created++;
   }
   if (created) console.log(`RS-Farm - Grassy World history import: ${created} month(s) added (Jul 2026 - Aug 2026).`);
+  // One-time cleanup for the 2026-09-29 water/sewer removal (see flat_site_seed_helpers.js's
+  // pruneTariffItemKeys comment) - a live deploy may have already seeded this tariff WITH
+  // water/sewer before the shape was corrected, and seedTariff's idempotency means re-running it
+  // alone would never remove those stale rows.
+  const pruned = pruneTariffItemKeys(db, { tariffName: TARIFF_NAME, keys: ['water', 'sewer'] });
+  if (pruned) console.log(`RS-Farm - Grassy World: pruned ${pruned} stale water/sewer tariff item(s).`);
   return db;
 }
 
