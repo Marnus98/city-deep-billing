@@ -200,6 +200,47 @@ module.exports = [
     hasFlagging: true,
     flaggingChartLayout: true,
   },
+  // RS-Farm - 4 loose-standing sites added 2026-09-29 (Grassy World, SHS, Just Trees, Main
+  // Incomer), all sharing the TSHWANE_LV_TOU shape (flat_site_tariff_shapes.js) - the first
+  // City of Tshwane sites in this app. No real municipal account statement yet, so no
+  // hasMunicipalStatements/Recovery tab for now (add once one's provided, same as every other
+  // site's own history).
+  {
+    slug: 'rs-farm-shs',
+    name: 'RS-Farm - SHS',
+    dbFile: 'rs-farm-shs.db',
+    seedFile: './rs-farm-shs/import_history',
+    billingModel: 'flat_site',
+    hasFlagging: true,
+    flaggingChartLayout: true,
+  },
+  {
+    slug: 'rs-farm-main-incomer',
+    name: 'RS-Farm - Main Incomer',
+    dbFile: 'rs-farm-main-incomer.db',
+    seedFile: './rs-farm-main-incomer/import_history',
+    billingModel: 'flat_site',
+    hasFlagging: true,
+    flaggingChartLayout: true,
+  },
+  {
+    slug: 'rs-farm-just-trees',
+    name: 'RS-Farm - Just Trees',
+    dbFile: 'rs-farm-just-trees.db',
+    seedFile: './rs-farm-just-trees/import_history',
+    billingModel: 'flat_site',
+    hasFlagging: true,
+    flaggingChartLayout: true,
+  },
+  {
+    slug: 'rs-farm-grassy-world',
+    name: 'RS-Farm - Grassy World',
+    dbFile: 'rs-farm-grassy-world.db',
+    seedFile: './rs-farm-grassy-world/import_history',
+    billingModel: 'flat_site',
+    hasFlagging: true,
+    flaggingChartLayout: true,
+  },
   {
     slug: 'colorobbia',
     name: '122 Loper - Colorobbia', // exactly as given on the client's own workbook (not "122 Loper Ave") - NOTE: its actual municipal account is billed to "13 Brussels Avenue", not any Loper address, see colorobbia/municipal_import.js

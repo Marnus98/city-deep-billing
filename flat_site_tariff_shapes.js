@@ -456,9 +456,39 @@ const EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET = [
   { key: 'sewer_interim', label: 'Sewer (Meter 66659830, INTERIM)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: true, section: 'water' },
 ];
 
+// City of Tshwane LV TOU - RS-Farm's 4 loose-standing sites (Grassy World, SHS, Just Trees, Main
+// Incomer), added 2026-09-29. First Tshwane-municipality site in this app - every other flat_site
+// property is Ekurhuleni or City Power (Johannesburg). Same 8-line TOU shape as EKURHULENI_E_TOU
+// (Fixed Charge + full Peak/Standard/Off-Peak High/Low split), but a single "Network Demand" line
+// instead of split Network Access/Network Demand, matching the client's own "Tshwane LV TOU"
+// workbook name across all 4 sites - identical rates confirmed across all 4 for a given month, so
+// they're 4 physically separate connections/sub-boards on the one farm, all billed on the same
+// municipal tariff rather than 4 different tariffs.
+//
+// fixed_charge intentionally has NO fixedReading (unlike every fixed-charge line elsewhere in this
+// app): 3 of the 4 sites (SHS, Just Trees, and Grassy World from its second month on) share one
+// "DB-B" sub-board and each pay exactly 1/3 of the Fixed Charge every month (reading 0.3333...),
+// while Main Incomer - and Grassy World's own first, partial month - pay the full reading of 1. So
+// unlike A-Shack's or every Loper Ave site's Fixed/Basic Charge, this one is a real per-month
+// reading value taken straight from each site's own workbook, not a constant.
+//
+// Water/Sewer: not billed by the client yet (rate 0, unused) - same WATER_SEWER_ITEMS 2-line
+// template as every other flat_site shape, ready for whenever real rates are provided.
+const TSHWANE_LV_TOU = [
+  { key: 'fixed_charge', label: 'Fixed Charge', unit: 'R/c', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'network_demand', label: 'Network Demand', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'peak_high', label: 'Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'peak_low', label: 'Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_high', label: 'Standard Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'standard_low', label: 'Standard Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_high', label: 'Off-Peak Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'offpeak_low', label: 'Off-Peak Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  ...WATER_SEWER_ITEMS,
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
-  EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE, A_SHACK_EKURHULENI_TARIFF_B_MIX,
+  EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE, A_SHACK_EKURHULENI_TARIFF_B_MIX, TSHWANE_LV_TOU,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
   EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE, EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET,

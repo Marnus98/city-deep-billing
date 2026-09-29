@@ -121,6 +121,13 @@ require('./colorobbia/import_history').run('colorobbia.db');
 // 8-month history from the start rather than a single-month seed.js, so it's registered here
 // alongside its own seedFile from day one (own de-dup key: slip label, always safe to re-run).
 require('./a-shack/import_history').run('a-shack.db');
+// RS-Farm's 4 loose-standing sites (Grassy World, SHS, Just Trees, Main Incomer), added 2026-09-29
+// with full histories from the start rather than single-month seed.js files - registered here
+// alongside their own seedFile from day one (own de-dup key: slip label, always safe to re-run).
+require('./rs-farm-shs/import_history').run('rs-farm-shs.db');
+require('./rs-farm-main-incomer/import_history').run('rs-farm-main-incomer.db');
+require('./rs-farm-just-trees/import_history').run('rs-farm-just-trees.db');
+require('./rs-farm-grassy-world/import_history').run('rs-farm-grassy-world.db');
 // Bob Martin's actual municipal account statements (Dec 2025, Jan/Feb/Mar/May 2026 - Apr 2026
 // missing, no statement provided for it) - own de-dup key (label), separate tables from the above
 // (see db.js), always safe to re-run; see bob-martin/municipal_import.js for extraction notes.
