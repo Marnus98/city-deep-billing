@@ -132,6 +132,11 @@ require('./rs-farm-grassy-world/import_history').run('rs-farm-grassy-world.db');
 // seeded intentionally blank (tariff/rates only, no slips) per the client's own request - see
 // rs-farm-malan-seuns/import_history.js.
 require('./rs-farm-malan-seuns/import_history').run('rs-farm-malan-seuns.db');
+// RS-Farm's 6th site, Eagles Valley Poultry - Hostels, added 2026-09-29 - same tariff/rates as
+// Malan Seuns above but only 1 meter (EAGLES_VALLEY_POULTRY_COT_TARIFF_B), also seeded
+// intentionally blank per the client's own request - see
+// rs-farm-eagles-valley-poultry-hostels/import_history.js.
+require('./rs-farm-eagles-valley-poultry-hostels/import_history').run('rs-farm-eagles-valley-poultry-hostels.db');
 // Bob Martin's actual municipal account statements (Dec 2025, Jan/Feb/Mar/May 2026 - Apr 2026
 // missing, no statement provided for it) - own de-dup key (label), separate tables from the above
 // (see db.js), always safe to re-run; see bob-martin/municipal_import.js for extraction notes.

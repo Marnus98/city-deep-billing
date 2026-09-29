@@ -504,10 +504,20 @@ const MALAN_SEUNS_COT_TARIFF_B = [
   { key: 'energy_m3', label: 'Energy Consumption - High Demand - Meter 3 (Grondsif, LEAR)', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
 ];
 
+// City of Tshwane Tariff B (<=150A) - RS-Farm's 6th site, Eagles Valley Poultry - Hostels, added
+// 2026-09-29. Same underlying tariff/rates as MALAN_SEUNS_COT_TARIFF_B above (confirmed identical
+// on both sites' own Tariffs sheets), but only ONE physical meter here (serial KM7T100C, location
+// "Pyramid" per the client's own "Hand readings - Electrical" tab) rather than 3, so it's its own
+// simple 2-line shape rather than reusing Malan Seuns' per-meter-keyed one.
+const EAGLES_VALLEY_POULTRY_COT_TARIFF_B = [
+  { key: 'basic_charge', label: 'Basic Charge (R/Ampere)', unit: 'R/A', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'energy', label: 'Energy Consumption - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
+];
+
 module.exports = {
   EKURHULENI_E_TOU, EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, CITY_POWER_LV_TOU,
   EKURHULENI_TARIFF_B, EKURHULENI_TARIFF_B_SIMPLE, A_SHACK_EKURHULENI_TARIFF_B_MIX, TSHWANE_LV_TOU,
-  MALAN_SEUNS_COT_TARIFF_B,
+  MALAN_SEUNS_COT_TARIFF_B, EAGLES_VALLEY_POULTRY_COT_TARIFF_B,
   EKURHULENI_MUNICIPAL_E_TOU_8FS, EKURHULENI_MUNICIPAL_D1_TOU_BOB_MARTIN, AUTOZONE_COJ_MUNICIPAL,
   EKURHULENI_MUNICIPAL_INDUSTRIAL_C_LOPER_ROAD, EKURHULENI_MUNICIPAL_E_TOU_CRANBROOK,
   EKURHULENI_MUNICIPAL_SIMPLE_LOPER_AVE, EKURHULENI_MUNICIPAL_TOU_55_LOPER_STREET,

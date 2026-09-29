@@ -256,6 +256,19 @@ module.exports = [
     flaggingChartLayout: true,
   },
   {
+    // 6th RS-Farm site, added 2026-09-29 - same underlying City of Tshwane Tariff B rates as
+    // Malan Seuns above, but only 1 meter (EAGLES_VALLEY_POULTRY_COT_TARIFF_B in
+    // flat_site_tariff_shapes.js). Seeded blank (tariff/rates only, no billing slip) per the
+    // client's own request, same as Malan Seuns.
+    slug: 'rs-farm-eagles-valley-poultry-hostels',
+    name: 'RS-Farm - Eagles Valley Poultry - Hostels',
+    dbFile: 'rs-farm-eagles-valley-poultry-hostels.db',
+    seedFile: './rs-farm-eagles-valley-poultry-hostels/import_history',
+    billingModel: 'flat_site',
+    hasFlagging: true,
+    flaggingChartLayout: true,
+  },
+  {
     slug: 'colorobbia',
     name: '122 Loper - Colorobbia', // exactly as given on the client's own workbook (not "122 Loper Ave") - NOTE: its actual municipal account is billed to "13 Brussels Avenue", not any Loper address, see colorobbia/municipal_import.js
     dbFile: 'colorobbia.db',
