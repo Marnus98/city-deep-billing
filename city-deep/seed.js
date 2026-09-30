@@ -153,6 +153,11 @@ const TENANT_DISPLAY_OVERRIDES = {
   // real workbook tab.
   '__HANDOVER_TWINPOUCH_UNIT4__': { name: 'Twinpouch (Pty) Ltd', unit: 'Unit 4' },
   '__HANDOVER_TWINPOUCH_UNIT5__': { name: 'Twinpouch (Pty) Ltd', unit: 'Unit 5' },
+  // Sanskar Trading CC's Unit 9 tenancy (see 'Shop 3 Unit 9 SANSKAR Trading' below, which keeps its
+  // own pre-handover history under that name untouched) was taken over by Uber Nutrition from
+  // 2026-09 - same synthetic-identity pattern as the two Twinpouch entries above, just its own
+  // third unit under a company that already has Units 6 and 7 (see TENANT_HANDOVERS).
+  '__HANDOVER_UBER_UNIT9__': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 9' },
   'Shop 6 Unit 6 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 6' },
   'Shop 5 Unit 7 URBER Nutrition (PTY) LTD': { name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 7' },
   'Shop 4 Unit 8 Citrashine': { name: 'Citrashine (Pty) Ltd', unit: 'Unit 8 (Shop 4)' },
@@ -184,12 +189,6 @@ function applyTenantDisplayOverrides() {
 // incoming tenant - the same mechanism that already handles a tariff or allocation change mid-year,
 // just triggered by a tenant_id change instead this time.
 //
-// Source table had 3 rows; only 2 are listed here. The 3rd (Unit 9, Sanskar Trading CC -> Uber
-// Nutrition (Pty) Ltd, effective 2026-09) is client-confirmed but deliberately NOT added yet - no
-// billing period with label >= '2026-09' has been imported, so there is nothing for it to redirect.
-// Add it here (matching rawName 'Shop 3 Unit 9 SANSKAR Trading', fromLabel '2026-09') once the
-// first September 2026 workbook is imported.
-//
 // Unit 4's fromLabel corrected 2026-09-30 (client: "Americandy only vacated end of August" - the
 // original '2026-08' guess assumed the handover took effect from the 1st of that month, which is
 // wrong). The August 2026 workbook itself backs this up: both its Electrical Billing and Water
@@ -197,9 +196,21 @@ function applyTenantDisplayOverrides() {
 // of August (just a near-zero, "DB Switched Off"-flagged reading, consistent with vacating right
 // at month-end) - Unit 5's workbook section, by contrast, is already headed "Twinpouch" for the
 // whole of August, so that handover's '2026-08' fromLabel is correct as-is and left unchanged.
+//
+// All 3 handovers now added (Unit 9 wired in 2026-09-30 once the first September 2026 workbook
+// arrived - see below). Note the September workbook's own tab headers changed the raw text a
+// SECOND time on top of the original handover (e.g. Unit 5's section now literally says "Unit 5
+// Twinpouch", not "Unit 5 AGRANA" anymore, and Unit 9's now says "Shop 3 Unit 9 Uber Nutrition
+// (PTY) LTD", not "Shop 3 Unit 9 SANSKAR Trading") - so each handover needs its OWN entry keyed to
+// whichever raw text that month's workbook actually uses; the original Aug-era rawName entries are
+// left in place (harmless - they just never match again) rather than rewritten, so this list stays
+// an honest record of exactly what each month's workbook called each unit.
 const TENANT_HANDOVERS = [
   { rawName: 'Unit 4 Americandy Manufacturers (PTY)LTD', fromLabel: '2026-09', newRawName: '__HANDOVER_TWINPOUCH_UNIT4__' },
+  { rawName: 'Unit 4 Twinpouch', fromLabel: '2026-09', newRawName: '__HANDOVER_TWINPOUCH_UNIT4__' },
   { rawName: 'Unit 5 AGRANA', fromLabel: '2026-08', newRawName: '__HANDOVER_TWINPOUCH_UNIT5__' },
+  { rawName: 'Unit 5 Twinpouch', fromLabel: '2026-09', newRawName: '__HANDOVER_TWINPOUCH_UNIT5__' },
+  { rawName: 'Shop 3 Unit 9 Uber Nutrition (PTY) LTD', fromLabel: '2026-09', newRawName: '__HANDOVER_UBER_UNIT9__' },
 ];
 function resolveTenantWorkbookName(rawName, periodLabel) {
   const handover = TENANT_HANDOVERS.find((h) => h.rawName === rawName && periodLabel >= h.fromLabel);
@@ -534,7 +545,7 @@ const MONTH_FILES = [
   'july2025.json', 'august2025.json', 'september2025.json', 'october2025.json',
   'november2025.json', 'december2025.json', 'january2026.json', 'february2026.json',
   'march.json', 'april.json', 'may2026.json', 'june2026.json', 'july2026.json',
-  'august2026.json',
+  'august2026.json', 'september2026.json',
 ];
 
 // `dbFile` picks which property database this seeds (see properties.js) - defaults to City
