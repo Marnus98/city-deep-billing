@@ -113,8 +113,15 @@ function canonicalTenantName(name) { return TENANT_NAME_ALIASES[name] || name; }
 // tenant's own original workbook name, after every tenant row for the month already exists.
 const TENANT_DISPLAY_OVERRIDES = {
   'Kimmo (PTY) LTD - Industrial Park': { name: 'Kimmo (Pty) Ltd', unit: 'Unit 1' },
-  'AGRANA Fruit - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2B' },
-  'AGRANA Fruit Warehouse/Office - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2C' },
+  // Corrected 2026-09-30 (client screenshot, Twinpouch/Agrana solar-rebate question): these two
+  // unit numbers were swapped relative to the client's own workbook meter labels ever since the
+  // original 2026-08-24 rename. Serial 35775957 (the meter with its own dedicated PV production/
+  // export sub-meters) is labelled "DB-B1 Unit 2C Import" on the client's own Electrical Billing
+  // sheet, and serial 35775955 (the shared mains/office meter, no direct solar connection) is
+  // labelled "DB-BB Unit 2B" there - the reverse of what was assigned here. See
+  // fixAgranaUnitLabels() below for the one-time correction applied to already-seeded history.
+  'AGRANA Fruit - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2C' },
+  'AGRANA Fruit Warehouse/Office - Industrial Park': { name: 'Agrana Fruit South Africa (Pty) Ltd', unit: 'Unit 2B' },
   'Lesco - Industrial Park': { name: 'Lesco Manufacturing (Pty) Ltd', unit: 'Unit 2A' },
   'Unit 3 HUDACO Trading - Industrial Park': { name: 'Hudaco Trading (Pty) Ltd', unit: 'Unit 3' },
   'Unit 4A JC Bakery (PTY) LTD - Industrial Park': { name: 'JC Bakeries (Pty) Ltd', unit: 'Unit 4A' },
@@ -170,6 +177,29 @@ function applyTenantDisplayOverrides() {
   for (const [oldName, { name, unit }] of Object.entries(TENANT_DISPLAY_OVERRIDES)) {
     run('UPDATE tenants SET name=?, unit=? WHERE name=?', [name, unit, oldName]);
   }
+}
+
+// One-time correction for the Agrana Unit 2B/2C swap (see TENANT_DISPLAY_OVERRIDES' own comment
+// above) on an ALREADY-SEEDED db, where the wrong unit labels may already be baked into existing
+// tenant rows from every prior boot. Must run BEFORE seedMonth()'s own getOrCreateTenant lookups
+// this run, since those resolve existing rows via the (now-corrected) TENANT_DISPLAY_OVERRIDES
+// unit values - if the stored row still had the old unit, that lookup would fail to find it and
+// silently create a duplicate tenant instead. Keyed by which physical meter each existing tenant
+// row is currently billing (via meter_assignments), not by the tenant's current unit value, so
+// this is safe to run on every boot forever: once the label is already correct it's a no-op,
+// and it never depends on guessing today's (possibly already-corrected) starting state.
+function fixAgranaUnitLabels() {
+  const bySerial = (serial) => get(`
+    SELECT t.id FROM tenants t
+    JOIN meter_assignments ma ON ma.tenant_id = t.id
+    JOIN meters m ON m.id = ma.meter_id
+    WHERE m.serial = ? AND t.name = 'Agrana Fruit South Africa (Pty) Ltd'
+    ORDER BY ma.id DESC LIMIT 1
+  `, [serial]);
+  const solarConnected = bySerial('35775957'); // "DB-B1 Unit 2C Import" on the client's own sheet
+  const sharedMains = bySerial('35775955');    // "DB-BB Unit 2B" on the client's own sheet
+  if (solarConnected) run('UPDATE tenants SET unit=? WHERE id=?', ['Unit 2C', solarConnected.id]);
+  if (sharedMains) run('UPDATE tenants SET unit=? WHERE id=?', ['Unit 2B', sharedMains.id]);
 }
 
 // Mid-history tenant handovers: same physical unit/meters, occupant changed on a specific date -
@@ -267,26 +297,63 @@ function getOrCreateMeter(serial, utilityType, role, location, unitScale) {
   return m;
 }
 
+// Fixed 2026-09-30: this used to look up "whichever row currently has effective_to IS NULL, most
+// recently inserted" and treat THAT as "the segment covering periodStart" - correct only the very
+// first time a meter's full history is built chronologically month-by-month into an empty table.
+// server.js re-runs this ENTIRE historical seed (all 15+ months) on every boot against the SAME
+// persistent db (see "City Deep seed gated-behind-empty-db bug" fix), so a re-seed always
+// reprocesses month 1 again while the "open" row is actually whatever the LAST prior run left open
+// (e.g. September's segment) - completely unrelated to month 1's own periodStart. That mismatch
+// either produced a duplicate row every single re-seed (silently doubling meter_assignments on
+// every redeploy) or, worse, closed a much-later segment using an early month's own periodStart as
+// its effective_to (effective_to < effective_from), corrupting the history outright. Root-caused via
+// a rebuild-twice-and-diff test: bill totals for the 4 solar-rebate tenants (Lesco/Hudaco/Agrana/
+// Teraoka, whose rebate depends on solar.js's billedEnergy() reading meter_assignments) drifted
+// between the 1st and 2nd seed of an identical dataset, then stayed stable from the 2nd run onward.
+// Fixed by keying lookups on (meter_id, effective_from) - the actual natural identity of one
+// historical episode - instead of "the currently open row", so reprocessing an already-recorded
+// month is a true no-op regardless of what a LATER month's run already did to the meter's history.
 function upsertAssignment({ meterId, tenantId, tariffCode, serviceFlag, sign, allocationPct, kvarhAllocationPct, kvaAllocationPct, capacityChargeOverride, networkLevyOverride, carriesLevy, isCommonArea, energyOnly, periodStart }) {
-  const open = get(
-    'SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL ORDER BY id DESC LIMIT 1',
-    [meterId]
-  );
   const near = (a, b) => Math.abs((a == null ? 0 : a) - (b == null ? 0 : b)) < 1e-6;
-  const same = open && open.tenant_id === tenantId && open.tariff_code === tariffCode &&
-    open.service_charge_flag === (serviceFlag ? 1 : 0) && open.sign === sign &&
-    near(open.allocation_pct, allocationPct) && near(open.allocation_pct_kvarh, kvarhAllocationPct) &&
-    near(open.allocation_pct_kva, kvaAllocationPct) && near(open.capacity_charge_override, capacityChargeOverride) &&
-    near(open.network_levy_override, networkLevyOverride) &&
-    open.carries_network_levy === (carriesLevy ? 1 : 0) && open.energy_only === (energyOnly ? 1 : 0);
-  if (same) return open;
-  if (open) run('UPDATE meter_assignments SET effective_to=? WHERE id=?', [periodStart, open.id]);
+  const matches = (row) => !!row && row.tenant_id === tenantId && row.tariff_code === tariffCode &&
+    row.service_charge_flag === (serviceFlag ? 1 : 0) && row.sign === sign &&
+    near(row.allocation_pct, allocationPct) && near(row.allocation_pct_kvarh, kvarhAllocationPct) &&
+    near(row.allocation_pct_kva, kvaAllocationPct) && near(row.capacity_charge_override, capacityChargeOverride) &&
+    near(row.network_levy_override, networkLevyOverride) &&
+    row.carries_network_levy === (carriesLevy ? 1 : 0) && row.energy_only === (energyOnly ? 1 : 0);
+
+  // This exact historical episode (same meter, same start date) may already exist from an earlier
+  // boot's seed run - if its parameters already match, this call is a pure no-op (the common case on
+  // every re-seed after the first). If a segment already starts here but with different parameters
+  // (e.g. a corrected workbook re-import), update that same row in place instead of inserting a
+  // second row for the same start date.
+  const existingAtStart = get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_from=?', [meterId, periodStart]);
+  if (matches(existingAtStart)) return existingAtStart;
+  if (existingAtStart) {
+    run(`UPDATE meter_assignments SET tenant_id=?, tariff_code=?, service_charge_flag=?, sign=?,
+        allocation_pct=?, allocation_pct_kvarh=?, allocation_pct_kva=?, capacity_charge_override=?,
+        network_levy_override=?, carries_network_levy=?, is_common_area=?, energy_only=? WHERE id=?`,
+      [tenantId, tariffCode, serviceFlag ? 1 : 0, sign, allocationPct, kvarhAllocationPct ?? null, kvaAllocationPct ?? null,
+       capacityChargeOverride ?? null, networkLevyOverride ?? null, carriesLevy ? 1 : 0, isCommonArea ? 1 : 0, energyOnly ? 1 : 0, existingAtStart.id]);
+    return get('SELECT * FROM meter_assignments WHERE id=?', [existingAtStart.id]);
+  }
+
+  // No segment starts exactly at this date yet - find whichever segment currently covers it (by
+  // date range, not by "most recently inserted") and close it as of this new period, same as
+  // before, then insert the new segment. Only ever touches a segment that this periodStart actually
+  // falls inside, so reprocessing an early month can never reach into and corrupt a later month's
+  // already-established segment.
+  const covering = get(
+    'SELECT * FROM meter_assignments WHERE meter_id=? AND effective_from<? AND (effective_to IS NULL OR effective_to>?) ORDER BY effective_from DESC LIMIT 1',
+    [meterId, periodStart, periodStart]
+  );
+  if (covering) run('UPDATE meter_assignments SET effective_to=? WHERE id=?', [periodStart, covering.id]);
   run(`INSERT INTO meter_assignments
       (meter_id, tenant_id, tariff_code, service_charge_flag, sign, allocation_pct, allocation_pct_kvarh, allocation_pct_kva, capacity_charge_override, network_levy_override, carries_network_levy, is_common_area, energy_only, effective_from)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [meterId, tenantId, tariffCode, serviceFlag ? 1 : 0, sign, allocationPct, kvarhAllocationPct ?? null, kvaAllocationPct ?? null,
      capacityChargeOverride ?? null, networkLevyOverride ?? null, carriesLevy ? 1 : 0, isCommonArea ? 1 : 0, energyOnly ? 1 : 0, periodStart]);
-  return get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL', [meterId]);
+  return get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_from=?', [meterId, periodStart]);
 }
 
 // Detects rows where the source workbook hand-overrode the fixed-charge/surcharge formulas to 0
@@ -547,11 +614,12 @@ function seedMonth(monthData) {
     count++;
   }
   seedSolarBulkMeters(monthData, billingPeriod);
-  // Must run after seedSolarBulkMeters (solar.js's getSolarSlips needs those bulk-export meter
-  // readings) and after every tenant in this month has its bill_line_items written above (solar.js
-  // cross-references other tenants' own energy_charge rows for this same period) - see
-  // billing.js's applySolarRebates() for the full explanation of why this can't run per-tenant.
-  applySolarRebates(db, billingPeriod.id);
+  // Solar rebates are applied in a separate final pass in main(), not here - see that pass's own
+  // comment for why (found 2026-09-30: applySolarRebates looks tenants up by their DISPLAY name,
+  // e.g. 'Lesco Manufacturing (Pty) Ltd', but that rename only happens once, in
+  // applyTenantDisplayOverrides() at the very end of a full run - so calling it here, per month,
+  // silently finds zero matching tenants and skips every rebate on the very first-ever historical
+  // seed of an empty db, only self-correcting from the SECOND full reseed onward).
   console.log(`Seeded ${count} tenants for period ${monthData.label} (${billingPeriod.start_date} - ${billingPeriod.end_date})`);
 }
 
@@ -583,8 +651,14 @@ function main(dbFile = 'city-deep.db') {
   db.exec('BEGIN');
   try {
     seedUsers();
+    fixAgranaUnitLabels();
     for (const monthData of months) seedMonth(monthData);
     applyTenantDisplayOverrides();
+    // Solar rebates last, only after every tenant is under its final display name (see seedMonth's
+    // own comment on why this can't run per-month inside the loop above) - one pass over every
+    // period actually seeded this run, not just the ones in MONTH_FILES, so it stays correct even
+    // if this file list and billing_periods ever diverge for some other reason.
+    for (const p of all('SELECT id FROM billing_periods')) applySolarRebates(db, p.id);
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');

@@ -127,17 +127,35 @@ function getOrCreateMeter(serial, utilityType, role, location) {
   return m;
 }
 
+// Fixed 2026-09-30 (same root-cause fix applied to city-deep/seed.js's own upsertAssignment - see
+// that file's comment for the full story): looking up "whichever row currently has effective_to IS
+// NULL, most recently inserted" only works the very first time a meter's history is built
+// chronologically into an empty table. server.js re-runs this whole historical seed on every boot
+// against the same persistent db, so a re-seed reprocesses month 1 while the "open" row is actually
+// whatever the LAST prior run left open (the newest month) - unrelated to month 1's own periodStart.
+// That mismatch silently duplicated every assignment row on every redeploy (or worse, corrupted
+// effective_to). Fixed by keying lookups on (meter_id, effective_from) - one historical episode's
+// natural identity - instead of "the currently open row".
 function upsertAssignment({ meterId, tenantId, sign, breakerAmp, periodStart }) {
-  const open = get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL ORDER BY id DESC LIMIT 1', [meterId]);
-  const same = open && open.tenant_id === tenantId && open.sign === sign &&
-    Math.abs((open.capacity_charge_override ?? 0) - (breakerAmp ?? 0)) < 1e-6;
-  if (same) return open;
-  if (open) run('UPDATE meter_assignments SET effective_to=? WHERE id=?', [periodStart, open.id]);
+  const matches = (row) => !!row && row.tenant_id === tenantId && row.sign === sign &&
+    Math.abs((row.capacity_charge_override ?? 0) - (breakerAmp ?? 0)) < 1e-6;
+  const existingAtStart = get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_from=?', [meterId, periodStart]);
+  if (matches(existingAtStart)) return existingAtStart;
+  if (existingAtStart) {
+    run('UPDATE meter_assignments SET tenant_id=?, sign=?, capacity_charge_override=? WHERE id=?',
+      [tenantId, sign, breakerAmp ?? null, existingAtStart.id]);
+    return get('SELECT * FROM meter_assignments WHERE id=?', [existingAtStart.id]);
+  }
+  const covering = get(
+    'SELECT * FROM meter_assignments WHERE meter_id=? AND effective_from<? AND (effective_to IS NULL OR effective_to>?) ORDER BY effective_from DESC LIMIT 1',
+    [meterId, periodStart, periodStart]
+  );
+  if (covering) run('UPDATE meter_assignments SET effective_to=? WHERE id=?', [periodStart, covering.id]);
   run(`INSERT INTO meter_assignments
       (meter_id, tenant_id, tariff_code, service_charge_flag, sign, allocation_pct, capacity_charge_override, effective_from)
       VALUES (?,?,?,?,?,?,?,?)`,
     [meterId, tenantId, null, 1, sign, 1, breakerAmp ?? null, periodStart]);
-  return get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL', [meterId]);
+  return get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_from=?', [meterId, periodStart]);
 }
 
 // A handful of meters physically sit on one tenant's board but are billed to a different tenant
