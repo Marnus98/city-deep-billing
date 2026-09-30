@@ -199,6 +199,16 @@ module.exports = [
     // for now (add once one's provided, same as every other site's own history).
     hasFlagging: true,
     flaggingChartLayout: true,
+    // Client confirmed 2026-09-30: the building changes ownership after the Sep 2026 slip (a
+    // partial period, 2026-09-01 to 2026-09-24, closing out the books under this ownership - see
+    // a-shack/import_history.js). Billing continues under the same "A-Shack" property/slug, but the
+    // client wants a clean visual break once billing resumes: the Jan-Sep 2026 history stays in the
+    // database (still viewable/downloadable slip-by-slip, e.g. for the outgoing owner's own
+    // records), but the trend charts on the billing slip PDF and the Flagging tab's client-billing
+    // series should only pick up slips starting AFTER this date, so the new owner's numbers aren't
+    // mixed in with (or averaged against) the old ownership's. See server.js's monthlyTrendForSite/
+    // currentPropFlagRows and flat_site_flagging_data.js's seriesFor for where this is read.
+    reportingResetDate: '2026-09-24',
   },
   // RS-Farm - 4 loose-standing sites added 2026-09-29 (Grassy World, SHS, Just Trees, Main
   // Incomer), all sharing the TSHWANE_LV_TOU shape (flat_site_tariff_shapes.js) - the first

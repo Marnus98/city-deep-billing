@@ -29,8 +29,15 @@ function all(db, sql, params = []) { return db.prepare(sql).all(...params); }
 // flat_site_recovery.js's siteSideFor or municipalSideFor, `labelsSql` picks which table's own
 // labels to iterate (a label with no row on this side is simply skipped, same "absent rather than
 // silently zero" convention buildRecoveryRows already uses).
-function seriesFor(db, table, sideFor, utility) {
-  const labels = all(db, `SELECT DISTINCT label FROM ${table} ORDER BY label`).map((r) => r.label);
+//
+// `resetDate`, when set (properties.js's reportingResetDate - currently just A-Shack), excludes any
+// slip on or before it - see server.js's monthlyTrendForSite for the matching PDF-trend-chart side
+// of this same "start over" request; here it keeps the Flagging tab's trailing-average/baseline
+// comparison from being skewed by mixing old-ownership months in with the new ones.
+function seriesFor(db, table, sideFor, utility, resetDate) {
+  const labels = (resetDate
+    ? all(db, `SELECT DISTINCT label FROM ${table} WHERE start_date>? ORDER BY label`, [resetDate])
+    : all(db, `SELECT DISTINCT label FROM ${table} ORDER BY label`)).map((r) => r.label);
   return labels.map((label) => {
     const f = sideFor(db, label);
     if (!f) return null;
@@ -60,12 +67,12 @@ function currentPeriodLabel(db) {
 // Top-level entry point, same { municipalRows, sectionRows, tenantRows } shape as the tenant-model
 // properties' own buildAllFlagRows, so server.js/views.js/pdf.js need zero property-type branching
 // beyond picking which module to call (see server.js's currentPropFlagRows).
-function buildAllFlagRows(db, settings, propertyName, hasMunicipalStatements) {
+function buildAllFlagRows(db, settings, propertyName, hasMunicipalStatements, resetDate) {
   const municipalRows = [];
   if (hasMunicipalStatements) {
     const cpLabel = currentPeriodLabel(db);
     for (const utility of ['electricity', 'water']) {
-      const series = seriesFor(db, 'municipal_statement_slips', flatSiteRecovery.municipalSideFor, utility);
+      const series = seriesFor(db, 'municipal_statement_slips', flatSiteRecovery.municipalSideFor, utility, resetDate);
       if (!series.length) {
         municipalRows.push(flagging.noDataRow({ entityType: 'municipal_account', entityKey: 'municipal', title: `${propertyName} (Municipal)`, utility }, cpLabel));
         continue;
@@ -82,7 +89,7 @@ function buildAllFlagRows(db, settings, propertyName, hasMunicipalStatements) {
 
   const sectionRows = [];
   for (const utility of ['electricity', 'water']) {
-    const series = seriesFor(db, 'site_billing_slips', flatSiteRecovery.siteSideFor, utility);
+    const series = seriesFor(db, 'site_billing_slips', flatSiteRecovery.siteSideFor, utility, resetDate);
     if (!series.length) continue;
     const result = flagging.evaluate(series, settings, utility);
     const annotation = getAnnotation(db, 'site_section', 'site', utility, result.stats.latest.label);

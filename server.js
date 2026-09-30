@@ -745,9 +745,21 @@ function sumElecKwh(elecItems) {
 // around Electricity/Water/Sanitation and the shapes line up one-for-one). Fills any calendar-month
 // gap between the earliest and latest of those 12 with a blank ({elec: null, ...}) entry rather
 // than skipping it, so pdf.js's chart drawing can render an empty column instead of closing the gap.
-function monthlyTrendForSite(asOfStartDate) {
-  const slips = all(`SELECT s.* FROM site_billing_slips s
-    WHERE s.start_date<=? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate]);
+// `resetDate`, when set (properties.js's reportingResetDate - currently just A-Shack, after its
+// 2026-09-30 ownership-change request), excludes any slip on or before it from a LATER slip's
+// (asOfStartDate strictly after resetDate) trailing view - so a slip added after the reset never
+// pulls the old ownership's figures into its own trend chart. Only applies looking forward: a slip
+// that is itself on or before the reset date (asOfStartDate<=resetDate) still sees its normal full
+// trailing history, unaffected - the reset is a one-way boundary, not a retroactive edit of every
+// past PDF. The older slips themselves always stay in the database and are still viewable/
+// downloadable individually either way.
+function monthlyTrendForSite(asOfStartDate, resetDate) {
+  const applyReset = resetDate && asOfStartDate > resetDate;
+  const slips = applyReset
+    ? all(`SELECT s.* FROM site_billing_slips s
+        WHERE s.start_date<=? AND s.start_date>? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate, resetDate])
+    : all(`SELECT s.* FROM site_billing_slips s
+        WHERE s.start_date<=? ORDER BY s.start_date DESC LIMIT 12`, [asOfStartDate]);
   const ordered = slips.reverse();
   if (!ordered.length) return [];
   const byLabel = new Map(ordered.map((s) => [s.label, s]));
@@ -1026,7 +1038,8 @@ route('GET', '/site-billing-pdf/:id', async (req, res, params) => {
   const items = getTariffItems(slip.tariff_id);
   const readings = getSlipReadings(slip.id);
   const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
-  const monthlyTrend = monthlyTrendForSite(slip.start_date);
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  const monthlyTrend = monthlyTrendForSite(slip.start_date, currentProp && currentProp.reportingResetDate);
   // Same-scale axis vs this property's municipal statement PDF (see combinedAxisMax above) - an
   // empty municipal trend (no municipal_import.js for this property) just leaves the scale as
   // monthlyTrend's own max, so this is harmless for Loper Road/Cranbrook Flavours too.
@@ -1151,7 +1164,7 @@ function currentPropFlagRows(user) {
     return { settings, ...cityDeepFlagging.buildAllFlagRows(db, settings) };
   }
   if (currentProp.billingModel === 'flat_site') {
-    return { settings, ...flatSiteFlagging.buildAllFlagRows(db, settings, propertyName, !!currentProp.hasMunicipalStatements) };
+    return { settings, ...flatSiteFlagging.buildAllFlagRows(db, settings, propertyName, !!currentProp.hasMunicipalStatements, currentProp.reportingResetDate) };
   }
   return { settings, ...wingfieldFlagging.buildAllFlagRows(db, settings, propertyName) };
 }
@@ -1421,7 +1434,8 @@ route('GET', '/municipal-billing-pdf/:id', async (req, res, params) => {
   const calc = calcFlatSite.computeSlip(items, readings, tariff, slip.apply_correction_factor);
   const monthlyTrend = monthlyTrendForMunicipal(slip.start_date);
   // Same-scale axis vs this property's own client billing PDF - see combinedAxisMax above.
-  const siteTrendForAxis = monthlyTrendForSite(slip.start_date);
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  const siteTrendForAxis = monthlyTrendForSite(slip.start_date, currentProp && currentProp.reportingResetDate);
   const axisMaxOverrides = {
     cost: combinedAxisMax(monthlyTrend, siteTrendForAxis, ['elec', 'water', 'sanitation']),
     consumption: combinedAxisMax(monthlyTrend, siteTrendForAxis, ['elecKwh', 'waterM3']),
