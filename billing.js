@@ -161,53 +161,70 @@ function generateBillsForPeriod(db, periodId) {
 // finished exporting, leaving solar.js's activeTariffParams undefined. Requiring lazily, inside a
 // function that only ever runs after server.js's startup require chain has already fully resolved
 // both modules, sidesteps that entirely (Node's require cache serves the complete module either way).
+// Two of the four rebate-eligible tenants (Agrana, Teraoka) are split across TWO separately
+// invoiced real units sharing one tenant name (Agrana: Unit 2B + Unit 2C; Teraoka: Unit 6A&B +
+// Unit 6C), but only ONE of each pair's units actually has a solar connection (confirmed with the
+// client 2026-09-30, after an earlier proportional-split version of this feature caused confusion
+// by putting a rebate line on the non-solar unit's own bill too): Agrana's Unit 2C (meter 35775957,
+// the one with its own dedicated PV production/export sub-meters) and Teraoka's Unit 6A&B (meter
+// 36533988, same pattern). The whole tenant-level rebate goes to that one unit's bill; the other
+// unit gets none at all, not even a proportional share.
+const SOLAR_UNIT_ONLY = { agrana: 'Unit 2C', teraoka: 'Unit 6A&B' };
+
 function applySolarRebates(db, periodId) {
   const solar = require('./solar');
   const slips = solar.getSolarSlips(db, periodId);
   for (const slip of slips) {
     if (!slip.total.rebate) continue; // not one of the 4 rebate-eligible tenants
     const tenantName = solar.SOLAR_TENANT_NAME[slip.key];
-    const tenants = all(db, 'SELECT id FROM tenants WHERE name=?', [tenantName]);
+    const tenants = all(db, 'SELECT id, unit FROM tenants WHERE name=?', [tenantName]);
 
-    // Two of the four rebate-eligible tenants (Agrana, Teraoka) are split across TWO separately
-    // invoiced real units sharing one tenant name (Agrana: Unit 2B + Unit 2C; Teraoka: Unit 6A&B +
-    // Unit 6C) - solar.js's slip.total.rebate is a single combined figure for the tenant as a whole
-    // (computed from a combined muniUsage/solarUsed across both units - see computeAgrana/
-    // computeTeraoka), not a per-bill figure. Applying the full amount to each matching bill (as an
-    // earlier version of this function did) double-credited those two tenants. Instead, gather every
-    // bill for this tenant name this period first and split the one slip-level rebate proportionally
-    // across them by each bill's own electricity subtotal, so the sum credited across all of the
-    // tenant's real invoices always equals the slip's rebate figure exactly.
     const bills = [];
     for (const t of tenants) {
       const bill = get(db, 'SELECT * FROM bills WHERE tenant_id=? AND billing_period_id=?', [t.id, periodId]);
-      if (bill) bills.push(bill);
+      if (bill) bills.push({ ...bill, unit: t.unit });
     }
     if (bills.length === 0) continue;
 
-    const elecSubtotals = bills.map((bill) => {
-      const rows = all(db, "SELECT amount FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' AND category!='solar_rebate'", [bill.id]);
-      return rows.reduce((s, li) => s + li.amount, 0);
-    });
-    const elecTotal = elecSubtotals.reduce((s, n) => s + n, 0);
-    const share = solar.SOLAR_CREDIT_SHARE[slip.key];
     const rebateTotal = slip.total.rebate.rand;
+    const solarOnlyUnit = SOLAR_UNIT_ONLY[slip.key];
 
+    let allocations;
+    if (solarOnlyUnit) {
+      // Whole amount to the one solar-connected unit's bill, zero to every other bill under this
+      // tenant name - a bill with zero allocation simply gets its old solar_rebate line removed
+      // below and no new one inserted, same as a tenant that was never rebate-eligible at all.
+      allocations = bills.map((bill) => (bill.unit === solarOnlyUnit ? rebateTotal : 0));
+    } else if (bills.length === 1) {
+      allocations = [rebateTotal];
+    } else {
+      // Fallback for any future multi-unit rebate-eligible tenant not listed in SOLAR_UNIT_ONLY:
+      // split proportionally by each bill's own electricity subtotal, last bill takes the rounding
+      // remainder so the shares always sum to rebateTotal exactly.
+      const elecSubtotals = bills.map((bill) => {
+        const rows = all(db, "SELECT amount FROM bill_line_items WHERE bill_id=? AND utility_type='electricity' AND category!='solar_rebate'", [bill.id]);
+        return rows.reduce((s, li) => s + li.amount, 0);
+      });
+      const elecTotal = elecSubtotals.reduce((s, n) => s + n, 0);
+      let running = 0;
+      allocations = bills.map((bill, i) => {
+        if (i === bills.length - 1) return calc.round2(rebateTotal - running);
+        const weight = elecTotal !== 0 ? elecSubtotals[i] / elecTotal : 1 / bills.length;
+        const amt = calc.round2(rebateTotal * weight);
+        running += amt;
+        return amt;
+      });
+    }
+
+    const share = solar.SOLAR_CREDIT_SHARE[slip.key];
     bills.forEach((bill, i) => {
       run(db, "DELETE FROM bill_line_items WHERE bill_id=? AND category='solar_rebate'", [bill.id]);
-      // Proportional split by electricity subtotal; if a bill has no electricity charges at all
-      // (elecTotal is 0, e.g. every matching bill is water-only), split evenly instead so no share
-      // of the rebate is silently dropped.
-      const weight = elecTotal !== 0 ? elecSubtotals[i] / elecTotal : 1 / bills.length;
-      // Last bill takes the rounding remainder so the per-bill amounts always sum exactly to
-      // rebateTotal (rather than each independently-rounded share drifting a cent off).
-      const isLast = i === bills.length - 1;
-      const allocated = isLast
-        ? calc.round2(rebateTotal - bills.slice(0, i).reduce((s, _, j) => s + calc.round2(rebateTotal * (elecTotal !== 0 ? elecSubtotals[j] / elecTotal : 1 / bills.length)), 0))
-        : calc.round2(rebateTotal * weight);
-      run(db, `INSERT INTO bill_line_items (bill_id, meter_id, utility_type, category, description, quantity, rate, amount)
-        VALUES (?,?,?,?,?,?,?,?)`,
-        [bill.id, null, 'electricity', 'solar_rebate', `Solar Rebate (${Math.round(share * 100)}% of solar-sourced energy)`, null, null, allocated]);
+      const allocated = allocations[i];
+      if (allocated) {
+        run(db, `INSERT INTO bill_line_items (bill_id, meter_id, utility_type, category, description, quantity, rate, amount)
+          VALUES (?,?,?,?,?,?,?,?)`,
+          [bill.id, null, 'electricity', 'solar_rebate', `Solar Rebate (${Math.round(share * 100)}% of solar-sourced energy)`, null, null, allocated]);
+      }
       const lineItems = all(db, 'SELECT amount FROM bill_line_items WHERE bill_id=?', [bill.id]);
       const subtotal = calc.round2(lineItems.reduce((s, li) => s + li.amount, 0));
       const vatAmount = calc.round2(subtotal * bill.vat_rate);
