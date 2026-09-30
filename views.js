@@ -1210,13 +1210,13 @@ function siteTariffEditPage({ user, tariff, items, error }) {
   const t = tariff || {};
   const factorInput = (key) => `
     <div><label class="text-xs text-slate-500">${esc(FACTOR_LABELS[key])} factor</label>
-      <input name="${key}_factor" type="number" step="0.0001" value="${esc(t[`${key}_factor`] != null ? t[`${key}_factor`] : 1)}" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/></div>`;
+      <input name="${key}_factor" type="number" step="any" value="${esc(t[`${key}_factor`] != null ? t[`${key}_factor`] : 1)}" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/></div>`;
   const itemRow = (it) => `
     <tr class="border-t">
       <td class="px-3 py-1.5 text-sm">${esc(it.label)}</td>
       <td class="px-3 py-1.5 text-sm text-slate-500">${esc(it.unit)}</td>
       <td class="px-3 py-1.5 w-32">
-        <input name="rate__${it.item_key}" type="number" step="0.0001" value="${esc(it.rate)}" class="w-full border rounded px-2 py-1.5 text-sm" required/>
+        <input name="rate__${it.item_key}" type="number" step="any" value="${esc(it.rate)}" class="w-full border rounded px-2 py-1.5 text-sm" required/>
       </td>
     </tr>`;
   const body = `
@@ -1279,7 +1279,7 @@ function siteTariffBuilderPage({ user, items = [], tariffName = '', effectiveFro
     <td class="px-2 py-1.5 w-24"><input name="unit__${id}" value="${esc(it.unit || '')}" placeholder="R/kWh" class="w-full border rounded px-2 py-1 text-sm"/></td>
     <td class="px-2 py-1.5 w-28"><select name="section__${id}" class="w-full border rounded px-2 py-1 text-sm">${sectionOptions(it.section || 'electricity')}</select></td>
     <td class="px-2 py-1.5 w-28"><select name="factor_type__${id}" class="w-full border rounded px-2 py-1 text-sm">${factorOptions(it.factor_type || 'none')}</select></td>
-    <td class="px-2 py-1.5 w-24"><input name="rate__${id}" type="number" step="0.0001" value="${it.rate != null ? esc(it.rate) : ''}" class="w-full border rounded px-2 py-1 text-sm"/></td>
+    <td class="px-2 py-1.5 w-24"><input name="rate__${id}" type="number" step="any" value="${it.rate != null ? esc(it.rate) : ''}" class="w-full border rounded px-2 py-1 text-sm"/></td>
     <td class="px-2 py-1.5 text-center"><input name="fixed_charge__${id}" type="checkbox" ${it.fixed_reading != null ? 'checked' : ''}/></td>
     <td class="px-2 py-1.5 text-center"><input name="has_comment__${id}" type="checkbox" ${it.has_comment ? 'checked' : ''}/></td>
     <td class="px-2 py-1.5 text-center"><button type="button" onclick="this.closest('tr').remove()" class="text-red-600 hover:underline text-xs">Remove</button></td>
@@ -1333,7 +1333,7 @@ function siteTariffBuilderPage({ user, items = [], tariffName = '', effectiveFro
           '<td class="px-2 py-1.5 w-24"><input name="unit__' + id + '" placeholder="R/kWh" class="w-full border rounded px-2 py-1 text-sm"/></td>' +
           '<td class="px-2 py-1.5 w-28"><select name="section__' + id + '" class="w-full border rounded px-2 py-1 text-sm">' + sectionSel + '</select></td>' +
           '<td class="px-2 py-1.5 w-28"><select name="factor_type__' + id + '" class="w-full border rounded px-2 py-1 text-sm">' + factorSel + '</select></td>' +
-          '<td class="px-2 py-1.5 w-24"><input name="rate__' + id + '" type="number" step="0.0001" class="w-full border rounded px-2 py-1 text-sm"/></td>' +
+          '<td class="px-2 py-1.5 w-24"><input name="rate__' + id + '" type="number" step="any" class="w-full border rounded px-2 py-1 text-sm"/></td>' +
           '<td class="px-2 py-1.5 text-center"><input name="fixed_charge__' + id + '" type="checkbox"/></td>' +
           '<td class="px-2 py-1.5 text-center"><input name="has_comment__' + id + '" type="checkbox"/></td>' +
           '<td class="px-2 py-1.5 text-center"><button type="button" onclick="this.closest(\\'tr\\').remove()" class="text-red-600 hover:underline text-xs">Remove</button></td>' +
@@ -1407,7 +1407,13 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
   // unchecked. It only starts checked when a slip was explicitly saved with the factor on
   // (apply_correction_factor === 1) - i.e. the client ticked it themselves for that one month.
   const applyFactorOn = s.apply_correction_factor === 1 || s.apply_correction_factor === true;
-  const rateInput = (name, value, step = '0.01') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
+  // step="any" (not a fixed decimal step) - rates on this app's tariffs go to 4 decimal places
+  // (e.g. 3.0949 R/kWh), but this input used to default to step="0.01", so the browser's native
+  // number-input validation rejected any rate that wasn't a multiple of 0.01, with a "nearest
+  // valid values" error - caught 2026-09-30 trying to change A-Shack's Solar Energy Charge rate to
+  // match the low-season Energy rate (3.0949) for a season change. "any" disables step validation
+  // entirely rather than just widening it, so this can't recur at a finer precision either.
+  const rateInput = (name, value, step = 'any') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
 
   // items (site_tariff_items/municipal_tariff_items rows, already sort_order'd) IS the form's
   // line-item list, whatever shape this tariff happens to be on - nothing here is hardcoded.

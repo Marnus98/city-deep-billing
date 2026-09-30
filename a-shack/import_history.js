@@ -54,6 +54,14 @@ const RATES_2026_27_HIGH = {
   fixed_charge: 100.23, capacity_charge: 13032, energy_high: 3.7982, energy_low: 3.0949,
   solar_charge: 3.7982, water: 0, sewer: 0,
 };
+// Sep 2026 onward: same 2026/27 tariff year base rates as above, but Low Season became active again
+// (confirmed on the client's own September workbook - the solar meter's own row is literally
+// labelled "Low Season Energy Charge" there, at the same 3.0949 rate as the main incomer's Low
+// Season line) - solar's rate flips back to match, same mechanic as the Jun 2026 High Season flip.
+const RATES_2026_27_LOW = {
+  fixed_charge: 100.23, capacity_charge: 13032, energy_high: 3.7982, energy_low: 3.0949,
+  solar_charge: 3.0949, water: 0, sewer: 0,
+};
 
 // label, start_date, end_date, effective_from, rates, energyHighReading, energyLowReading, solarReading
 const MONTHS = [
@@ -65,6 +73,11 @@ const MONTHS = [
   ['2026-06', '2026-06-01', '2026-07-01', '2026-06-01', RATES_2025_26_HIGH, 5075.99999999999, 0, 3165.71],
   ['2026-07', '2026-07-01', '2026-08-01', '2026-07-01', RATES_2026_27_HIGH, 4689.688, 0, 4316.08],
   ['2026-08', '2026-08-01', '2026-09-01', '2026-07-01', RATES_2026_27_HIGH, 3686.908, 0, 3348.68],
+  // Partial month (2026-09-01 - 2026-09-24 only, not a full calendar month) - the client is closing
+  // out A-Shack's books under this ownership as the building changes hands; see the client's
+  // 2026-09-30 request for how future (post-handover) billing should be kept separate from this
+  // history once it resumes.
+  ['2026-09', '2026-09-01', '2026-09-24', '2026-09-01', RATES_2026_27_LOW, 0, 3362.2, 3139.58],
 ];
 
 function main(dbFile = 'a-shack.db') {
@@ -80,7 +93,7 @@ function main(dbFile = 'a-shack.db') {
     });
     if (slipId) created++;
   }
-  if (created) console.log(`A-Shack history import: ${created} month(s) added (Jan 2026 - Aug 2026).`);
+  if (created) console.log(`A-Shack history import: ${created} month(s) added (Jan 2026 - Sep 2026).`);
   return db;
 }
 
