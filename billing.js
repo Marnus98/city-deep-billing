@@ -93,7 +93,7 @@ function generateBillsForPeriod(db, periodId) {
           kvaAllocationPct: a.allocation_pct_kva != null ? a.allocation_pct_kva : a.allocation_pct,
           tariffCode: a.tariff_code, serviceChargeFlag: !!a.service_charge_flag, sign: a.sign,
           carriesNetworkLevy: !!a.carries_network_levy, isCommonArea: !!a.is_common_area, energyOnly: !!a.energy_only,
-          capacityChargeOverride: a.capacity_charge_override,
+          capacityChargeOverride: a.capacity_charge_override, networkLevyOverride: a.network_levy_override,
           tariff1, tariff2, yChargeEnabled,
         });
         for (const li of result.lineItems) lineItems.push({ ...li, meter_id: a.meter_id, utility_type: 'electricity' });

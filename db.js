@@ -83,6 +83,7 @@ function migrate(db) {
     service_charge_flag INTEGER NOT NULL DEFAULT 1,
     sign INTEGER NOT NULL DEFAULT 1, -- -1 for solar export / credit meters
     allocation_pct REAL NOT NULL DEFAULT 1, -- fraction of this meter's consumption billed to this tenant
+    network_levy_override REAL, -- per-meter Network Levy amount when it differs from the tariff-wide rate (see calc.js/seed.js's detectNetworkLevyOverride - first needed Sep 2026, when the source workbook carried two different levy amounts across tenants in the same month)
     carries_network_levy INTEGER NOT NULL DEFAULT 0,
     is_common_area INTEGER NOT NULL DEFAULT 0,
     energy_only INTEGER NOT NULL DEFAULT 0, -- manual-adjustment rows where fixed charges/surcharges were hand-zeroed in the source (see calc.js)
@@ -485,6 +486,7 @@ function migrate(db) {
   if (!cols.includes('allocation_pct_kvarh')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kvarh REAL');
   if (!cols.includes('allocation_pct_kva')) db.exec('ALTER TABLE meter_assignments ADD COLUMN allocation_pct_kva REAL');
   if (!cols.includes('capacity_charge_override')) db.exec('ALTER TABLE meter_assignments ADD COLUMN capacity_charge_override REAL');
+  if (!cols.includes('network_levy_override')) db.exec('ALTER TABLE meter_assignments ADD COLUMN network_levy_override REAL');
 
   const mrCols = db.prepare("PRAGMA table_info(meter_readings)").all().map((c) => c.name);
   if (!mrCols.includes('photo_path')) db.exec('ALTER TABLE meter_readings ADD COLUMN photo_path TEXT');

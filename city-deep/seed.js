@@ -267,7 +267,7 @@ function getOrCreateMeter(serial, utilityType, role, location, unitScale) {
   return m;
 }
 
-function upsertAssignment({ meterId, tenantId, tariffCode, serviceFlag, sign, allocationPct, kvarhAllocationPct, kvaAllocationPct, capacityChargeOverride, carriesLevy, isCommonArea, energyOnly, periodStart }) {
+function upsertAssignment({ meterId, tenantId, tariffCode, serviceFlag, sign, allocationPct, kvarhAllocationPct, kvaAllocationPct, capacityChargeOverride, networkLevyOverride, carriesLevy, isCommonArea, energyOnly, periodStart }) {
   const open = get(
     'SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL ORDER BY id DESC LIMIT 1',
     [meterId]
@@ -277,14 +277,15 @@ function upsertAssignment({ meterId, tenantId, tariffCode, serviceFlag, sign, al
     open.service_charge_flag === (serviceFlag ? 1 : 0) && open.sign === sign &&
     near(open.allocation_pct, allocationPct) && near(open.allocation_pct_kvarh, kvarhAllocationPct) &&
     near(open.allocation_pct_kva, kvaAllocationPct) && near(open.capacity_charge_override, capacityChargeOverride) &&
+    near(open.network_levy_override, networkLevyOverride) &&
     open.carries_network_levy === (carriesLevy ? 1 : 0) && open.energy_only === (energyOnly ? 1 : 0);
   if (same) return open;
   if (open) run('UPDATE meter_assignments SET effective_to=? WHERE id=?', [periodStart, open.id]);
   run(`INSERT INTO meter_assignments
-      (meter_id, tenant_id, tariff_code, service_charge_flag, sign, allocation_pct, allocation_pct_kvarh, allocation_pct_kva, capacity_charge_override, carries_network_levy, is_common_area, energy_only, effective_from)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      (meter_id, tenant_id, tariff_code, service_charge_flag, sign, allocation_pct, allocation_pct_kvarh, allocation_pct_kva, capacity_charge_override, network_levy_override, carries_network_levy, is_common_area, energy_only, effective_from)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [meterId, tenantId, tariffCode, serviceFlag ? 1 : 0, sign, allocationPct, kvarhAllocationPct ?? null, kvaAllocationPct ?? null,
-     capacityChargeOverride ?? null, carriesLevy ? 1 : 0, isCommonArea ? 1 : 0, energyOnly ? 1 : 0, periodStart]);
+     capacityChargeOverride ?? null, networkLevyOverride ?? null, carriesLevy ? 1 : 0, isCommonArea ? 1 : 0, energyOnly ? 1 : 0, periodStart]);
   return get('SELECT * FROM meter_assignments WHERE meter_id=? AND effective_to IS NULL', [meterId]);
 }
 
@@ -304,6 +305,23 @@ function detectCapacityChargeOverride(row, tariff2) {
   const actual = row.capacity_charge || 0;
   if (Math.abs(actual - standard) < 0.5) return null;
   return row.sign ? actual / row.sign : actual;
+}
+
+// Detects a fixed Network Levy that doesn't match the standard tariff-wide rate (tariff2.networkLevy,
+// read from the Tariff sheet's B25 cell - see buildTariffParams). Every month through Aug 2026 this
+// was a single flat figure applied uniformly to every tenant that carries the levy, so the raw row's
+// own network_levy value always equalled the tariff-wide one. Sep 2026 broke that assumption: the
+// workbook carries the levy at two different rates that month (R2,332.96 for most tenants, R853.72
+// for a subset - Network Dynamics, Twinpouch Unit 4/5, ATC, Sanskar Unit 3, Express Chef, one of
+// Kimmo's meters), confirmed against the client's own screenshot 2026-09-30 (Twinpouch Unit 5's own
+// bill should read R853.75, not the tariff-wide R2,332.96 the app was applying to every meter).
+// Mirrors detectCapacityChargeOverride's pattern: per-meter override stored on the assignment,
+// falling back to the standard tariff-wide rate whenever the raw figure agrees with it (i.e. every
+// month before Sep 2026 produces no overrides at all, so nothing changes for prior periods).
+function detectNetworkLevyOverride(row, tariff2) {
+  if (!row.network_levy || tariff2.networkLevy == null) return null;
+  if (Math.abs(row.network_levy - tariff2.networkLevy) < 0.5) return null;
+  return row.network_levy;
 }
 
 function allocationFromRow(rawConsumption, billable, commonAreaPct) {
@@ -350,10 +368,11 @@ function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tari
 
     const energyOnly = detectEnergyOnly(row);
     const capacityChargeOverride = detectCapacityChargeOverride(row, tariffParams.tariff2);
+    const networkLevyOverride = detectNetworkLevyOverride(row, tariffParams.tariff2);
     const assignment = upsertAssignment({
       meterId: meter.id, tenantId: tenant.id, tariffCode: row.tariff_code, serviceFlag: row.service_flag,
       sign: row.sign, allocationPct, kvarhAllocationPct: kvarhAlloc, kvaAllocationPct: kvaAlloc, capacityChargeOverride,
-      carriesLevy: !!row.network_levy, isCommonArea: row.common_area_pct != null,
+      networkLevyOverride, carriesLevy: !!row.network_levy, isCommonArea: row.common_area_pct != null,
       energyOnly, periodStart: billingPeriod.start_date,
     });
 
@@ -362,6 +381,7 @@ function generateBill(tenant, billingPeriod, elecMeterRows, waterMeterRows, tari
       allocationPct, kvarhAllocationPct: kvarhAlloc, kvaAllocationPct: kvaAlloc,
       tariffCode: row.tariff_code, serviceChargeFlag: !!row.service_flag, sign: row.sign,
       carriesNetworkLevy: !!row.network_levy, isCommonArea: row.common_area_pct != null, energyOnly, capacityChargeOverride,
+      networkLevyOverride,
       tariff1: tariffParams.tariff1, tariff2: tariffParams.tariff2, yChargeEnabled: precinctYEnabled,
     });
     for (const li of result.lineItems) lineItems.push({ ...li, meter_id: meter.id, utility_type: 'electricity' });

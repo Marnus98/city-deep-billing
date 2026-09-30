@@ -16,7 +16,7 @@ function calcElectricityMeterLine({
   rawConsumptionKwh, rawKvarh, rawKva,
   allocationPct, kvarhAllocationPct, kvaAllocationPct,
   tariffCode, serviceChargeFlag, sign,
-  carriesNetworkLevy, isCommonArea, energyOnly, capacityChargeOverride,
+  carriesNetworkLevy, isCommonArea, energyOnly, capacityChargeOverride, networkLevyOverride,
   tariff1, tariff2, yChargeEnabled
 }) {
   // 'energyOnly' reproduces a handful of manually-adjusted rows in the source workbook (e.g. the
@@ -71,7 +71,11 @@ function calcElectricityMeterLine({
   // Park common-area rows) even though the formula is present and live on every other row.
   if (isCommonArea) { networkSurcharge = 0; }
   if (carriesNetworkLevy) {
-    networkLevy = tariff2.networkLevy;
+    // Confirmed Sep 2026: the source workbook can carry more than one Network Levy amount in the
+    // same month (a subset of tenants at a different rate than the rest of the property, not a
+    // uniform tariff-wide figure like every prior month) - see seed.js's detectNetworkLevyOverride
+    // for how a per-meter override is detected and stored, same pattern as capacityChargeOverride.
+    networkLevy = networkLevyOverride != null ? networkLevyOverride : tariff2.networkLevy;
   }
 
   if (serviceCharge) items.push({ category: 'service_charge', description: isCommonArea ? 'Service charge (common area)' : 'Service charge', quantity: null, rate: null, amount: round2(serviceCharge) });
