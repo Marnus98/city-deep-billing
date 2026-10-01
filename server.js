@@ -968,6 +968,20 @@ route('GET', '/site-billing/:id/edit', async (req, res, params) => {
 // municipality's own already-reconciled figure from the real invoice, not something to recompute.
 const SITE_BILLING_AUTO_COMPUTED_KEYS = ['network_surcharge'];
 const SITE_BILLING_AUTO_COMPUTED_SOURCE_KEYS = ['peak_high', 'peak_low', 'standard_high', 'standard_low', 'offpeak_high', 'offpeak_low'];
+// Which of the tariff's 4 correction factors grosses up each source key above before it's summed
+// into Network Surcharge's reading - mirrors each key's own factor_type in CITY_POWER_LV_TOU
+// (flat_site_tariff_shapes.js). Network Surcharge itself carries factor_type: null (it isn't a
+// kWh/kVA quantity the site-vs-municipal factor was independently calibrated against - it's a
+// derived total of OTHER rows), so calc_flat_site.js never factors its reading a second time; this
+// map is what makes its reading reflect the grossed-up TOU total when the correction factor is on,
+// instead of silently staying at the raw total while Peak/Standard/Off-Peak's own costs increase -
+// caught by the client 2026-10-01 asking "if I apply the correction factor, shouldn't the Network
+// Surcharge kWh increase too?".
+const SITE_BILLING_AUTO_COMPUTED_SOURCE_FACTOR = {
+  peak_high: 'peak_factor', peak_low: 'peak_factor',
+  standard_high: 'standard_factor', standard_low: 'standard_factor',
+  offpeak_high: 'offpeak_factor', offpeak_low: 'offpeak_factor',
+};
 
 async function saveSiteBillingSlip(req, res, existingId) {
   const user = requireLogin(req, res); if (!user) return;
@@ -989,18 +1003,27 @@ async function saveSiteBillingSlip(req, res, existingId) {
       error: 'Label, start date and end date are all required.', autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS,
     }));
   }
+  // Checkboxes only appear in the POST body at all when checked ("apply_correction_factor=1"); an
+  // unchecked box simply isn't sent, so its absence here means "off", not "unset". Computed before
+  // the auto-computed-item block below, since it decides whether that sum gets grossed up too.
+  const applyCorrectionFactor = body.apply_correction_factor ? 1 : 0;
   // Overwrite whatever was submitted for an auto-computed item (network_surcharge) with the live
   // sum of this same submission's TOU readings - the form field is readonly/JS-computed already,
   // but re-deriving it here server-side means a disabled/bypassed script can never save a stale or
   // tampered number. See views.js's AUTO_COMPUTED_SUM_SOURCE_KEYS comment for the full reasoning.
+  // Each source reading is grossed up by its own correction factor first when the slip's factor
+  // switch is on (see SITE_BILLING_AUTO_COMPUTED_SOURCE_FACTOR above) - otherwise Network
+  // Surcharge's basis would silently stay at the raw total while Peak/Standard/Off-Peak's own costs
+  // increase around it.
   if (template.some((it) => SITE_BILLING_AUTO_COMPUTED_KEYS.includes(it.item_key))) {
-    const touSum = SITE_BILLING_AUTO_COMPUTED_SOURCE_KEYS.reduce((s, k) => s + (Number(body[`reading__${k}`]) || 0), 0);
+    const touSum = SITE_BILLING_AUTO_COMPUTED_SOURCE_KEYS.reduce((s, k) => {
+      const raw = Number(body[`reading__${k}`]) || 0;
+      const factor = applyCorrectionFactor ? (Number(body[SITE_BILLING_AUTO_COMPUTED_SOURCE_FACTOR[k]]) || 1) : 1;
+      return s + raw * factor;
+    }, 0);
     for (const key of SITE_BILLING_AUTO_COMPUTED_KEYS) body[`reading__${key}`] = String(touSum);
   }
   const tariffId = findOrCreateSiteTariff(templateTariff, template, body, startDate);
-  // Checkboxes only appear in the POST body at all when checked ("apply_correction_factor=1"); an
-  // unchecked box simply isn't sent, so its absence here means "off", not "unset".
-  const applyCorrectionFactor = body.apply_correction_factor ? 1 : 0;
 
   let slipId = existingId;
   if (existingId) {

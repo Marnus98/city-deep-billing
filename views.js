@@ -1403,6 +1403,15 @@ function siteBillingListPage({ user, rows, basePath = '/site-billing', pageTitle
 // against the real municipal statement) - so relying on someone to hand-add six numbers every month
 // is exactly what silently dropped this line to R0 for Jul/Aug 2026 before this fix.
 const AUTO_COMPUTED_SUM_SOURCE_KEYS = ['peak_high', 'peak_low', 'standard_high', 'standard_low', 'offpeak_high', 'offpeak_low'];
+// Mirrors server.js's SITE_BILLING_AUTO_COMPUTED_SOURCE_FACTOR - which correction-factor input each
+// source key is grossed up by in the live in-browser preview below, so what the client sees while
+// filling in the form already matches what saveSiteBillingSlip() will compute and store once
+// submitted, instead of only the saved figure reflecting the correction factor.
+const AUTO_COMPUTED_SOURCE_FACTOR = {
+  peak_high: 'peak_factor', peak_low: 'peak_factor',
+  standard_high: 'standard_factor', standard_low: 'standard_factor',
+  offpeak_high: 'offpeak_factor', offpeak_low: 'offpeak_factor',
+};
 
 function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, error, basePath = '/site-billing', pageTitle = 'billing slip', backLabel = 'Billing Slips', helpText, autoComputedKeys = [] }) {
   const isEdit = !!(slip && slip.id);
@@ -1519,14 +1528,32 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
   ${autoComputedKeys.length ? `<script>
     (function() {
       var sourceKeys = ${JSON.stringify(AUTO_COMPUTED_SUM_SOURCE_KEYS)};
+      var sourceFactorName = ${JSON.stringify(AUTO_COMPUTED_SOURCE_FACTOR)};
       var targetKeys = ${JSON.stringify(autoComputedKeys)};
       var sources = sourceKeys.map(function(k) { return document.querySelector('input[name="reading__' + k + '"]'); }).filter(Boolean);
       var targets = targetKeys.map(function(k) { return document.querySelector('input[name="reading__' + k + '"]'); }).filter(Boolean);
+      var factorInputs = {};
+      ['peak_factor', 'standard_factor', 'offpeak_factor'].forEach(function(n) { factorInputs[n] = document.querySelector('input[name="' + n + '"]'); });
+      var applyFactorCheckbox = document.querySelector('input[name="apply_correction_factor"]');
+      // Mirrors server.js's saveSiteBillingSlip(): when the correction-factor switch is on, each
+      // source reading is grossed up by its own factor before being summed, so what's shown here
+      // while filling in the form already matches what gets saved - see
+      // SITE_BILLING_AUTO_COMPUTED_SOURCE_FACTOR's comment there for why this exists (the Network
+      // Surcharge basis should increase along with Peak/Standard/Off-Peak's own costs, not silently
+      // stay at the raw pre-factor total).
       function recompute() {
-        var total = sources.reduce(function(sum, el) { return sum + (parseFloat(el.value) || 0); }, 0);
+        var applyFactor = !!(applyFactorCheckbox && applyFactorCheckbox.checked);
+        var total = sourceKeys.reduce(function(sum, k, i) {
+          var raw = parseFloat(sources[i] && sources[i].value) || 0;
+          var factorInput = factorInputs[sourceFactorName[k]];
+          var factor = (applyFactor && factorInput) ? (parseFloat(factorInput.value) || 1) : 1;
+          return sum + raw * factor;
+        }, 0);
         targets.forEach(function(el) { el.value = total; });
       }
       sources.forEach(function(el) { el.addEventListener('input', recompute); });
+      Object.keys(factorInputs).forEach(function(n) { if (factorInputs[n]) factorInputs[n].addEventListener('input', recompute); });
+      if (applyFactorCheckbox) applyFactorCheckbox.addEventListener('change', recompute);
       recompute();
     })();
   </script>` : ''}`;
