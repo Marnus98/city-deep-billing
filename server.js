@@ -719,10 +719,14 @@ function findOrCreateSiteTariff(templateTariff, template, body, effectiveFrom) {
     [templateTariff.tariff_name || null, effectiveFrom, ...FACTOR_COLS.map((c) => newFactors[c])]);
   const tariffId = get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
   template.forEach((it, i) => {
-    run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, tier_limit, tier2_rate)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    // multiplier (e.g. the Loper Ave "Ekurhuleni Tariff B" sites' Capacity Charge x3 - see db.js/
+    // calc_flat_site.js) isn't an editable form field here, same as factor_type/fixed_reading above -
+    // always carried forward unchanged from the template tariff's own item row, so editing a rate on
+    // this form can never silently reset it back to the column default.
+    run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, tier_limit, tier2_rate, multiplier)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [tariffId, i, it.section, it.item_key, it.label, it.unit, newRates[it.item_key], it.factor_type, it.fixed_reading, it.has_comment ? 1 : 0,
-       newTierLimits[it.item_key], newTier2Rates[it.item_key]]);
+       newTierLimits[it.item_key], newTier2Rates[it.item_key], it.multiplier ?? 1]);
   });
   return tariffId;
 }
@@ -948,7 +952,8 @@ route('GET', '/site-billing/new', async (req, res) => {
   if (!latestTariff) return send(res, 400, 'This property has no tariff yet - it needs an initial seed/import script before slips can be added.');
   const latestSlip = get('SELECT * FROM site_billing_slips ORDER BY start_date DESC LIMIT 1');
   const items = getTariffItems(latestTariff.id);
-  send(res, 200, views.siteBillingFormPage({ user, tariff: latestTariff, items, readings: {}, slip: null, latestSlip, autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS }));
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  send(res, 200, views.siteBillingFormPage({ user, tariff: latestTariff, items, readings: {}, slip: null, latestSlip, autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS, linkedReadingKeys: (currentProp && currentProp.linkedReadings) || {} }));
 });
 
 route('GET', '/site-billing/:id/edit', async (req, res, params) => {
@@ -959,7 +964,8 @@ route('GET', '/site-billing/:id/edit', async (req, res, params) => {
   const tariff = get('SELECT * FROM site_tariffs WHERE id=?', [slip.tariff_id]);
   const items = getTariffItems(slip.tariff_id);
   const readings = getSlipReadings(slip.id);
-  send(res, 200, views.siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip: null, autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS }));
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  send(res, 200, views.siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip: null, autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS, linkedReadingKeys: (currentProp && currentProp.linkedReadings) || {} }));
 });
 
 // See views.js's own comment above AUTO_COMPUTED_SUM_SOURCE_KEYS for the full reasoning. Only ever
@@ -997,10 +1003,12 @@ async function saveSiteBillingSlip(req, res, existingId) {
     : get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
   const templateTariff = get('SELECT * FROM site_tariffs WHERE id=?', [templateTariffId]);
   const template = getTariffItems(templateTariffId);
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  const linkedReadingKeys = (currentProp && currentProp.linkedReadings) || {};
   if (!label || !startDate || !endDate) {
     return send(res, 400, views.siteBillingFormPage({
       user, tariff: { ...body }, items: template, readings: {}, slip: { ...body, id: existingId }, latestSlip: null,
-      error: 'Label, start date and end date are all required.', autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS,
+      error: 'Label, start date and end date are all required.', autoComputedKeys: SITE_BILLING_AUTO_COMPUTED_KEYS, linkedReadingKeys,
     }));
   }
   // Checkboxes only appear in the POST body at all when checked ("apply_correction_factor=1"); an
@@ -1022,6 +1030,16 @@ async function saveSiteBillingSlip(req, res, existingId) {
       return s + raw * factor;
     }, 0);
     for (const key of SITE_BILLING_AUTO_COMPUTED_KEYS) body[`reading__${key}`] = String(touSum);
+  }
+  // Linked readings (e.g. the 5 "Loper Ave" Ekurhuleni Tariff B sites' Sewer Consumption always
+  // equalling Water Consumption, client-confirmed 2026-10-01: sewage can't be separately metered) -
+  // same "re-derive server-side, never trust the readonly/JS-filled form field alone" reasoning as
+  // the auto-computed block above. Only applies when BOTH keys exist on this site's own template, so
+  // this is a no-op for every property without a linkedReadings entry in properties.js.
+  for (const [targetKey, sourceKey] of Object.entries(linkedReadingKeys)) {
+    if (template.some((it) => it.item_key === targetKey) && template.some((it) => it.item_key === sourceKey)) {
+      body[`reading__${targetKey}`] = body[`reading__${sourceKey}`];
+    }
   }
   const tariffId = findOrCreateSiteTariff(templateTariff, template, body, startDate);
 

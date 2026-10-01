@@ -355,7 +355,14 @@ function migrate(db) {
       -- 'tier2_rate' - see calc_flat_site.js. Replaces the old convention of manually back-computing
       -- a single blended "effective" R/kL rate each month to approximate this same stepped formula
       -- (confirmed to produce byte-identical historical totals - see the 2026-10-01 AutoZone change).
-    tier2_rate REAL -- the rate for consumption above tier_limit. NULL unless tier_limit is also set.
+    tier2_rate REAL, -- the rate for consumption above tier_limit. NULL unless tier_limit is also set.
+    multiplier REAL NOT NULL DEFAULT 1 -- scales cost beyond plain reading*rate (default 1 = no-op).
+      -- Added 2026-10-01 for the Loper Ave "Ekurhuleni Tariff B" sites' Capacity Charge line, whose
+      -- Cost cell on the real municipal-template statement always implies a reading of exactly 3x the
+      -- Reading column actually shown (a 3-phase billing convention - see
+      -- flat_site_tariff_shapes.js's EKURHULENI_TARIFF_B comment) - reading and rate stay exactly as
+      -- printed on the statement, this just carries the x3 into the cost calc (calc_flat_site.js)
+      -- instead of silently under-billing by a factor of 3 the way a brand-new slip did before this.
   );
 
   -- site_slip_readings: one row per line item *per slip* - the actual meter reading (or fixed-row
@@ -517,6 +524,7 @@ function migrate(db) {
   const stiCols = db.prepare("PRAGMA table_info(site_tariff_items)").all().map((c) => c.name);
   if (!stiCols.includes('tier_limit')) db.exec('ALTER TABLE site_tariff_items ADD COLUMN tier_limit REAL');
   if (!stiCols.includes('tier2_rate')) db.exec('ALTER TABLE site_tariff_items ADD COLUMN tier2_rate REAL');
+  if (!stiCols.includes('multiplier')) db.exec('ALTER TABLE site_tariff_items ADD COLUMN multiplier REAL NOT NULL DEFAULT 1');
 
   // SQLite can't ALTER a CHECK constraint in place - site_tariff_items/municipal_tariff_items'
   // factor_type CHECK predates 'kwh' (added 2026-10-01, see Loper Road's single-kWh-factor shape
@@ -544,7 +552,8 @@ function migrate(db) {
       fixed_reading REAL,
       has_comment INTEGER NOT NULL DEFAULT 0,
       tier_limit REAL,
-      tier2_rate REAL
+      tier2_rate REAL,
+      multiplier REAL NOT NULL DEFAULT 1
     )`,
     municipal_tariff_items: `CREATE TABLE municipal_tariff_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

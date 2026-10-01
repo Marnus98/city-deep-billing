@@ -323,7 +323,14 @@ const EKURHULENI_TARIFF_B = [
   { key: 'basic_charge', label: 'Basic Charge', unit: 'R/A', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
   { key: 'energy_high', label: 'Energy Consumption - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'energy_low', label: 'Energy Consumption - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
-  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/A', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity' },
+  // multiplier: 3 - see the 2026-08-20 note above and db.js's column comment: the real statement's
+  // own Cost cell always implies Reading x3 (3-phase convention), even though Reading/Rate both show
+  // the plain per-phase Amp figure - this is what makes a brand-new slip's Cost actually match the
+  // client's own statement instead of silently under-billing by a factor of 3 (caught 2026-10-01 on
+  // ADH Machine Tool's September 2026 slip, the first one entered live through this form rather than
+  // back-solved from a workbook). fixedReading is left null here (set per-site instead, in each
+  // site's own import_history.js - the breaker rating differs per site) - see that comment for why.
+  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/A', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity', multiplier: 3 },
   { key: 'water', label: 'Water Consumption', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
   { key: 'water_common_area', label: 'Common Area (Water)', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
   { key: 'sewer', label: 'Sewer Consumption', unit: 'R/kL', factorType: null, fixedReading: null, hasComment: false, section: 'water' },
@@ -339,7 +346,8 @@ const EKURHULENI_TARIFF_B_SIMPLE = [
   { key: 'basic_charge', label: 'Basic Charge', unit: 'R/A', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
   { key: 'energy_high', label: 'Energy Consumption - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
   { key: 'energy_low', label: 'Energy Consumption - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
-  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/A', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity' },
+  // multiplier: 3 - see EKURHULENI_TARIFF_B's comment above (same shared-template quirk/fix).
+  { key: 'capacity_charge', label: 'Capacity Charge', unit: 'R/A', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity', multiplier: 3 },
   ...WATER_SEWER_ITEMS,
 ];
 

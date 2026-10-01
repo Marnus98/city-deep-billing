@@ -38,6 +38,15 @@ function computeSlip(tariffItems, readingsByKey, tariff, applyCorrectionFactor) 
     // month - the true tier-1/tier-2 rates and the threshold are still visible via tier_limit/
     // tier2_rate on this same object for anything that needs the real structure (e.g. the Tariff tab).
     const isTiered = it.tier_limit != null && it.tier2_rate != null;
+    // multiplier (default 1, never combined with tiering) - scales cost beyond plain reading*rate.
+    // Added 2026-10-01 for the Loper Ave "Ekurhuleni Tariff B" sites' Capacity Charge: the real
+    // statement's Reading/Rate columns are both exactly as printed (e.g. 80A, R28.96/A), but its Cost
+    // cell always implies a 3x multiplier (a 3-phase billing convention) - see db.js's column comment
+    // and flat_site_tariff_shapes.js's EKURHULENI_TARIFF_B. Deliberately NOT folded into the displayed
+    // rate/reading (unlike the tiered effectiveRate below) - the client's own statement shows the raw
+    // Amp rating and raw per-Amp rate too, with the x3 only visible in the Cost column, so this
+    // mirrors that rather than inventing a "R86.88/A" rate nobody's tariff schedule actually quotes.
+    const multiplier = Number(it.multiplier) || 1;
     let cost, effectiveRate;
     if (isTiered) {
       const limit = Number(it.tier_limit);
@@ -45,13 +54,14 @@ function computeSlip(tariffItems, readingsByKey, tariff, applyCorrectionFactor) 
       cost = round2(adjustedReading <= limit ? adjustedReading * rate : limit * rate + (adjustedReading - limit) * tier2);
       effectiveRate = adjustedReading > 0 ? cost / adjustedReading : rate;
     } else {
-      cost = round2(adjustedReading * rate);
+      cost = round2(adjustedReading * rate * multiplier);
       effectiveRate = rate;
     }
     return {
       key: it.item_key, label: it.label, unit: it.unit, rate: isTiered ? effectiveRate : rate, reading, factor, adjustedReading, cost,
       comment: it.has_comment ? ((r && r.comment) || null) : null, section: it.section, factor_type: it.factor_type,
       vatExempt: !!it.vat_exempt, isTiered, tierLimit: it.tier_limit, tier1Rate: isTiered ? rate : null, tier2Rate: it.tier2_rate,
+      multiplier,
     };
   });
   // 'municipal' is a third bucket only municipal account statements use (Property Rates, Refuse -

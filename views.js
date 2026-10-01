@@ -1425,7 +1425,7 @@ const AUTO_COMPUTED_SOURCE_FACTOR = {
   offpeak_high: 'offpeak_factor', offpeak_low: 'offpeak_factor',
 };
 
-function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, error, basePath = '/site-billing', pageTitle = 'billing slip', backLabel = 'Billing Slips', helpText, autoComputedKeys = [] }) {
+function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, error, basePath = '/site-billing', pageTitle = 'billing slip', backLabel = 'Billing Slips', helpText, autoComputedKeys = [], linkedReadingKeys = {} }) {
   const isEdit = !!(slip && slip.id);
   const t = tariff || {};
   const s = slip || {};
@@ -1449,20 +1449,31 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
   // entirely rather than just widening it, so this can't recur at a finer precision either.
   const rateInput = (name, value, step = 'any') => `<input name="${name}" type="number" step="${step}" value="${value != null ? esc(value) : ''}" class="w-full border rounded px-2 py-1.5 text-sm" required/>`;
 
+  // linkedReadingKeys (e.g. { sewer: 'water' } for the 5 "Loper Ave" Ekurhuleni Tariff B sites,
+  // client-confirmed 2026-10-01: sewage can't be separately metered, so Sewer Consumption is always
+  // exactly the Water Consumption reading) - only treated as active when BOTH the target and source
+  // item_key actually exist on this tariff's own items, so a shared `linkedReadingKeys` object never
+  // breaks a differently-shaped site that happens to reuse one of the same keys.
+  const itemKeySet = new Set((items || []).map((it) => it.item_key));
+  const activeLinkedKeys = {};
+  for (const [target, source] of Object.entries(linkedReadingKeys)) {
+    if (itemKeySet.has(target) && itemKeySet.has(source)) activeLinkedKeys[target] = source;
+  }
   // items (site_tariff_items/municipal_tariff_items rows, already sort_order'd) IS the form's
   // line-item list, whatever shape this tariff happens to be on - nothing here is hardcoded.
   const rowHtml = (it) => {
     const reading = r[it.item_key] ? r[it.item_key].reading : (isEdit ? 0 : null);
     const comment = r[it.item_key] ? r[it.item_key].comment : '';
+    const isLinked = activeLinkedKeys[it.item_key] != null;
     return `
     <tr class="border-t">
-      <td class="px-3 py-1.5 text-sm">${esc(it.label)}</td>
+      <td class="px-3 py-1.5 text-sm">${esc(it.label)}${isLinked ? ' <span class="text-xs text-slate-400">(= Water)</span>' : ''}</td>
       <td class="px-3 py-1.5 w-28">${rateInput(`rate__${it.item_key}`, it.rate)}</td>
       <td class="px-3 py-1.5 text-sm text-slate-500">${esc(it.unit)}</td>
       <td class="px-3 py-1.5 w-32">${it.fixed_reading != null
         ? `<span class="text-slate-400 text-sm">${esc(it.fixed_reading)} (fixed)</span>`
-        : autoComputedKeys.includes(it.item_key)
-          ? `<input name="reading__${it.item_key}" data-auto-computed="1" type="number" step="0.01" value="${reading != null ? esc(reading) : ''}" readonly class="w-full border rounded px-2 py-1.5 text-sm bg-slate-50 text-slate-500"/>`
+        : autoComputedKeys.includes(it.item_key) || isLinked
+          ? `<input name="reading__${it.item_key}" data-auto-computed="1" data-linked-from="${isLinked ? esc(activeLinkedKeys[it.item_key]) : ''}" type="number" step="0.01" value="${reading != null ? esc(reading) : ''}" readonly class="w-full border rounded px-2 py-1.5 text-sm bg-slate-50 text-slate-500"/>`
           : `<input name="reading__${it.item_key}" type="number" step="0.01" value="${reading != null ? esc(reading) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>`}</td>
       <td class="px-3 py-1.5 w-44">${it.has_comment ? `<input name="comment__${it.item_key}" placeholder="e.g. 2026/07/15 22:00" value="${esc(comment || '')}" class="w-full border rounded px-2 py-1.5 text-sm"/>` : ''}</td>
     </tr>`;
@@ -1536,7 +1547,7 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
       </div>
     </details>
 
-    ${autoComputedKeys.length ? `<p class="text-xs text-slate-500 mb-3">Fields shown greyed-out (e.g. Network Surcharge) are calculated automatically from the Peak/Standard/Off-Peak readings above and can't be typed into directly.</p>` : ''}
+    ${(autoComputedKeys.length || Object.keys(activeLinkedKeys).length) ? `<p class="text-xs text-slate-500 mb-3">Fields shown greyed-out ${autoComputedKeys.length ? '(e.g. Network Surcharge) are calculated automatically from the Peak/Standard/Off-Peak readings above' : ''}${autoComputedKeys.length && Object.keys(activeLinkedKeys).length ? '; fields marked "(= Water)" ' : Object.keys(activeLinkedKeys).length ? '(marked "(= Water)") ' : ''}${Object.keys(activeLinkedKeys).length ? 'always match the Water Consumption reading (sewage isn\'t separately metered)' : ''} and can't be typed into directly.</p>` : ''}
     <button class="bg-slate-900 text-white rounded px-6 py-2 font-medium">Save</button>
   </form>
   ${autoComputedKeys.length ? `<script>
@@ -1569,6 +1580,24 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
       Object.keys(factorInputs).forEach(function(n) { if (factorInputs[n]) factorInputs[n].addEventListener('input', recompute); });
       if (applyFactorCheckbox) applyFactorCheckbox.addEventListener('change', recompute);
       recompute();
+    })();
+  </script>` : ''}
+  ${Object.keys(activeLinkedKeys).length ? `<script>
+    (function() {
+      // Mirrors server.js's saveSiteBillingSlip(): the Sewer (and Common Area Sewer, where it
+      // exists) reading always equals the Water reading - sewage isn't separately metered at these
+      // sites (client-confirmed 2026-10-01) - so this just keeps the greyed-out field showing what
+      // will actually be saved while the form is being filled in.
+      var links = ${JSON.stringify(activeLinkedKeys)};
+      Object.keys(links).forEach(function(targetKey) {
+        var sourceKey = links[targetKey];
+        var source = document.querySelector('input[name="reading__' + sourceKey + '"]');
+        var target = document.querySelector('input[name="reading__' + targetKey + '"]');
+        if (!source || !target) return;
+        function copy() { target.value = source.value; }
+        source.addEventListener('input', copy);
+        copy();
+      });
     })();
   </script>` : ''}`;
   return layout({ title: isEdit ? `Edit ${s.label}` : `New ${pageTitle}`, user, active: basePath, body });

@@ -125,6 +125,43 @@ function main(dbFile = 'adh-machine-tool.db') {
   });
   if (aug26SlipId) console.log('55 Loper Ave - ADH Machine Tool: August 2026 slip added.');
 
+  // September 2026 onward: client-confirmed 2026-10-01 fix for 2 real bugs caught on this site's
+  // first-ever LIVE (not back-solved-from-workbook) slip:
+  //   1. Capacity Charge's cost was calculated as plain reading x rate (R2,316.80 for 80A), when the
+  //      real Ekurhuleni Tariff B statement always bills it at reading x rate x 3 (a 3-phase
+  //      convention - see flat_site_tariff_shapes.js's EKURHULENI_TARIFF_B comment and db.js's
+  //      multiplier column) - R6,950.40, matching the client's own screenshot exactly. July/August
+  //      above were unaffected (their readings were back-solved to 240 = 80x3 directly), but any
+  //      month entered live through the Add/Edit Billing Slip form before this fix would under-bill
+  //      Capacity Charge by exactly 3x.
+  //   2. "Make the capacity charge reading fixed... 55 Loper ADH is an 80A breaker" - the breaker
+  //      rating never changes month to month, so it's no longer typed in each time; fixedReading:80
+  //      below means the Billing Slip form now shows it as a fixed, non-editable value (same
+  //      convention as Basic Charge's fixedReading:1).
+  // Only a NEW tariff version going forward - July/August's own tariff rows are untouched (their
+  // readings already encode the x3 directly, so adding a multiplier to THOSE same rows would
+  // retroactively triple their already-correct historical cost).
+  const sept26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-09-01', shape: EKURHULENI_TARIFF_B, rates: RATES, factors: FACTORS,
+    fixedReadingOverrides: { capacity_charge: 80 },
+    notes: 'Same 2026/2027 rate card as July/August - only fixes Capacity Charge\'s reading (now '
+      + 'fixed at this site\'s 80A breaker rating) and its x3 multiplier (client-confirmed 2026-10-01, '
+      + 'see this file\'s own comment).',
+  });
+  // One-off repoint: if a September 2026 slip was already entered live (through the app, before this
+  // fix shipped) on the OLD tariff version, move it onto the corrected one above so it recalculates
+  // correctly - readings for every other line stay exactly as the client entered them (only tariff_id
+  // changes; capacity_charge's own stored reading becomes irrelevant once fixed_reading is set).
+  // Idempotent: a no-op once the slip is already on a tariff whose capacity_charge has fixed_reading set.
+  const sept26Slip = db.prepare("SELECT * FROM site_billing_slips WHERE label='2026-09'").get();
+  if (sept26Slip && sept26Slip.tariff_id !== sept26TariffId) {
+    const oldItem = db.prepare("SELECT fixed_reading FROM site_tariff_items WHERE tariff_id=? AND item_key='capacity_charge'").get(sept26Slip.tariff_id);
+    if (!oldItem || oldItem.fixed_reading == null) {
+      db.prepare('UPDATE site_billing_slips SET tariff_id=? WHERE id=?').run(sept26TariffId, sept26Slip.id);
+      console.log('55 Loper Ave - ADH Machine Tool: repointed the already-entered September 2026 slip onto the corrected Capacity Charge tariff.');
+    }
+  }
+
   return db;
 }
 

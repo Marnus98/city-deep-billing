@@ -135,6 +135,12 @@ module.exports = [
     dbFile: 'adh-machine-tool.db',
     seedFile: './adh-machine-tool/import_history',
     billingModel: 'flat_site',
+    // Client-confirmed 2026-10-01: sewage can't be separately metered, so Sewer Consumption is
+    // always exactly the Water Consumption reading - the Billing Slip form now auto-fills it instead
+    // of asking for a separate figure each month (see server.js's saveSiteBillingSlip /
+    // SITE_BILLING_LINKED_READING_KEYS and views.js's rowHtml). Scoped to this property only (not a
+    // blanket rule - other flat_site properties' water/sewer are genuinely independently metered).
+    linkedReadings: { sewer: 'water', sewer_common_area: 'water_common_area' },
     // Real municipal account statement received 2026-09 for 55 Loper Street (account 1702343124) -
     // but that one account bills BOTH this site AND Zelvio Global below under one physical municipal
     // account. Confirmed with the client 2026-09-22: import a flat 50/50 split of every line item
@@ -157,6 +163,8 @@ module.exports = [
     dbFile: 'zelvio-global.db',
     seedFile: './zelvio-global/import_history',
     billingModel: 'flat_site',
+    // See adh-machine-tool's own comment above - same shared "Loper Ave" template, same rule.
+    linkedReadings: { sewer: 'water', sewer_common_area: 'water_common_area' },
     // Real municipal account statement received 2026-09 for the same shared 55 Loper Street account
     // as ADH Machine Tool above (account 1702343124) - flat 50/50 split confirmed with the client
     // 2026-09-22, see zelvio-global/municipal_import.js.
@@ -170,6 +178,8 @@ module.exports = [
     dbFile: 'interoll.db',
     seedFile: './interoll/import_history',
     billingModel: 'flat_site',
+    // See adh-machine-tool's own comment above - same rule, no Common Area line at this site.
+    linkedReadings: { sewer: 'water' },
     // Real municipal account statement received 2026-09 (see interoll/municipal_import.js) - so the
     // "Recovery" nav tab applies here now, same as field-street/bob-martin/loper-road/etc.
     hasMunicipalStatements: true,
@@ -182,6 +192,8 @@ module.exports = [
     dbFile: 'rcl-group.db',
     seedFile: './rcl-group/import_history',
     billingModel: 'flat_site',
+    // See adh-machine-tool's own comment above - same rule, no Common Area line at this site.
+    linkedReadings: { sewer: 'water' },
     // Real municipal account statement received 2026-09 (see rcl-group/municipal_import.js).
     hasMunicipalStatements: true,
     hasFlagging: true,
@@ -284,6 +296,8 @@ module.exports = [
     dbFile: 'colorobbia.db',
     seedFile: './colorobbia/import_history',
     billingModel: 'flat_site',
+    // See adh-machine-tool's own comment above - same rule, no Common Area line at this site.
+    linkedReadings: { sewer: 'water' },
     // Real municipal account statement received 2026-09 (see colorobbia/municipal_import.js).
     hasMunicipalStatements: true,
     hasFlagging: true,

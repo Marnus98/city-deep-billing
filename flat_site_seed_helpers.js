@@ -12,7 +12,7 @@ function get(db, sql, params = []) { return db.prepare(sql).get(...params); }
 // (defaults to 1, i.e. no adjustment) - only shapes with a factor_type:'kwh' item (e.g. Loper Road's
 // 2026/27 collapsed Total Energy shape, client-confirmed 2026-10-01) ever read it. Returns the
 // tariff's id.
-function seedTariff(db, { tariffName, effectiveFrom, shape, rates, factors, notes }) {
+function seedTariff(db, { tariffName, effectiveFrom, shape, rates, factors, notes, fixedReadingOverrides = {} }) {
   const existing = get(db, 'SELECT id FROM site_tariffs WHERE tariff_name=? AND effective_from=?', [tariffName, effectiveFrom]);
   if (existing) return existing.id;
   run(db, `INSERT INTO site_tariffs (tariff_name, effective_from, kva_factor, peak_factor, standard_factor, offpeak_factor, kwh_factor, notes)
@@ -26,10 +26,18 @@ function seedTariff(db, { tariffName, effectiveFrom, shape, rates, factors, note
     // reusable flat_site_tariff_shapes.js constants, a site that needs tiering defines its own
     // shape array inline in its own import_history.js), so there's no ambiguity about which
     // version's tier structure a bare item_key would otherwise refer to.
-    run(db, `INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, tier_limit, tier2_rate)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [tariffId, i, it.section, it.key, it.label, it.unit, Number(rates[it.key]) || 0, it.factorType, it.fixedReading, it.hasComment ? 1 : 0,
-       it.tierLimit ?? null, it.tier2Rate ?? null]);
+    //
+    // fixedReadingOverrides (optional, keyed by item key) - for a shape shared across several sites
+    // where one item's fixed quantity genuinely differs per site (e.g. EKURHULENI_TARIFF_B's
+    // Capacity Charge - each "Loper Ave" site has its own breaker rating in Amps, client-confirmed
+    // 2026-10-01: "make the capacity charge reading fixed... 55 Loper ADH is an 80A breaker"), rather
+    // than cloning the whole shared shape array just to change one field.
+    const fixedReading = Object.prototype.hasOwnProperty.call(fixedReadingOverrides, it.key)
+      ? fixedReadingOverrides[it.key] : it.fixedReading;
+    run(db, `INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, tier_limit, tier2_rate, multiplier)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [tariffId, i, it.section, it.key, it.label, it.unit, Number(rates[it.key]) || 0, it.factorType, fixedReading, it.hasComment ? 1 : 0,
+       it.tierLimit ?? null, it.tier2Rate ?? null, it.multiplier ?? 1]);
   });
   return tariffId;
 }

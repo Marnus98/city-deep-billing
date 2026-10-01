@@ -101,6 +101,26 @@ function main(dbFile = 'interoll.db') {
   });
   if (aug26SlipId) console.log('63 Loper Ave - Interoll: August 2026 slip added.');
 
+  // September 2026 onward: same Capacity Charge x3 + fixed-reading fix as adh-machine-tool/
+  // import_history.js (see that file's own comment for the full reasoning, client-confirmed
+  // 2026-10-01) - this site's breaker is 100A (300 = 100x3 in the back-solved July/August readings
+  // above). Only a NEW tariff version going forward; July/August untouched.
+  const sept26TariffId = seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-09-01', shape: EKURHULENI_TARIFF_B_SIMPLE, rates: RATES, factors: FACTORS,
+    fixedReadingOverrides: { capacity_charge: 100 },
+    notes: 'Same 2026/2027 rate card as July/August - only fixes Capacity Charge\'s reading (now '
+      + 'fixed at this site\'s 100A breaker rating) and its x3 multiplier (client-confirmed '
+      + '2026-10-01).',
+  });
+  const sept26Slip = db.prepare("SELECT * FROM site_billing_slips WHERE label='2026-09'").get();
+  if (sept26Slip && sept26Slip.tariff_id !== sept26TariffId) {
+    const oldItem = db.prepare("SELECT fixed_reading FROM site_tariff_items WHERE tariff_id=? AND item_key='capacity_charge'").get(sept26Slip.tariff_id);
+    if (!oldItem || oldItem.fixed_reading == null) {
+      db.prepare('UPDATE site_billing_slips SET tariff_id=? WHERE id=?').run(sept26TariffId, sept26Slip.id);
+      console.log('63 Loper Ave - Interoll: repointed the already-entered September 2026 slip onto the corrected Capacity Charge tariff.');
+    }
+  }
+
   return db;
 }
 
