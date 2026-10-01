@@ -1541,10 +1541,15 @@ function siteBillingDetailPage({ user, slip, tariff, calc, basePath = '/site-bil
   const body = `
   <a href="${basePath}" class="text-sm text-blue-600 hover:underline">&larr; ${esc(backLabel)}</a>
   <div class="flex justify-between items-baseline mt-2 mb-4 flex-wrap gap-2">
-    <h1 class="text-2xl font-bold">${esc(pageTitle)} &mdash; ${esc(slip.label)}</h1>
+    <h1 class="text-2xl font-bold">${esc(pageTitle)} &mdash; ${esc(slip.label)} <span class="badge ${statusColor(slip.status)} align-middle">${esc(slip.status)}</span></h1>
     <div class="flex gap-2">
       <a href="${pdfBasePath}/${slip.id}" class="bg-slate-900 text-white rounded px-3 py-1.5 text-sm font-medium">Download PDF</a>
       <a href="${basePath}/${slip.id}/edit" class="border rounded px-3 py-1.5 text-sm font-medium">Edit</a>
+      <form method="post" action="${basePath}/${slip.id}/finalize">
+        ${slip.status === 'draft'
+          ? `<button class="bg-green-600 text-white rounded px-3 py-1.5 text-sm font-medium">Mark as Finalised</button>`
+          : `<button class="border rounded px-3 py-1.5 text-sm font-medium">Revert to Draft</button>`}
+      </form>
       <form method="post" action="${basePath}/${slip.id}/delete" onsubmit="return confirm('Delete this entry? This cannot be undone.')">
         <button class="border border-red-300 text-red-600 rounded px-3 py-1.5 text-sm font-medium">Delete</button>
       </form>

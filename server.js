@@ -1018,6 +1018,25 @@ route('GET', '/site-billing/:id', async (req, res, params) => {
   send(res, 200, views.siteBillingDetailPage({ user, slip, tariff, calc, propertyName: currentPropertyName(user) }));
 });
 
+// Toggles a flat_site slip (site_billing_slips or municipal_statement_slips - same status column
+// shape in both, see db.js) between 'draft' and 'finalised'. Added because the manual-entry flow
+// left every new slip stuck showing "draft" forever on screen and in the PDF (db.js's column
+// default) - there was no route anywhere to ever change it, confirmed by the client building their
+// first manual 8 Field Street entry and asking why it wouldn't say "finalised".
+async function toggleSlipStatus(req, res, params, table, redirectBase) {
+  const user = requireLogin(req, res); if (!user) return;
+  if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
+  const slip = get(`SELECT * FROM ${table} WHERE id=?`, [params.id]);
+  if (slip) {
+    const newStatus = slip.status === 'draft' ? 'finalised' : 'draft';
+    run(`UPDATE ${table} SET status=? WHERE id=?`, [newStatus, slip.id]);
+    audit(user.userId, 'update', table, slip.id, 'status', slip.status, newStatus, null);
+  }
+  redirect(res, `${redirectBase}/${params.id}`);
+}
+route('POST', '/site-billing/:id/finalize', async (req, res, params) => toggleSlipStatus(req, res, params, 'site_billing_slips', '/site-billing'));
+route('POST', '/municipal-billing/:id/finalize', async (req, res, params) => toggleSlipStatus(req, res, params, 'municipal_statement_slips', '/municipal-billing'));
+
 route('POST', '/site-billing/:id/delete', async (req, res, params) => {
   const user = requireLogin(req, res); if (!user) return;
   if (!requireRole(req, res, user, auth.CAN_EDIT)) return;
