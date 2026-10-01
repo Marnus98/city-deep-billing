@@ -25,17 +25,18 @@
 //   3. "IHS Towers" (Wingfield tenant code 158) doesn't exist under that name in the app's Wingfield
 //      data (checked all 19 real tenant names) - client confirmed this code is actually "MTN".
 //
-// Two things could NOT be resolved and are deliberately left as documented gaps rather than guessed:
+// One thing could NOT be resolved and is deliberately left as a documented gap rather than guessed:
 //   - CSV BEV's tenant-code-269 row has TenantCode2 (column D) = 193 instead of 269 in the client's
 //     own original file (193 is Cards Plus's code, a different tenant) - almost certainly a
 //     copy/paste slip in the client's own template. Reproduced literally (D=193) since the client
 //     hasn't asked for it to be corrected and the export's job is to fill in F/G/I only, not silently
 //     rewrite a column that isn't F/G/I.
-//   - CSV Lisa's tenant-code-223350 row ("Uber Nutrition - Unit 9" per the xlsx) has no live tenant
-//     in city-deep.db yet - city-deep/seed.js documents a confirmed-but-not-yet-implemented handover
-//     from Sanskar Trading CC (tenant id 17, currently billed under code 223341) to Uber Nutrition,
-//     effective 2026-09, but no billing period >= 2026-09 has been seeded yet. This row always
-//     resolves to 0 with a flag until that handover is implemented and a 2026-09+ period exists.
+//
+// CSV Lisa's tenant-code-223350 row ("Uber Nutrition - Unit 9" per the xlsx) was a documented gap
+// (no live tenant yet) until 2026-09's Sanskar Trading CC -> Uber Nutrition handover went live -
+// resolved 2026-10-01 once the client pointed out Unit 9 has its own code separate from 223339
+// (Uber Nutrition's Unit 6+7). Code 223339 now excludes Unit 9 so the two codes never double-count
+// the same unit's amount - see the excludeUnits comment on code 223339's own rows below.
 const calcFlatSite = require('./calc_flat_site');
 const solar = require('./solar');
 
@@ -325,8 +326,13 @@ const ROWS = [
   { file: 'LISA', building: 3, tenantCode: 223342, tenantCode2: 223342, utility: 'EL00', src: tenantRow('city-deep', ['Express Chef Sauces (Pty) Ltd'], 'EL00') },
   { file: 'LISA', building: 3, tenantCode: 223342, tenantCode2: 223342, utility: 'WT00', src: tenantRow('city-deep', ['Express Chef Sauces (Pty) Ltd'], 'WT00') },
 
-  { file: 'LISA', building: 3, tenantCode: 223339, tenantCode2: 223339, utility: 'EL00', src: tenantRow('city-deep', ['Uber Nutrition (Pty) Ltd'], 'EL00') },
-  { file: 'LISA', building: 3, tenantCode: 223339, tenantCode2: 223339, utility: 'WT00', src: tenantRow('city-deep', ['Uber Nutrition (Pty) Ltd'], 'WT00') },
+  // excludeUnits: ['Unit 9'] - added 2026-10-01 (client-reported): code 223339 is Uber Nutrition's
+  // Unit 6+7 combined per the xlsx, NOT all 3 of its units - Unit 9 has its own separate code
+  // (223350, below) since 2026-09's Sanskar -> Uber Nutrition handover went live. Without this
+  // exclusion, a bare name match would silently fold Unit 9's amount into 223339 too (same bug class
+  // as Agrana's Unit 5 above), double-counting it against 223350.
+  { file: 'LISA', building: 3, tenantCode: 223339, tenantCode2: 223339, utility: 'EL00', src: tenantRow('city-deep', ['Uber Nutrition (Pty) Ltd'], 'EL00', { excludeUnits: ['Unit 9'] }) },
+  { file: 'LISA', building: 3, tenantCode: 223339, tenantCode2: 223339, utility: 'WT00', src: tenantRow('city-deep', ['Uber Nutrition (Pty) Ltd'], 'WT00', { excludeUnits: ['Unit 9'] }) },
 
   { file: 'LISA', building: 3, tenantCode: 223338, tenantCode2: 223338, utility: 'EL00', src: tenantRow('city-deep', ['Americandy Manufacturers (Pty) Ltd'], 'EL00') },
   { file: 'LISA', building: 3, tenantCode: 223338, tenantCode2: 223338, utility: 'WT00', src: tenantRow('city-deep', ['Americandy Manufacturers (Pty) Ltd'], 'WT00') },
@@ -349,11 +355,12 @@ const ROWS = [
   { file: 'LISA', building: 3, tenantCode: 223340, tenantCode2: 223340, utility: 'EL00', src: tenantRow('city-deep', ['Citrashine (Pty) Ltd'], 'EL00') },
   { file: 'LISA', building: 3, tenantCode: 223340, tenantCode2: 223340, utility: 'WT00', src: tenantRow('city-deep', ['Citrashine (Pty) Ltd'], 'WT00') },
 
-  // 223350 "Uber Nutrition - Unit 9" per the client's xlsx - no live tenant exists yet (see file
-  // header note). Always resolves to 0 and gets flagged in the export result until city-deep/seed.js
-  // implements the documented Sanskar -> Uber Nutrition handover and a 2026-09+ period is seeded.
-  { file: 'LISA', building: 3, tenantCode: 223350, tenantCode2: 223350, utility: 'EL00', src: { kind: 'unresolved', note: 'Uber Nutrition "Unit 9" has no live tenant yet in city-deep.db - the Sanskar Trading CC handover for this unit is confirmed but not yet implemented (see city-deep/seed.js). Resolves to 0 until then.' } },
-  { file: 'LISA', building: 3, tenantCode: 223350, tenantCode2: 223350, utility: 'WT00', src: { kind: 'unresolved', note: 'Uber Nutrition "Unit 9" has no live tenant yet in city-deep.db - see the EL00 row above for the same note.' } },
+  // 223350 "Uber Nutrition - Unit 9" per the client's xlsx - resolved 2026-10-01 now that the
+  // Sanskar Trading CC -> Uber Nutrition handover is live (2026-09 period onward). Pinned to exactly
+  // this unit via tenant_by_id_name (like Sanskar's own Unit 3 vs Unit 9 split above), not a bare
+  // name match, so it never double-counts against 223339's Unit 6+7.
+  { file: 'LISA', building: 3, tenantCode: 223350, tenantCode2: 223350, utility: 'EL00', src: { kind: 'tenant_by_id_name', slug: 'city-deep', name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 9', utilityCode: 'EL00' } },
+  { file: 'LISA', building: 3, tenantCode: 223350, tenantCode2: 223350, utility: 'WT00', src: { kind: 'tenant_by_id_name', slug: 'city-deep', name: 'Uber Nutrition (Pty) Ltd', unit: 'Unit 9', utilityCode: 'WT00' } },
 
   { file: 'LISA', building: 3, tenantCode: 223343, tenantCode2: 223343, utility: 'EL00', src: tenantRow('city-deep', ['Twinpouch (Pty) Ltd'], 'EL00') },
   { file: 'LISA', building: 3, tenantCode: 223343, tenantCode2: 223343, utility: 'WT00', src: tenantRow('city-deep', ['Twinpouch (Pty) Ltd'], 'WT00') },
