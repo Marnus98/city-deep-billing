@@ -30,11 +30,28 @@ function computeSlip(tariffItems, readingsByKey, tariff, applyCorrectionFactor) 
     const factorCol = it.factor_type ? `${it.factor_type}_factor` : null;
     const factor = (applyFactor && factorCol) ? Number(tariff[factorCol] || 1) : 1;
     const adjustedReading = reading * factor;
-    const cost = round2(adjustedReading * rate);
+    // Stepped/tiered item (e.g. AutoZone's water, client-confirmed 2026-10-01: first tier_limit
+    // kL/month at `rate`, every kL above that at `tier2_rate`) - tier_limit/tier2_rate are only ever
+    // both set together (see db.js), everything else keeps the plain reading*rate calc below.
+    // `rate` is exposed as the blended effective R/kL (cost/adjustedReading) rather than the raw
+    // tier-1 rate, matching this site's own convention of backing into one displayable rate per
+    // month - the true tier-1/tier-2 rates and the threshold are still visible via tier_limit/
+    // tier2_rate on this same object for anything that needs the real structure (e.g. the Tariff tab).
+    const isTiered = it.tier_limit != null && it.tier2_rate != null;
+    let cost, effectiveRate;
+    if (isTiered) {
+      const limit = Number(it.tier_limit);
+      const tier2 = Number(it.tier2_rate);
+      cost = round2(adjustedReading <= limit ? adjustedReading * rate : limit * rate + (adjustedReading - limit) * tier2);
+      effectiveRate = adjustedReading > 0 ? cost / adjustedReading : rate;
+    } else {
+      cost = round2(adjustedReading * rate);
+      effectiveRate = rate;
+    }
     return {
-      key: it.item_key, label: it.label, unit: it.unit, rate, reading, factor, adjustedReading, cost,
+      key: it.item_key, label: it.label, unit: it.unit, rate: isTiered ? effectiveRate : rate, reading, factor, adjustedReading, cost,
       comment: it.has_comment ? ((r && r.comment) || null) : null, section: it.section, factor_type: it.factor_type,
-      vatExempt: !!it.vat_exempt,
+      vatExempt: !!it.vat_exempt, isTiered, tierLimit: it.tier_limit, tier1Rate: isTiered ? rate : null, tier2Rate: it.tier2_rate,
     };
   });
   // 'municipal' is a third bucket only municipal account statements use (Property Rates, Refuse -

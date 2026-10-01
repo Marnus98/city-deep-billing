@@ -283,6 +283,33 @@ function main(dbFile = 'autozone.db') {
     db.prepare("UPDATE site_slip_readings SET reading=? WHERE slip_id=? AND item_key='network_surcharge'").run(touSum, aug26Slip.id);
   }
 
+  // 2026-10-01: client-confirmed new tariff year rates (2026/2027) for water/sewer, replacing the
+  // old convention above of manually back-computing a blended R/kL rate each month to approximate
+  // City Power's real sliding-scale water formula - calc_flat_site.js now does that calculation
+  // itself (tier_limit/tier2_rate on the water item), so this version carries the true tier-1/
+  // tier-2 rates directly rather than one month's derived blend. Also adds Water Demand (R/Month,
+  // a fixed charge that was never billed through this app at all before now) - per the client's
+  // explicit instruction 2026-10-01, this is added going FORWARD ONLY: every historical slip keeps
+  // its own already-issued total untouched, this just becomes the template the next new slip
+  // (whatever month that turns out to be) is created from. No slip is seeded alongside this tariff
+  // version - unlike every block above, there's no real statement yet for a month on these rates.
+  const AUTOZONE_WATER_2026_27_SHAPE = CITY_POWER_LV_TOU.flatMap((it) => {
+    if (it.key !== 'water') return [it];
+    return [
+      { ...it, tierLimit: 200, tier2Rate: 77.77 },
+      { key: 'water_demand', label: 'Water Demand', unit: 'R/Month', factorType: null, fixedReading: 1, hasComment: false, section: 'water' },
+    ];
+  });
+  seedTariff(db, {
+    tariffName: TARIFF_NAME, effectiveFrom: '2026-10-01', shape: AUTOZONE_WATER_2026_27_SHAPE,
+    rates: { ...RATES_AUG26, water: 73.72, water_demand: 413.84, sewer: 58.66 },
+    factors: FACTORS,
+    notes: 'Client-confirmed 2026/2027 water tariff year (2026-10-01): Water Consumption '
+      + '0-200kL/month @ R73.72, above 200kL @ R77.77 (true tiered rates, not a derived blend - see '
+      + 'calc_flat_site.js), Water Demand R413.84/month added for the first time, Sewer unchanged at '
+      + 'R58.66/kL. Added going forward only - no historical slip is re-priced onto this version.',
+  });
+
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via
   // the live "Add Billing Slip" form (default unticked there too - see views.js). Runs

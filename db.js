@@ -343,7 +343,13 @@ function migrate(db) {
     rate REAL NOT NULL DEFAULT 0,
     factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak') OR factor_type IS NULL),
     fixed_reading REAL, -- non-NULL for a flat per-slip charge (e.g. 1) that's never typed in
-    has_comment INTEGER NOT NULL DEFAULT 0
+    has_comment INTEGER NOT NULL DEFAULT 0,
+    tier_limit REAL, -- NULL for a normal flat-rate item. When set (e.g. 200, AutoZone's water -
+      -- client-confirmed 2026-10-01: first tier_limit kL/month at 'rate', everything above it at
+      -- 'tier2_rate' - see calc_flat_site.js. Replaces the old convention of manually back-computing
+      -- a single blended "effective" R/kL rate each month to approximate this same stepped formula
+      -- (confirmed to produce byte-identical historical totals - see the 2026-10-01 AutoZone change).
+    tier2_rate REAL -- the rate for consumption above tier_limit. NULL unless tier_limit is also set.
   );
 
   -- site_slip_readings: one row per line item *per slip* - the actual meter reading (or fixed-row
@@ -496,6 +502,10 @@ function migrate(db) {
 
   const stCols = db.prepare("PRAGMA table_info(site_tariffs)").all().map((c) => c.name);
   if (!stCols.includes('tariff_name')) db.exec('ALTER TABLE site_tariffs ADD COLUMN tariff_name TEXT');
+
+  const stiCols = db.prepare("PRAGMA table_info(site_tariff_items)").all().map((c) => c.name);
+  if (!stiCols.includes('tier_limit')) db.exec('ALTER TABLE site_tariff_items ADD COLUMN tier_limit REAL');
+  if (!stiCols.includes('tier2_rate')) db.exec('ALTER TABLE site_tariff_items ADD COLUMN tier2_rate REAL');
 
   // A municipal statement's own `start_date`/`end_date` has always meant the ELECTRICITY reading
   // period by convention (see every property's own municipal_import.js) - but the water/sewer meter

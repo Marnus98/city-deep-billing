@@ -1218,6 +1218,12 @@ function siteTariffEditPage({ user, tariff, items, error }) {
       <td class="px-3 py-1.5 w-32">
         <input name="rate__${it.item_key}" type="number" step="any" value="${esc(it.rate)}" class="w-full border rounded px-2 py-1.5 text-sm" required/>
       </td>
+      <td class="px-3 py-1.5 w-28">
+        <input name="tierlimit__${it.item_key}" type="number" step="any" placeholder="&mdash;" value="${it.tier_limit != null ? esc(it.tier_limit) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>
+      </td>
+      <td class="px-3 py-1.5 w-32">
+        <input name="tier2rate__${it.item_key}" type="number" step="any" placeholder="&mdash;" value="${it.tier2_rate != null ? esc(it.tier2_rate) : ''}" class="w-full border rounded px-2 py-1.5 text-sm"/>
+      </td>
     </tr>`;
   const body = `
   <a href="/site-tariff" class="text-sm text-blue-600 hover:underline">&larr; Tariff</a>
@@ -1242,9 +1248,11 @@ function siteTariffEditPage({ user, tariff, items, error }) {
     </div>
     <div class="bg-white rounded-lg border mb-4 overflow-hidden">
       <div class="px-4 py-2 border-b font-semibold text-sm">Rates</div>
+      <p class="px-4 pt-2 text-xs text-slate-500">Leave "Tier Limit"/"Above-Tier Rate" blank for a normal flat-rate item. Fill both in for a stepped item (e.g. AutoZone's water: first 200kL/month at Rate, everything above 200kL at Above-Tier Rate) - the billing slip then shows the blended effective R/kL rate rather than the raw tier-1 rate.</p>
       <table class="w-full">
         <thead><tr class="text-left text-slate-500 bg-slate-50 text-xs">
-          <th class="px-3 py-1.5">Item</th><th class="px-3 py-1.5">Unit</th><th class="px-3 py-1.5">Rate</th>
+          <th class="px-3 py-1.5">Item</th><th class="px-3 py-1.5">Unit</th><th class="px-3 py-1.5">Rate (tier 1)</th>
+          <th class="px-3 py-1.5">Tier Limit</th><th class="px-3 py-1.5">Above-Tier Rate</th>
         </tr></thead>
         <tbody>${items.map(itemRow).join('')}</tbody>
       </table>

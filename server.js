@@ -684,6 +684,21 @@ function findOrCreateSiteTariff(templateTariff, template, body, effectiveFrom) {
   for (const it of template) newRates[it.item_key] = Number(body[`rate__${it.item_key}`]) || 0;
   const newFactors = {};
   for (const c of FACTOR_COLS) newFactors[c] = Number(body[c]) || 1;
+  // tier_limit/tier2_rate (AutoZone's tiered water, client-confirmed 2026-10-01 - see
+  // calc_flat_site.js) are structural-but-editable, like rate: a `tierlimit__<key>`/`tier2rate__<key>`
+  // form field overrides them for this version if present, otherwise they carry forward unchanged
+  // from whichever tariff this slip's template came from - most items never have either field
+  // submitted at all (only the Tariff tab's edit form exposes them, not the plain billing-slip form),
+  // so "unsubmitted" must mean "keep the template's existing value", not "clear it to null".
+  const newTierLimits = {}, newTier2Rates = {};
+  for (const it of template) {
+    newTierLimits[it.item_key] = body[`tierlimit__${it.item_key}`] !== undefined
+      ? (body[`tierlimit__${it.item_key}`] === '' ? null : Number(body[`tierlimit__${it.item_key}`]))
+      : (it.tier_limit ?? null);
+    newTier2Rates[it.item_key] = body[`tier2rate__${it.item_key}`] !== undefined
+      ? (body[`tier2rate__${it.item_key}`] === '' ? null : Number(body[`tier2rate__${it.item_key}`]))
+      : (it.tier2_rate ?? null);
+  }
 
   const existingTariffs = all('SELECT * FROM site_tariffs ORDER BY id DESC');
   for (const t of existingTariffs) {
@@ -691,7 +706,11 @@ function findOrCreateSiteTariff(templateTariff, template, body, effectiveFrom) {
     const items = getTariffItems(t.id);
     if (items.length !== template.length) continue;
     const ratesMatch = items.every((it) => Math.abs((it.rate || 0) - (newRates[it.item_key] ?? NaN)) < 1e-9);
-    if (ratesMatch) return t.id;
+    if (!ratesMatch) continue;
+    const tiersMatch = items.every((it) =>
+      (it.tier_limit ?? null) === (newTierLimits[it.item_key] ?? null) &&
+      (it.tier2_rate ?? null) === (newTier2Rates[it.item_key] ?? null));
+    if (tiersMatch) return t.id;
   }
 
   // tariff_name is a site-level constant (e.g. "City_Power_Industrial_LV_TOU_Incl_Surcharge") -
@@ -700,9 +719,10 @@ function findOrCreateSiteTariff(templateTariff, template, body, effectiveFrom) {
     [templateTariff.tariff_name || null, effectiveFrom, newFactors.kva_factor, newFactors.peak_factor, newFactors.standard_factor, newFactors.offpeak_factor]);
   const tariffId = get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
   template.forEach((it, i) => {
-    run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [tariffId, i, it.section, it.item_key, it.label, it.unit, newRates[it.item_key], it.factor_type, it.fixed_reading, it.has_comment ? 1 : 0]);
+    run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, tier_limit, tier2_rate)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [tariffId, i, it.section, it.item_key, it.label, it.unit, newRates[it.item_key], it.factor_type, it.fixed_reading, it.has_comment ? 1 : 0,
+       newTierLimits[it.item_key], newTier2Rates[it.item_key]]);
   });
   return tariffId;
 }

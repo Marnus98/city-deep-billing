@@ -17,9 +17,16 @@ function seedTariff(db, { tariffName, effectiveFrom, shape, rates, factors, note
     [tariffName, effectiveFrom, factors.kva_factor, factors.peak_factor, factors.standard_factor, factors.offpeak_factor, notes || null]);
   const tariffId = get(db, 'SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
   shape.forEach((it, i) => {
-    run(db, `INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [tariffId, i, it.section, it.key, it.label, it.unit, Number(rates[it.key]) || 0, it.factorType, it.fixedReading, it.hasComment ? 1 : 0]);
+    // tierLimit/tier2Rate (AutoZone's stepped water, client-confirmed 2026-10-01 - see
+    // calc_flat_site.js) are optional per-item properties on the shape array itself, not part of
+    // the `rates` map - a shape definition is specific to one tariff version anyway (unlike the
+    // reusable flat_site_tariff_shapes.js constants, a site that needs tiering defines its own
+    // shape array inline in its own import_history.js), so there's no ambiguity about which
+    // version's tier structure a bare item_key would otherwise refer to.
+    run(db, `INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, tier_limit, tier2_rate)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [tariffId, i, it.section, it.key, it.label, it.unit, Number(rates[it.key]) || 0, it.factorType, it.fixedReading, it.hasComment ? 1 : 0,
+       it.tierLimit ?? null, it.tier2Rate ?? null]);
   });
   return tariffId;
 }
