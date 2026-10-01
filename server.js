@@ -670,7 +670,7 @@ function getSlipReadings(slipId) {
   for (const r of rows) map[r.item_key] = { reading: r.reading, comment: r.comment };
   return map;
 }
-const FACTOR_COLS = ['kva_factor', 'peak_factor', 'standard_factor', 'offpeak_factor'];
+const FACTOR_COLS = ['kva_factor', 'peak_factor', 'standard_factor', 'offpeak_factor', 'kwh_factor'];
 
 // Reuses an existing site_tariffs row if one already has these exact rates/factors for this site's
 // exact item set (e.g. saving a slip without touching the tariff section), otherwise inserts a new
@@ -715,8 +715,8 @@ function findOrCreateSiteTariff(templateTariff, template, body, effectiveFrom) {
 
   // tariff_name is a site-level constant (e.g. "City_Power_Industrial_LV_TOU_Incl_Surcharge") -
   // there's no form field for it, it just carries forward from whichever tariff this slip started from.
-  run(`INSERT INTO site_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,?,?,?,?)`,
-    [templateTariff.tariff_name || null, effectiveFrom, newFactors.kva_factor, newFactors.peak_factor, newFactors.standard_factor, newFactors.offpeak_factor]);
+  run(`INSERT INTO site_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,${FACTOR_COLS.map(() => '?').join(',')})`,
+    [templateTariff.tariff_name || null, effectiveFrom, ...FACTOR_COLS.map((c) => newFactors[c])]);
   const tariffId = get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
   template.forEach((it, i) => {
     run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, tier_limit, tier2_rate)
@@ -917,8 +917,8 @@ route('POST', '/site-tariff/new', async (req, res) => {
     }));
   }
 
-  run(`INSERT INTO site_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,?,?,?,?)`,
-    [tariffName, effectiveFrom, 1, 1, 1, 1]);
+  run(`INSERT INTO site_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,${FACTOR_COLS.map(() => '?').join(',')})`,
+    [tariffName, effectiveFrom, ...FACTOR_COLS.map(() => 1)]);
   const tariffId = get('SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
   for (const r of rows) {
     run(`INSERT INTO site_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment)
@@ -1333,8 +1333,8 @@ function findOrCreateMunicipalTariff(templateTariff, template, body, effectiveFr
     if (ratesMatch) return t.id;
   }
 
-  run(`INSERT INTO municipal_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,?,?,?,?)`,
-    [templateTariff.tariff_name || null, effectiveFrom, newFactors.kva_factor, newFactors.peak_factor, newFactors.standard_factor, newFactors.offpeak_factor]);
+  run(`INSERT INTO municipal_tariffs (tariff_name, effective_from, ${FACTOR_COLS.join(', ')}) VALUES (?,?,${FACTOR_COLS.map(() => '?').join(',')})`,
+    [templateTariff.tariff_name || null, effectiveFrom, ...FACTOR_COLS.map((c) => newFactors[c])]);
   const tariffId = get('SELECT id FROM municipal_tariffs ORDER BY id DESC LIMIT 1').id;
   template.forEach((it, i) => {
     run(`INSERT INTO municipal_tariff_items (tariff_id, sort_order, section, item_key, label, unit, rate, factor_type, fixed_reading, has_comment, vat_exempt)

@@ -62,12 +62,21 @@ const EKURHULENI_INDUSTRIAL_C = [
 // genuinely different line-item structure the old shape can't represent (not a rate change on the
 // same rows). Given its own shape/tariff version rather than forcing the collapsed total into one
 // of the old peak/standard/offpeak keys, which would show a misleading row label on the bill.
+//
+// factorType: client-confirmed 2026-10-01 - this site only has 2 real correction factors (kVA, and
+// ONE shared kWh factor for both Total Energy bands, not a separate Peak/Standard/Off-Peak each) -
+// every item here originally shipped with factorType: null, which was simply an oversight (it meant
+// NEITHER factor ever applied to anything, including kVA on Network Access/Demand Charge, unlike the
+// old EKURHULENI_INDUSTRIAL_C shape above which correctly used 'kva' there). 'kwh' is its own
+// factor_type (site_tariffs.kwh_factor - see db.js) rather than reusing 'peak', so the Correction
+// Factors box can show one honestly-labelled "kWh factor" instead of a "Peak factor" input that's
+// secretly also billing the Low-demand band.
 const EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27 = [
   { key: 'basic_charge', label: 'Basic Charge', unit: 'R/c', factorType: null, fixedReading: 1, hasComment: false, section: 'electricity' },
-  { key: 'total_energy_high', label: 'Total Energy - High Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
-  { key: 'total_energy_low', label: 'Total Energy - Low Demand', unit: 'R/kWh', factorType: null, fixedReading: null, hasComment: false, section: 'electricity' },
-  { key: 'network_access', label: 'Network Access', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
-  { key: 'demand_charge', label: 'Demand Charge', unit: 'R/kVA', factorType: null, fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'total_energy_high', label: 'Total Energy - High Demand', unit: 'R/kWh', factorType: 'kwh', fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'total_energy_low', label: 'Total Energy - Low Demand', unit: 'R/kWh', factorType: 'kwh', fixedReading: null, hasComment: false, section: 'electricity' },
+  { key: 'network_access', label: 'Network Access', unit: 'R/kVA', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity' },
+  { key: 'demand_charge', label: 'Demand Charge', unit: 'R/kVA', factorType: 'kva', fixedReading: null, hasComment: true, section: 'electricity' },
   ...WATER_SEWER_ITEMS,
 ];
 

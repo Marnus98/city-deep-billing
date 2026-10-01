@@ -32,6 +32,13 @@ const { EKURHULENI_INDUSTRIAL_C, EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27 } = 
 const { seedTariff, seedSlip } = require('../flat_site_seed_helpers');
 
 const FACTORS = { kva_factor: 1.038681688, peak_factor: 1.017448464, standard_factor: 1.017563209, offpeak_factor: 1.017174764 };
+// 2026/27-year factors (EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27 shape): that shape has only 2 real
+// correction factors - kVA (Network Access/Demand Charge) and one shared kWh factor (Total Energy
+// High/Low) - see flat_site_tariff_shapes.js's comment, client-confirmed 2026-10-01. No distinct
+// measured value for the combined kWh reading exists yet, so this reuses FACTORS.peak_factor as a
+// placeholder (closest available TOU energy factor) until the client provides a real one; harmless in
+// the meantime since apply_correction_factor is off for every slip seeded here anyway.
+const FACTORS_2026_27 = { kva_factor: FACTORS.kva_factor, kwh_factor: FACTORS.peak_factor };
 
 const TARIFF_NAME = 'Ekurhuleni_Industrial_Tariff_C_Loper Road - Sandvic';
 
@@ -90,7 +97,7 @@ function main(dbFile = 'loper-road.db') {
   };
   const jul26TariffId = seedTariff(db, {
     tariffName: TARIFF_NAME, effectiveFrom: '2026-07-01',
-    shape: EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, rates: RATES_JUL26, factors: FACTORS,
+    shape: EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, rates: RATES_JUL26, factors: FACTORS_2026_27,
     notes: 'New 2026/2027 tariff year - collapsed Total Energy High/Low format replaces the '
       + 'Peak/Standard/Off-Peak split used through Jun 2026.',
   });
@@ -113,7 +120,7 @@ function main(dbFile = 'loper-road.db') {
   };
   const aug26TariffId = seedTariff(db, {
     tariffName: TARIFF_NAME, effectiveFrom: '2026-08-01',
-    shape: EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, rates: RATES_AUG26, factors: FACTORS,
+    shape: EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27, rates: RATES_AUG26, factors: FACTORS_2026_27,
     notes: 'Real statement from "Loper Road Slips August 2026.xlsx", uploaded 2026-09-02 - same '
       + 'rate card as RATES_JUL26, rate*reading=cost verified exactly for every line, no correction '
       + 'factor.',
@@ -126,6 +133,26 @@ function main(dbFile = 'loper-road.db') {
     },
   });
   if (aug26SlipId) console.log('Loper Road - Sandvic: August 2026 slip added.');
+
+  // One-off correction for an already-deployed db: seedTariff is idempotent by (tariff_name,
+  // effective_from), so the 2026-07-01/2026-08-01 tariff rows above were already created (with
+  // factor_type: null on every item, including the kVA ones - a latent bug, since this shape's
+  // Network Access/Demand Charge items should have always had factor_type: 'kva', same as every
+  // other Ekurhuleni shape) by a previous boot, before EKURHULENI_INDUSTRIAL_C_LOPER_ROAD_2026_27's
+  // factorType fields and the kwh_factor column existed - the shape fix above only affects a BRAND
+  // NEW tariff version, not rows already sitting in the db. Patches those specific rows in place
+  // (matched by tariff_name + the two known effective_from dates, not by id, so this is safe to
+  // re-run and safe even if the ids differ across deployments). Idempotent: harmless no-op once the
+  // factor_type values already match.
+  const legacy202627 = db.prepare(
+    'SELECT id FROM site_tariffs WHERE tariff_name=? AND effective_from IN (?,?)'
+  ).all(TARIFF_NAME, '2026-07-01', '2026-08-01');
+  for (const { id: tid } of legacy202627) {
+    db.prepare('UPDATE site_tariffs SET kva_factor=?, kwh_factor=? WHERE id=?')
+      .run(FACTORS_2026_27.kva_factor, FACTORS_2026_27.kwh_factor, tid);
+    db.prepare("UPDATE site_tariff_items SET factor_type='kva' WHERE tariff_id=? AND item_key IN ('network_access','demand_charge')").run(tid);
+    db.prepare("UPDATE site_tariff_items SET factor_type='kwh' WHERE tariff_id=? AND item_key IN ('total_energy_high','total_energy_low')").run(tid);
+  }
 
   // The client doesn't want the site-meter correction factor applied to any historical import -
   // it should only ever be ticked deliberately, per month, on new slips added going forward via

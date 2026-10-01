@@ -1136,7 +1136,18 @@ function flatSiteDashboardPage({ user, propertyName, gaugeOptions, gaugeSelector
 // See server.js's /site-tariff routes for the full explanation of why this exists alongside the
 // Billing Slip form's own inline rate editing. FACTOR_LABELS/SECTION_LABELS are shared display
 // strings between the overview, edit-rates and builder pages below.
-const FACTOR_LABELS = { kva: 'kVA', peak: 'Peak', standard: 'Standard', offpeak: 'Off-Peak' };
+const FACTOR_LABELS = { kva: 'kVA', peak: 'Peak', standard: 'Standard', offpeak: 'Off-Peak', kwh: 'kWh' };
+// All 4 legacy TOU/kVA factor types plus the newer shared 'kwh' factor (Loper Road, client-confirmed
+// 2026-10-01 - that site only has kVA + one shared kWh factor, not separate Peak/Standard/Off-Peak).
+// The Correction Factors box below only renders the factor types actually present among a tariff's
+// CURRENT items (via itemFactorTypes), so a site like Loper Road with just 'kva'/'kwh' items shows 2
+// boxes, not 4 unused ones - showing an unused factor input is actively misleading (implies a factor
+// that is silently never applied to anything, which is exactly the shape of the bug being fixed here).
+const ALL_FACTOR_TYPES = ['kva', 'peak', 'standard', 'offpeak', 'kwh'];
+function itemFactorTypes(items) {
+  const present = new Set((items || []).map((it) => it.factor_type).filter(Boolean));
+  return ALL_FACTOR_TYPES.filter((f) => present.has(f));
+}
 const SECTION_LABELS = { electricity: 'Electricity', water: 'Water', municipal: 'Municipal' };
 
 function siteTariffPage({ user, tariff, items, versions, propertyName }) {
@@ -1153,7 +1164,7 @@ function siteTariffPage({ user, tariff, items, versions, propertyName }) {
     if (v == null || Math.abs(v - 1) < 1e-9) return '';
     return `<div><span class="text-slate-500">${esc(label)} correction factor:</span> <span class="font-medium">${esc(v)}&times;</span></div>`;
   };
-  const factorsHtml = ['kva', 'peak', 'standard', 'offpeak'].map((k) => factorRow(k, FACTOR_LABELS[k])).join('');
+  const factorsHtml = itemFactorTypes(items).map((k) => factorRow(k, FACTOR_LABELS[k])).join('');
   const itemRow = (it) => `
     <tr class="border-t">
       <td class="px-3 py-1.5 text-sm">${esc(it.label)}</td>
@@ -1208,6 +1219,7 @@ function siteTariffPage({ user, tariff, items, versions, propertyName }) {
 
 function siteTariffEditPage({ user, tariff, items, error }) {
   const t = tariff || {};
+  const relevantFactorTypes = itemFactorTypes(items);
   const factorInput = (key) => `
     <div><label class="text-xs text-slate-500">${esc(FACTOR_LABELS[key])} factor</label>
       <input name="${key}_factor" type="number" step="any" value="${esc(t[`${key}_factor`] != null ? t[`${key}_factor`] : 1)}" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/></div>`;
@@ -1241,10 +1253,10 @@ function siteTariffEditPage({ user, tariff, items, error }) {
     </div>
     <div class="bg-white rounded-lg border p-4 mb-4">
       <div class="font-semibold mb-3 text-sm">Correction Factors</div>
-      <div class="grid grid-cols-4 gap-3">
-        ${['kva', 'peak', 'standard', 'offpeak'].map(factorInput).join('')}
+      <div class="grid gap-3" style="grid-template-columns: repeat(${Math.max(relevantFactorTypes.length, 1)}, minmax(0, 1fr));">
+        ${relevantFactorTypes.map(factorInput).join('')}
       </div>
-      <p class="text-xs text-slate-400 mt-2">Grosses up the matching line items' readings before the rate is applied, when a billing slip has its correction-factor switch on. Leave at 1 for no adjustment.</p>
+      <p class="text-xs text-slate-400 mt-2">Grosses up the matching line items' readings before the rate is applied, when a billing slip has its correction-factor switch on. Leave at 1 for no adjustment. Only factor types actually used by this site's current line items are shown here.</p>
     </div>
     <div class="bg-white rounded-lg border mb-4 overflow-hidden">
       <div class="px-4 py-2 border-b font-semibold text-sm">Rates</div>
@@ -1273,7 +1285,7 @@ function siteTariffEditPage({ user, tariff, items, error }) {
 // id suffix (see the `rowSeq` counter below) so removing a row never has to renumber the ones after
 // it; see server.js's POST handler for why that matters.
 function siteTariffBuilderPage({ user, items = [], tariffName = '', effectiveFrom = '', error }) {
-  const factorOptions = (selected) => ['none', 'kva', 'peak', 'standard', 'offpeak']
+  const factorOptions = (selected) => ['none', 'kva', 'peak', 'standard', 'offpeak', 'kwh']
     .map((v) => `<option value="${v}" ${selected === v ? 'selected' : ''}>${v === 'none' ? 'None' : FACTOR_LABELS[v]}</option>`).join('');
   const sectionOptions = (selected) => ['electricity', 'water', 'municipal']
     .map((v) => `<option value="${v}" ${selected === v ? 'selected' : ''}>${SECTION_LABELS[v]}</option>`).join('');
@@ -1330,7 +1342,7 @@ function siteTariffBuilderPage({ user, items = [], tariffName = '', effectiveFro
       var seq = ${nextRowSeq};
       var sectionOpts = ${JSON.stringify(['electricity', 'water', 'municipal'])};
       var sectionLabels = ${JSON.stringify(SECTION_LABELS)};
-      var factorOpts = ${JSON.stringify(['none', 'kva', 'peak', 'standard', 'offpeak'])};
+      var factorOpts = ${JSON.stringify(['none', 'kva', 'peak', 'standard', 'offpeak', 'kwh'])};
       var factorLabels = ${JSON.stringify(Object.assign({ none: 'None' }, FACTOR_LABELS))};
       function rowHtml(id) {
         var sectionSel = sectionOpts.map(function (v) { return '<option value="' + v + '">' + sectionLabels[v] + '</option>'; }).join('');
@@ -1424,6 +1436,11 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
   // unchecked. It only starts checked when a slip was explicitly saved with the factor on
   // (apply_correction_factor === 1) - i.e. the client ticked it themselves for that one month.
   const applyFactorOn = s.apply_correction_factor === 1 || s.apply_correction_factor === true;
+  // Which correction-factor boxes to show - only the factor types this tariff's own line items
+  // actually reference (see FACTOR_LABELS/itemFactorTypes above), e.g. Loper Road only ever had
+  // 'kva' and 'kwh' items, so showing Peak/Standard/Off-Peak boxes there was actively misleading
+  // (client-reported 2026-10-01: those factors looked configurable but never applied to anything).
+  const relevantFactorTypes = itemFactorTypes(items);
   // step="any" (not a fixed decimal step) - rates on this app's tariffs go to 4 decimal places
   // (e.g. 3.0949 R/kWh), but this input used to default to step="0.01", so the browser's native
   // number-input validation rejected any rate that wasn't a multiple of 0.01, with a "nearest
@@ -1514,11 +1531,8 @@ function siteBillingFormPage({ user, tariff, items, readings, slip, latestSlip, 
         Apply these factors to this month's readings
       </label>
       <p class="text-xs text-slate-500 mt-1 mb-3">Our meters read lower than the municipality's - only relevant to the client-facing billing slip. A municipal account statement's readings are already the municipality's own figures, so this is off by default there.</p>
-      <div class="grid grid-cols-4 gap-3">
-        <div><label class="text-xs text-slate-500">kVA factor</label>${rateInput('kva_factor', t.kva_factor ?? 1, '0.000000001')}</div>
-        <div><label class="text-xs text-slate-500">Peak factor</label>${rateInput('peak_factor', t.peak_factor ?? 1, '0.000000001')}</div>
-        <div><label class="text-xs text-slate-500">Standard factor</label>${rateInput('standard_factor', t.standard_factor ?? 1, '0.000000001')}</div>
-        <div><label class="text-xs text-slate-500">Off-Peak factor</label>${rateInput('offpeak_factor', t.offpeak_factor ?? 1, '0.000000001')}</div>
+      <div class="grid gap-3" style="grid-template-columns: repeat(${Math.max(relevantFactorTypes.length, 1)}, minmax(0, 1fr));">
+        ${relevantFactorTypes.map((k) => `<div><label class="text-xs text-slate-500">${esc(FACTOR_LABELS[k])} factor</label>${rateInput(`${k}_factor`, t[`${k}_factor`] ?? 1, '0.000000001')}</div>`).join('')}
       </div>
     </details>
 

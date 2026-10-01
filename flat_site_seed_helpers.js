@@ -8,13 +8,16 @@ function get(db, sql, params = []) { return db.prepare(sql).get(...params); }
 
 // Idempotent by (tariff_name, effective_from) - safe to call on every boot. `shape` is one of the
 // arrays exported by flat_site_tariff_shapes.js; `rates` maps item key -> rate; `factors` is
-// { kva_factor, peak_factor, standard_factor, offpeak_factor }. Returns the tariff's id.
+// { kva_factor, peak_factor, standard_factor, offpeak_factor, kwh_factor }. kwh_factor is optional
+// (defaults to 1, i.e. no adjustment) - only shapes with a factor_type:'kwh' item (e.g. Loper Road's
+// 2026/27 collapsed Total Energy shape, client-confirmed 2026-10-01) ever read it. Returns the
+// tariff's id.
 function seedTariff(db, { tariffName, effectiveFrom, shape, rates, factors, notes }) {
   const existing = get(db, 'SELECT id FROM site_tariffs WHERE tariff_name=? AND effective_from=?', [tariffName, effectiveFrom]);
   if (existing) return existing.id;
-  run(db, `INSERT INTO site_tariffs (tariff_name, effective_from, kva_factor, peak_factor, standard_factor, offpeak_factor, notes)
-    VALUES (?,?,?,?,?,?,?)`,
-    [tariffName, effectiveFrom, factors.kva_factor, factors.peak_factor, factors.standard_factor, factors.offpeak_factor, notes || null]);
+  run(db, `INSERT INTO site_tariffs (tariff_name, effective_from, kva_factor, peak_factor, standard_factor, offpeak_factor, kwh_factor, notes)
+    VALUES (?,?,?,?,?,?,?,?)`,
+    [tariffName, effectiveFrom, factors.kva_factor ?? 1, factors.peak_factor ?? 1, factors.standard_factor ?? 1, factors.offpeak_factor ?? 1, factors.kwh_factor ?? 1, notes || null]);
   const tariffId = get(db, 'SELECT id FROM site_tariffs ORDER BY id DESC LIMIT 1').id;
   shape.forEach((it, i) => {
     // tierLimit/tier2Rate (AutoZone's stepped water, client-confirmed 2026-10-01 - see

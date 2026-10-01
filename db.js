@@ -280,6 +280,12 @@ function migrate(db) {
     peak_factor REAL NOT NULL DEFAULT 1,
     standard_factor REAL NOT NULL DEFAULT 1,
     offpeak_factor REAL NOT NULL DEFAULT 1,
+    kwh_factor REAL NOT NULL DEFAULT 1, -- for a shape that bills one combined "Total Energy" figure
+      -- per demand season instead of a genuine 3-way Peak/Standard/Off-Peak split (e.g. Loper Road -
+      -- Sandvic's 2026/27 tariff year, client-confirmed 2026-10-01: "we only have a kVA factor and a
+      -- single kWh factor for this site, not all 3") - a site_tariff_items row uses this one instead
+      -- of peak_factor/standard_factor/offpeak_factor via factor_type='kwh' (see the CHECK rebuild
+      -- below). Harmless/unused (stays at the default 1) for every other shape's items.
     notes TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
@@ -341,7 +347,7 @@ function migrate(db) {
     label TEXT NOT NULL,
     unit TEXT NOT NULL,
     rate REAL NOT NULL DEFAULT 0,
-    factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak') OR factor_type IS NULL),
+    factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak','kwh') OR factor_type IS NULL),
     fixed_reading REAL, -- non-NULL for a flat per-slip charge (e.g. 1) that's never typed in
     has_comment INTEGER NOT NULL DEFAULT 0,
     tier_limit REAL, -- NULL for a normal flat-rate item. When set (e.g. 200, AutoZone's water -
@@ -383,6 +389,7 @@ function migrate(db) {
     peak_factor REAL NOT NULL DEFAULT 1,
     standard_factor REAL NOT NULL DEFAULT 1,
     offpeak_factor REAL NOT NULL DEFAULT 1,
+    kwh_factor REAL NOT NULL DEFAULT 1,
     notes TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
@@ -403,7 +410,7 @@ function migrate(db) {
     label TEXT NOT NULL,
     unit TEXT NOT NULL,
     rate REAL NOT NULL DEFAULT 0,
-    factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak') OR factor_type IS NULL),
+    factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak','kwh') OR factor_type IS NULL),
     fixed_reading REAL,
     has_comment INTEGER NOT NULL DEFAULT 0,
     vat_exempt INTEGER NOT NULL DEFAULT 0
@@ -502,10 +509,70 @@ function migrate(db) {
 
   const stCols = db.prepare("PRAGMA table_info(site_tariffs)").all().map((c) => c.name);
   if (!stCols.includes('tariff_name')) db.exec('ALTER TABLE site_tariffs ADD COLUMN tariff_name TEXT');
+  if (!stCols.includes('kwh_factor')) db.exec('ALTER TABLE site_tariffs ADD COLUMN kwh_factor REAL NOT NULL DEFAULT 1');
+
+  const mtCols = db.prepare("PRAGMA table_info(municipal_tariffs)").all().map((c) => c.name);
+  if (!mtCols.includes('kwh_factor')) db.exec('ALTER TABLE municipal_tariffs ADD COLUMN kwh_factor REAL NOT NULL DEFAULT 1');
 
   const stiCols = db.prepare("PRAGMA table_info(site_tariff_items)").all().map((c) => c.name);
   if (!stiCols.includes('tier_limit')) db.exec('ALTER TABLE site_tariff_items ADD COLUMN tier_limit REAL');
   if (!stiCols.includes('tier2_rate')) db.exec('ALTER TABLE site_tariff_items ADD COLUMN tier2_rate REAL');
+
+  // SQLite can't ALTER a CHECK constraint in place - site_tariff_items/municipal_tariff_items'
+  // factor_type CHECK predates 'kwh' (added 2026-10-01, see Loper Road's single-kWh-factor shape
+  // below) on any database created before this shipped, so inserting a 'kwh' row would fail there
+  // even though the CREATE TABLE text above already allows it for a brand-new database. Rebuild
+  // (copy to a new table with the updated CHECK, drop the old one, rename) only when the stored
+  // schema text doesn't already mention 'kwh' - a cheap, idempotent check via sqlite_master, safe to
+  // run on every boot.
+  // The exact current CREATE TABLE text for each (kept in sync with the schema block up top by
+  // hand - both are small, stable tables unlikely to gain new columns often) - rebuilding means
+  // DROPping the live table, so this can't just re-run the giant schema exec above (everything in
+  // it is one single statement, not addressable table-by-table) or reuse CREATE TABLE AS SELECT
+  // (which silently drops every CHECK/DEFAULT, not just the one being changed).
+  const REBUILD_DDL = {
+    site_tariff_items: `CREATE TABLE site_tariff_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tariff_id INTEGER NOT NULL REFERENCES site_tariffs(id),
+      sort_order INTEGER NOT NULL,
+      section TEXT NOT NULL DEFAULT 'electricity' CHECK(section IN ('electricity','water')),
+      item_key TEXT NOT NULL,
+      label TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      rate REAL NOT NULL DEFAULT 0,
+      factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak','kwh') OR factor_type IS NULL),
+      fixed_reading REAL,
+      has_comment INTEGER NOT NULL DEFAULT 0,
+      tier_limit REAL,
+      tier2_rate REAL
+    )`,
+    municipal_tariff_items: `CREATE TABLE municipal_tariff_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tariff_id INTEGER NOT NULL REFERENCES municipal_tariffs(id),
+      sort_order INTEGER NOT NULL,
+      section TEXT NOT NULL DEFAULT 'electricity' CHECK(section IN ('electricity','water','municipal')),
+      item_key TEXT NOT NULL,
+      label TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      rate REAL NOT NULL DEFAULT 0,
+      factor_type TEXT CHECK(factor_type IN ('kva','peak','standard','offpeak','kwh') OR factor_type IS NULL),
+      fixed_reading REAL,
+      has_comment INTEGER NOT NULL DEFAULT 0,
+      vat_exempt INTEGER NOT NULL DEFAULT 0
+    )`,
+  };
+  function rebuildFactorTypeCheck(table) {
+    const row = db.prepare('SELECT sql FROM sqlite_master WHERE type=\'table\' AND name=?').get(table);
+    if (!row || row.sql.includes('kwh')) return; // already rebuilt, or table doesn't exist yet (new db - created fresh with 'kwh' already in it above)
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    const colList = cols.join(', ');
+    db.exec(`ALTER TABLE ${table} RENAME TO ${table}_old;`);
+    db.exec(REBUILD_DDL[table]);
+    db.exec(`INSERT INTO ${table} (${colList}) SELECT ${colList} FROM ${table}_old;`);
+    db.exec(`DROP TABLE ${table}_old;`);
+  }
+  rebuildFactorTypeCheck('site_tariff_items');
+  rebuildFactorTypeCheck('municipal_tariff_items');
 
   // A municipal statement's own `start_date`/`end_date` has always meant the ELECTRICITY reading
   // period by convention (see every property's own municipal_import.js) - but the water/sewer meter
