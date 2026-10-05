@@ -670,8 +670,26 @@ function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
   if (!opts.noComment) doc.text(xComment, y, 'Comment', { bold: true, size: 8.5 });
   y -= 4; doc.line(left, y, right, y); y -= 12;
   for (const it of items) {
-    doc.text(left, y, it.label, { size: 8.5 });
     const rateStr = money(it.rate);
+    // Long labels (e.g. "Energy Consumption - High Demand - Meter 1 (Pomp, DEM4B409)" on the RS-Farm
+    // multi-meter sites) used to run straight through the Rate/Unit columns. Room for the label is
+    // everything left of the (right-aligned) rate string; shrink the font a little first, then wrap
+    // onto continuation lines at word boundaries if it still doesn't fit.
+    const maxLabelW = xRate - left - textWidth(rateStr, { size: 8.5 }) - 10;
+    let labelSize = 8.5;
+    while (labelSize > 7.5 && textWidth(it.label, { size: labelSize }) > maxLabelW) labelSize -= 0.5;
+    const labelLines = [];
+    if (textWidth(it.label, { size: labelSize }) <= maxLabelW) labelLines.push(it.label);
+    else {
+      let cur = '';
+      for (const word of String(it.label).split(' ')) {
+        const trial = cur ? `${cur} ${word}` : word;
+        if (cur && textWidth(trial, { size: labelSize }) > maxLabelW) { labelLines.push(cur); cur = word; } else cur = trial;
+      }
+      if (cur) labelLines.push(cur);
+    }
+    doc.text(left, y, labelLines[0], { size: labelSize });
+    for (let li = 1; li < labelLines.length; li++) doc.text(left, y - li * 10, labelLines[li], { size: labelSize });
     doc.text(xRate - textWidth(rateStr, { size: 8.5 }), y, rateStr, { size: 8.5 });
     doc.text(xUnit, y, it.unit, { size: 8 });
     const readingStr = it.adjustedReading.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -679,7 +697,7 @@ function drawSiteLineItemsTable(doc, items, left, right, y, opts = {}) {
     const costStr = money(it.cost);
     doc.text(xCost - textWidth(costStr, { size: 8.5, bold: true }), y, costStr, { size: 8.5, bold: true });
     if (it.comment) doc.text(xComment, y, it.comment, { size: 7.5 });
-    y -= 13;
+    y -= 13 + (labelLines.length - 1) * 10;
   }
   return { y, xCost };
 }
@@ -714,10 +732,16 @@ function drawSiteBillingSummaryPage(doc, data) {
 
   const slipDays = daysBetween(data.slip.start_date, data.slip.end_date);
   const readingPeriodStr = `${data.slip.start_date} to ${data.slip.end_date}${slipDays != null && slipDays > LONG_PERIOD_DAYS ? ` (${slipDays} days)` : ''}`;
+  // The reading-period value (with its optional "(59 days)" suffix) can be wider than the 100pt that
+  // used to be reserved for it, running off the page edge - slide the whole label/value pair left
+  // just far enough that the value ends at the right margin.
+  const rpValW = textWidth(readingPeriodStr, { size: 10 });
+  const rpValX = Math.min(right - 100, right - rpValW);
+  const rpLabelX = rpValX - 80;
   doc.text(left, y, 'Period:', { bold: true }); doc.text(left + 90, y, data.slip.label);
-  doc.text(right - 180, y, 'Reading Period:', { bold: true }); doc.text(right - 100, y, readingPeriodStr); y -= 15;
+  doc.text(rpLabelX, y, 'Reading Period:', { bold: true }); doc.text(rpValX, y, readingPeriodStr); y -= 15;
   doc.text(left, y, 'Tariff:', { bold: true }); doc.text(left + 90, y, (data.tariff && data.tariff.tariff_name) || '-');
-  doc.text(right - 180, y, 'Status:', { bold: true }); doc.text(right - 100, y, data.slip.status); y -= 20;
+  doc.text(rpLabelX, y, 'Status:', { bold: true }); doc.text(rpValX, y, data.slip.status); y -= 20;
 
   doc.line(left, y, right, y); y -= 18;
 
