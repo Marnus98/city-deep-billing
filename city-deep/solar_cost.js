@@ -18,7 +18,7 @@
 //
 // Source: 6 monthly Tax Invoices from Capital Propfund (Pty) Ltd - INV2600 (Feb 2026), INV2657
 // (Apr 2026), INV2684 (May 2026), INV2735 (Jun 2026) uploaded 2026-08-11, INV2756 (Jul 2026)
-// uploaded 2026-08-24, and INV2788 (Aug 2026) uploaded 2026-09-15. Jan 2026, Mar 2026, and
+// uploaded 2026-08-24, and INV2788 (Aug 2026) uploaded 2026-09-15, and INV2824 (Sep 2026) uploaded 2026-10-06. Jan 2026, Mar 2026, and
 // everything before Feb 2026 / after Aug 2026 has no invoice yet - those months simply get a R0
 // solar deduction (see solarCostForSection's fallback) rather than blocking the whole Recovery
 // page. Each invoice's own period happens to line up with
@@ -72,6 +72,15 @@ const INVOICES = [
       south: { amount: 216422.12, productionKwh: 71750.82, exportKwh: 8621.33 },
       north: { amount: 225659.92, productionKwh: 70635.16, exportKwh: 3052.35 },
       mini: { amount: 73829.86, productionKwh: 23483.26, exportKwh: 1545.07 },
+    } },
+  // INV2824 (Sept 2026, dated 2026-10-05, uploaded 2026-10-06) - Total Excl R428,595.25 = 168,637.91 +
+  // 175,215.99 + 84,741.35; each sub-site's Report Data workbook "Total Due" matches its invoice line
+  // to the cent.
+  { invoiceNumber: 'INV2824', invoiceDate: '2026-10-05', periodLabel: '2026-09', startDate: '2026-09-01', endDate: '2026-09-30',
+    lines: {
+      south: { amount: 168637.91, productionKwh: 83387.07, exportKwh: 16126.15 },
+      north: { amount: 175215.99, productionKwh: 78521.64, exportKwh: 8211.00 },
+      mini: { amount: 84741.35, productionKwh: 38544.96, exportKwh: 4407.18 },
     } },
 ];
 
