@@ -1,12 +1,15 @@
 {
  "label": "2026-09",
- "file": "WINGFIELD PARK Oct 2026 Final .xlsx",
+ "file": "Copy of WINGFIELD PARK Oct 2026 Final_.xlsx",
  "period": {
   "start": "2026-09-01",
   "end": "2026-10-01"
  },
  "period_source_note": "Workbook headers are correct this month: Electrical Billing C1/D1 and Water Billing both read 01/09/2026-01/10/2026, and every meter's start reading continues from the 2026-08 file's end reading (one trivial exception: ELON044318 start 236 vs prior end 236.6, zero consumption both months).",
- "corrections": [],
+ "corrections": [
+  "Client's own 2026-10-08 update of the workbook: Active Tariff changed from 4.23 (high season) to 3.35 (low season) for this period; all energy charges recalculated by the client.",
+  "Sange SA: breaker reduced 120A -> 100A and meter changed from ELON071992 to the meter inside their premises (serial 858834, single phase: basic charge R36.95, capacity R27.97 x 100A = R2,797.00). Readings 245,375 -> 245,922 = 547 kWh."
+ ],
  "tariff_raw": {
   "B3": {
    "label": "Basic charge: per/month Single Phase",
@@ -30,7 +33,7 @@
   },
   "B8": {
    "label": "Active Tarriff",
-   "B": 4.23
+   "B": 3.35
   },
   "B12": {
    "label": "Usage (0-5000kl): 54.51/kl",
@@ -930,11 +933,11 @@
    "phases": null,
    "ct_ratio": null,
    "billing_rx": null,
-   "start_kwh": 23805.2,
+   "start_kwh": 245375,
    "end_kwh": 245922,
-   "usage_kwh": 222116.8,
-   "tenant_alloc": "Unknown",
-   "location": "Offices ",
+   "usage_kwh": 547,
+   "tenant_alloc": "Sange SA ",
+   "location": "Block D",
    "cb_rating": null,
    "notes": null
   }
@@ -1265,9 +1268,9 @@
      "breaker": 630,
      "basic_charge": 82.92,
      "capacity_charge": 17621.1,
-     "energy_charge": 32790.96000000111,
+     "energy_charge": 25969.200000000877,
      "common_area": null,
-     "row_total": 50494.98000000111
+     "row_total": 43673.220000000874
     },
     {
      "row": 5,
@@ -1280,9 +1283,9 @@
      "breaker": 200,
      "basic_charge": 82.92,
      "capacity_charge": 5594,
-     "energy_charge": 40469.25600000005,
+     "energy_charge": 32050.12000000004,
      "common_area": null,
-     "row_total": 46146.17600000005
+     "row_total": 37727.04000000004
     },
     {
      "row": 6,
@@ -1295,18 +1298,18 @@
      "breaker": 800,
      "basic_charge": 82.92,
      "capacity_charge": 22376,
-     "energy_charge": 34855.200000000004,
+     "energy_charge": 27604,
      "common_area": null,
-     "row_total": 57314.12
+     "row_total": 50062.92
     }
    ],
    "totals": {
     "row": 7,
     "basic_charge": 165.84,
     "capacity_charge": 27970,
-    "energy_charge": 75324.45600000006,
+    "energy_charge": 59654.12000000004,
     "common_area": 0,
-    "row_total": 153955.27600000115
+    "row_total": 131463.18000000092
    }
   },
   {
@@ -1324,9 +1327,9 @@
      "breaker": 630,
      "basic_charge": 82.92,
      "capacity_charge": 17621.1,
-     "energy_charge": 81368.27999999964,
+     "energy_charge": 64440.59999999971,
      "common_area": null,
-     "row_total": 99072.29999999964
+     "row_total": 82144.6199999997
     },
     {
      "row": 12,
@@ -1339,9 +1342,9 @@
      "breaker": 150,
      "basic_charge": 82.92,
      "capacity_charge": 4195.5,
-     "energy_charge": 14656.95,
+     "energy_charge": 11607.75,
      "common_area": null,
-     "row_total": 18935.370000000003
+     "row_total": 15886.17
     },
     {
      "row": 13,
@@ -1354,9 +1357,9 @@
      "breaker": 300,
      "basic_charge": 82.92,
      "capacity_charge": 8391,
-     "energy_charge": 33450.83999999982,
+     "energy_charge": 26491.799999999854,
      "common_area": null,
-     "row_total": 41924.75999999982
+     "row_total": 34965.719999999856
     },
     {
      "row": 14,
@@ -1369,9 +1372,9 @@
      "breaker": 25,
      "basic_charge": 36.95,
      "capacity_charge": 699.25,
-     "energy_charge": 230.53500000000003,
+     "energy_charge": 182.57500000000002,
      "common_area": null,
-     "row_total": 966.7350000000001
+     "row_total": 918.7750000000001
     },
     {
      "row": 15,
@@ -1384,18 +1387,18 @@
      "breaker": 25,
      "basic_charge": 36.95,
      "capacity_charge": 699.25,
-     "energy_charge": 164.5469999999999,
+     "energy_charge": 130.31499999999994,
      "common_area": null,
-     "row_total": 900.747
+     "row_total": 866.515
     }
    ],
    "totals": {
     "row": 16,
     "basic_charge": 322.65999999999997,
     "capacity_charge": 31606.1,
-    "energy_charge": 129871.15199999946,
+    "energy_charge": 102853.03999999957,
     "common_area": 0,
-    "row_total": 161799.91199999946
+    "row_total": 134781.79999999955
    }
   },
   {
@@ -1413,9 +1416,9 @@
      "breaker": 150,
      "basic_charge": 82.92,
      "capacity_charge": 4195.5,
-     "energy_charge": 52625.430000000095,
+     "energy_charge": 41677.35000000007,
      "common_area": null,
-     "row_total": 56903.85000000009
+     "row_total": 45955.77000000007
     },
     {
      "row": 21,
@@ -1428,18 +1431,18 @@
      "breaker": 63,
      "basic_charge": null,
      "capacity_charge": null,
-     "energy_charge": -6475.453200000016,
+     "energy_charge": -5128.314000000013,
      "common_area": null,
-     "row_total": -6475.453200000016
+     "row_total": -5128.314000000013
     }
    ],
    "totals": {
     "row": 22,
     "basic_charge": 82.92,
     "capacity_charge": 4195.5,
-    "energy_charge": 46149.97680000008,
+    "energy_charge": 36549.03600000006,
     "common_area": 0,
-    "row_total": 50428.396800000075
+    "row_total": 40827.45600000006
    }
   },
   {
@@ -1457,18 +1460,18 @@
      "breaker": 630,
      "basic_charge": 82.92,
      "capacity_charge": 17621.1,
-     "energy_charge": 46699.200000000004,
+     "energy_charge": 36984,
      "common_area": null,
-     "row_total": 64403.22
+     "row_total": 54688.02
     }
    ],
    "totals": {
     "row": 26,
     "basic_charge": 82.92,
     "capacity_charge": 17621.1,
-    "energy_charge": 46699.200000000004,
+    "energy_charge": 36984,
     "common_area": 0,
-    "row_total": 64403.22
+    "row_total": 54688.02
    }
   },
   {
@@ -1486,18 +1489,18 @@
      "breaker": 630,
      "basic_charge": 82.92,
      "capacity_charge": 17621.1,
-     "energy_charge": 24314.03999999982,
+     "energy_charge": 19255.799999999854,
      "common_area": null,
-     "row_total": 42018.059999999816
+     "row_total": 36959.81999999985
     }
    ],
    "totals": {
     "row": 31,
     "basic_charge": 82.92,
     "capacity_charge": 17621.1,
-    "energy_charge": 24314.03999999982,
+    "energy_charge": 19255.799999999854,
     "common_area": 0,
-    "row_total": 42018.059999999816
+    "row_total": 36959.81999999985
    }
   },
   {
@@ -1515,18 +1518,18 @@
      "breaker": 63,
      "basic_charge": 82.92,
      "capacity_charge": 1762.11,
-     "energy_charge": 6475.453200000016,
+     "energy_charge": 5128.314000000013,
      "common_area": null,
-     "row_total": 8320.483200000017
+     "row_total": 6973.344000000013
     }
    ],
    "totals": {
     "row": 36,
     "basic_charge": 82.92,
     "capacity_charge": 1762.11,
-    "energy_charge": 6475.453200000016,
+    "energy_charge": 5128.314000000013,
     "common_area": 0,
-    "row_total": 8320.483200000017
+    "row_total": 6973.344000000013
    }
   },
   {
@@ -1544,18 +1547,18 @@
      "breaker": 32,
      "basic_charge": 82.92,
      "capacity_charge": 895.04,
-     "energy_charge": 7203.6900000000005,
+     "energy_charge": 5705.05,
      "common_area": null,
-     "row_total": 8181.650000000001
+     "row_total": 6683.01
     }
    ],
    "totals": {
     "row": 41,
     "basic_charge": 82.92,
     "capacity_charge": 895.04,
-    "energy_charge": 7203.6900000000005,
+    "energy_charge": 5705.05,
     "common_area": 0,
-    "row_total": 8181.650000000001
+    "row_total": 6683.01
    }
   },
   {
@@ -1573,9 +1576,9 @@
      "breaker": 100,
      "basic_charge": 82.92,
      "capacity_charge": 2797,
-     "energy_charge": 12967.065,
+     "energy_charge": 10269.425000000001,
      "common_area": null,
-     "row_total": 15846.985
+     "row_total": 13149.345000000001
     },
     {
      "row": 46,
@@ -1588,18 +1591,18 @@
      "breaker": 32,
      "basic_charge": null,
      "capacity_charge": null,
-     "energy_charge": -7203.6900000000005,
+     "energy_charge": -5705.05,
      "common_area": null,
-     "row_total": -7203.6900000000005
+     "row_total": -5705.05
     }
    ],
    "totals": {
     "row": 47,
     "basic_charge": 0,
     "capacity_charge": 0,
-    "energy_charge": 5763.375,
+    "energy_charge": 4564.375000000001,
     "common_area": 0,
-    "row_total": 8643.295
+    "row_total": 7444.295000000001
    }
   },
   {
@@ -1617,18 +1620,18 @@
      "breaker": 600,
      "basic_charge": 82.92,
      "capacity_charge": 16782,
-     "energy_charge": 2284.2000000000003,
+     "energy_charge": 1809,
      "common_area": null,
-     "row_total": 19149.12
+     "row_total": 18673.92
     }
    ],
    "totals": {
     "row": 51,
     "basic_charge": 82.92,
     "capacity_charge": 16782,
-    "energy_charge": 2284.2000000000003,
+    "energy_charge": 1809,
     "common_area": 0,
-    "row_total": 19149.12
+    "row_total": 18673.92
    }
   },
   {
@@ -1646,9 +1649,9 @@
      "breaker": 315,
      "basic_charge": 82.92,
      "capacity_charge": 8810.55,
-     "energy_charge": 26445.96000000019,
+     "energy_charge": 20944.200000000146,
      "common_area": null,
-     "row_total": 35339.43000000019
+     "row_total": 29837.670000000144
     },
     {
      "row": 55,
@@ -1661,18 +1664,18 @@
      "breaker": 120,
      "basic_charge": null,
      "capacity_charge": null,
-     "energy_charge": -431.45999999999714,
+     "energy_charge": -341.6999999999977,
      "common_area": null,
-     "row_total": -431.45999999999714
+     "row_total": -341.6999999999977
     }
    ],
    "totals": {
     "row": 56,
     "basic_charge": 82.92,
     "capacity_charge": 8810.55,
-    "energy_charge": 26014.500000000193,
+    "energy_charge": 20602.50000000015,
     "common_area": 0,
-    "row_total": 34907.97000000019
+    "row_total": 29495.970000000147
    }
   },
   {
@@ -1690,9 +1693,9 @@
      "breaker": 630,
      "basic_charge": 82.92,
      "capacity_charge": 17621.1,
-     "energy_charge": 13400.639999999818,
+     "energy_charge": 10612.799999999854,
      "common_area": null,
-     "row_total": 31104.659999999814
+     "row_total": 28316.81999999985
     },
     {
      "row": 60,
@@ -1705,9 +1708,9 @@
      "breaker": 150,
      "basic_charge": 82.92,
      "capacity_charge": 4195.5,
-     "energy_charge": 68086.08000000025,
+     "energy_charge": 53921.600000000195,
      "common_area": null,
-     "row_total": 72364.50000000025
+     "row_total": 58200.02000000019
     },
     {
      "row": 61,
@@ -1720,9 +1723,9 @@
      "breaker": 150,
      "basic_charge": null,
      "capacity_charge": null,
-     "energy_charge": -52625.430000000095,
+     "energy_charge": -41677.35000000007,
      "common_area": null,
-     "row_total": -52625.430000000095
+     "row_total": -41677.35000000007
     },
     {
      "row": 62,
@@ -1735,18 +1738,18 @@
      "breaker": 25,
      "basic_charge": null,
      "capacity_charge": null,
-     "energy_charge": -230.53500000000003,
+     "energy_charge": -182.57500000000002,
      "common_area": null,
-     "row_total": -230.53500000000003
+     "row_total": -182.57500000000002
     }
    ],
    "totals": {
     "row": 63,
     "basic_charge": 165.84,
     "capacity_charge": 21816.6,
-    "energy_charge": 28630.754999999965,
+    "energy_charge": 22674.47499999998,
     "common_area": 0,
-    "row_total": 50613.19499999996
+    "row_total": 44656.91499999997
    }
   },
   {
@@ -1755,27 +1758,27 @@
    "meters": [
     {
      "row": 65,
-     "serial": "ELON071992",
-     "start": 418.1,
-     "end": 421.5,
-     "consumption": 101.99999999999932,
+     "serial": "858834",
+     "start": 245375,
+     "end": 245922,
+     "consumption": 547,
      "tenant_label": "Sange SA ",
      "location": "Block D",
-     "breaker": 120,
-     "basic_charge": 82.92,
-     "capacity_charge": 3356.3999999999996,
-     "energy_charge": 431.45999999999714,
+     "breaker": 100,
+     "basic_charge": 36.95,
+     "capacity_charge": 2797,
+     "energy_charge": 1832.45,
      "common_area": null,
-     "row_total": 3870.779999999997
+     "row_total": 4666.4
     }
    ],
    "totals": {
     "row": 66,
-    "basic_charge": 82.92,
-    "capacity_charge": 3356.3999999999996,
-    "energy_charge": 431.45999999999714,
+    "basic_charge": 36.95,
+    "capacity_charge": 2797,
+    "energy_charge": 1832.45,
     "common_area": 0,
-    "row_total": 3870.779999999997
+    "row_total": 4666.4
    }
   },
   {
@@ -1822,9 +1825,9 @@
      "breaker": 1600,
      "basic_charge": 82.92,
      "capacity_charge": 44752,
-     "energy_charge": 60370.5600000005,
+     "energy_charge": 47811.20000000039,
      "common_area": null,
-     "row_total": 105205.4800000005
+     "row_total": 92646.12000000039
     },
     {
      "row": 74,
@@ -1837,9 +1840,9 @@
      "breaker": 1600,
      "basic_charge": 82.92,
      "capacity_charge": 44752,
-     "energy_charge": 92450.87999999903,
+     "energy_charge": 73217.59999999922,
      "common_area": null,
-     "row_total": 137285.79999999903
+     "row_total": 118052.51999999922
     },
     {
      "row": 75,
@@ -1852,9 +1855,9 @@
      "breaker": 1600,
      "basic_charge": 82.92,
      "capacity_charge": 44752,
-     "energy_charge": 143887.67999999903,
+     "energy_charge": 113953.59999999922,
      "common_area": null,
-     "row_total": 188722.59999999905
+     "row_total": 158788.5199999992
     },
     {
      "row": 76,
@@ -1867,18 +1870,18 @@
      "breaker": 1600,
      "basic_charge": 82.92,
      "capacity_charge": 44752,
-     "energy_charge": 62671.67999999902,
+     "energy_charge": 49633.59999999922,
      "common_area": null,
-     "row_total": 107506.59999999902
+     "row_total": 94468.51999999922
     }
    ],
    "totals": {
     "row": 77,
     "basic_charge": 331.68,
     "capacity_charge": 179008,
-    "energy_charge": 359380.7999999976,
+    "energy_charge": 284615.999999998,
     "common_area": 0,
-    "row_total": 538720.4799999977
+    "row_total": 463955.679999998
    }
   },
   {
@@ -1896,9 +1899,9 @@
      "breaker": 40,
      "basic_charge": 82.92,
      "capacity_charge": null,
-     "energy_charge": 10039.735799999966,
+     "energy_charge": 7951.090999999973,
      "common_area": null,
-     "row_total": 10122.655799999966
+     "row_total": 8034.010999999973
     },
     {
      "row": 81,
@@ -1911,9 +1914,9 @@
      "breaker": 40,
      "basic_charge": 36.95,
      "capacity_charge": null,
-     "energy_charge": 55.83599999999924,
+     "energy_charge": 44.219999999999395,
      "common_area": null,
-     "row_total": 92.78599999999923
+     "row_total": 81.16999999999939
     },
     {
      "row": 82,
@@ -1971,9 +1974,9 @@
      "breaker": 200,
      "basic_charge": 82.92,
      "capacity_charge": null,
-     "energy_charge": 5084.459999999877,
+     "energy_charge": 4026.6999999999025,
      "common_area": null,
-     "row_total": 5167.379999999877
+     "row_total": 4109.619999999903
     },
     {
      "row": 86,
@@ -1986,9 +1989,9 @@
      "breaker": 16,
      "basic_charge": 36.95,
      "capacity_charge": null,
-     "energy_charge": 21.57299999999998,
+     "energy_charge": 17.084999999999983,
      "common_area": null,
-     "row_total": 58.52299999999998
+     "row_total": 54.03499999999998
     },
     {
      "row": 87,
@@ -2016,9 +2019,9 @@
      "breaker": 100,
      "basic_charge": 82.92,
      "capacity_charge": null,
-     "energy_charge": 70.21800000000155,
+     "energy_charge": 55.61000000000122,
      "common_area": null,
-     "row_total": 153.13800000000157
+     "row_total": 138.53000000000122
     },
     {
      "row": 89,
@@ -2055,9 +2058,9 @@
     "row": 91,
     "basic_charge": 728.24,
     "capacity_charge": 0,
-    "energy_charge": 15271.822799999843,
+    "energy_charge": 12094.705999999875,
     "common_area": 0,
-    "row_total": 16000.062799999845
+    "row_total": 12822.945999999876
    }
   }
  ],
