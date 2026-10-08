@@ -309,7 +309,7 @@ const MONTH_FILES = [
   'wingfield_2025-06.json', 'wingfield_2025-07.json', 'wingfield_2025-08.json', 'wingfield_2025-09.json',
   'wingfield_2025-10.json', 'wingfield_2025-11.json', 'wingfield_2025-12.json', 'wingfield_2026-01.json',
   'wingfield_2026-02.json', 'wingfield_2026-03.json', 'wingfield_2026-04.json', 'wingfield_2026-05.json',
-  'wingfield_2026-06.json', 'wingfield_2026-07.json', 'wingfield_2026-08.json',
+  'wingfield_2026-06.json', 'wingfield_2026-07.json', 'wingfield_2026-08.json', 'wingfield_2026-09.json',
 ];
 
 // ---------- Ptyprops 348 / Komatsu Offices cross-mirroring ----------

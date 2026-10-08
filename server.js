@@ -87,6 +87,13 @@ require('./city-deep/seed').run('city-deep.db');
 // by City of Ekurhuleni, a different municipality with its own statement layout entirely (see
 // seed_wingfield_municipal.js).
 require('./city-deep/seed_municipal').run('city-deep.db');
+// Wingfield's own monthly tenant/billing history (wingfield/seed_wingfield.js) - same gap as City
+// Deep's seed above: it was only ever reached via the "empty database" gate at the top of this file,
+// so a new month added to its MONTH_FILES (e.g. 2026-09, added 2026-10-08) never reached an already-
+// populated live database. Verified idempotent 2026-10-08 (two consecutive runs against a scratch db
+// leave identical assignment/bill/line-item counts and totals - bills are DELETEd+re-INSERTed per
+// (tenant, period), meter assignments are keyed by (meter, effective_from)), so safe on every boot.
+require('./wingfield/seed_wingfield').run('wingfield.db');
 require('./wingfield/seed_wingfield_municipal').run('wingfield.db');
 // The solar plant owner's own monthly invoices to the property (Industrial Park + Mini Park only -
 // see city-deep/solar_cost.js) - own de-dup key (sub_site + period_label), always safe to re-run.
