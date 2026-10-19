@@ -1256,6 +1256,20 @@ function currentPropFlagRows(user) {
   return { settings, ...wingfieldFlagging.buildAllFlagRows(db, settings, propertyName) };
 }
 
+// Solar PV / BESS sizing model - 8 Field Street only (properties.js hasSolarSizing). Read-only: it
+// loads the last 12 months of billed kWh/kVA and the latest tariff (field-street/solar_sizing_data.js)
+// and hands them to a self-contained page whose model runs in the browser. Any other property that
+// somehow requests this URL is bounced to its dashboard.
+route('GET', '/solar-sizing', async (req, res) => {
+  const user = requireLogin(req, res); if (!user) return;
+  const currentProp = properties.find((p) => p.slug === user.currentProperty);
+  if (!currentProp || !currentProp.hasSolarSizing) return redirect(res, '/dashboard');
+  const data = require('./field-street/solar_sizing_data').loadSolarSizingData(all, get);
+  send(res, 200, require('./field-street/solar_sizing_page').render({
+    layout: views.layout, esc: views.esc, user, propertyName: currentPropertyName(user), data,
+  }));
+});
+
 route('GET', '/flagging', async (req, res) => {
   const user = requireLogin(req, res); if (!user) return;
   const data = currentPropFlagRows(user);

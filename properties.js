@@ -80,6 +80,10 @@ module.exports = [
     hasMunicipalStatements: true,
     hasFlagging: true,
     flaggingChartLayout: true,
+    // Enables the "Solar Sizing" nav tab + /solar-sizing page (field-street/solar_sizing_*.js): a
+    // read-only Solar PV / BESS sizing and finance model built on this site's own billed kWh.
+    // 8 Field Street only - no other property has this flag, so none of them get the tab or route.
+    hasSolarSizing: true,
   },
   {
     slug: 'bob-martin',

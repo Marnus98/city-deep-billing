@@ -43,6 +43,8 @@ function layout({ title, user, active, body }) {
       // initial all-properties rollout (2026-08-25), since every flat_site property also got
       // hasFlagging: true in properties.js but this nav branch never checked it.
       ...(currentProp.hasFlagging ? [['/flagging', 'Flagging']] : []),
+      // Solar PV / BESS sizing model - 8 Field Street only (properties.js hasSolarSizing).
+      ...(currentProp.hasSolarSizing ? [['/solar-sizing', 'Solar Sizing']] : []),
       ['/recharge-export', 'Recharge Export'], ['/audit-log', 'Audit Log'],
     ]
     : [
