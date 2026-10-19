@@ -23,7 +23,8 @@
       esc: num('i_esc') / 100, maint: num('i_maint') / 100, ins: num('i_ins') / 100, maintEsc: num('i_mesc') / 100,
       prime, ppaSpread: spread, disc: $('i_disc').value === '' ? prime + spread : num('i_disc') / 100,
       loanTerm: Math.max(1, Math.round(num('i_loan'))), ppaEsc: num('i_ppaesc') / 100,
-      mount: $('i_mount').value, rateRoof: num('i_rroof'), rateGround: num('i_rground'), rateBat: num('i_rbat'),
+      mount: $('i_mount').value, rateRoof: num('i_rroof'), rateGround: num('i_rground'), rateBat: 0,
+      dcacMax: num('i_dcac') || 1.5, cmax: 1 / Math.max(0.5, num('i_hours') || 2), hybridGp: num('i_gp'), hybridBrand: $('i_brand').value, panelRpw: 2.45,
     };
   }
 
@@ -87,13 +88,13 @@
     const pvBest = M.pickPv(pvRows, num('i_hurdlepv'));
     const batSizes = []; for (let k = 100; k <= 2000; k += 100) batSizes.push(k);
     const hr = Math.max(0.5, num('i_hours'));
-    const batRows = M.sweepBat(c, a, pvBest.kwp, batSizes, hr, 'C');
+    const batRows = M.sweepHybrid(c, a, pvBest.kwp, 1500, batSizes, hr, 'C');
     const k0 = M.evaluate(c, a, 'A', pvBest.kwp, 0, 0);
-    // battery: largest size whose marginal payback stays within the hurdle AND which adds NPV vs PV only
+    // hybrid: largest size whose marginal payback (extra PV + battery + inverter) stays within the hurdle and adds NPV vs PV only
     let best = null; const hb = num('i_hurdlebat');
     for (let i = 0; i < batRows.length; i++) {
-      const r = batRows[i]; const mp = i === 0 ? (r.capBat / Math.max(1, r.arb)) : r.margPay;
-      if (mp <= hb && r.dNpvVsPv > 0) best = r; else if (best) break;
+      const r = batRows[i];
+      if (r.margPay <= hb && r.dNpvVsPv > 0) best = r; else if (best) break;
     }
     return { pvRows, pvBest, batRows, batBest: best, pvOnly: k0 };
   }
@@ -102,7 +103,7 @@
 
   function setSizesFromRecommendation() {
     if (!recommended) return;
-    $('i_kwp').value = recommended.pvBest.kwp;
+    $('i_kwp').value = recommended.batBest ? recommended.batBest.kwp : recommended.pvBest.kwp;
     if (recommended.batBest) { $('i_kwh').value = recommended.batBest.kwh; $('i_pkw').value = Math.round(recommended.batBest.pkw); }
     else { $('i_kwh').value = 0; $('i_pkw').value = 0; }
     if (recommended.batBest) $('i_scen').value = 'C'; else $('i_scen').value = 'A';
@@ -128,8 +129,8 @@
     // ---- recommendation banner
     const rb = recommended.batBest;
     let banner = '<h3>Engineering recommendation <span class="ss-tag">optimiser</span></h3>';
-    banner += '<div class="ss-big">PV ' + fmtN(recommended.pvBest.kwp) + ' kWp' + (rb ? ' + battery ' + fmtN(rb.kwh) + ' kWh / ' + fmtN(rb.pkw) + ' kW' : ' (no battery justified)') + '</div>';
-    banner += '<p>PV stops paying where the marginal payback of each extra 50 kWp passes ' + num('i_hurdlepv') + ' years; the battery is sized the same way against ' + num('i_hurdlebat') + ' years. Change the hurdles or any price and the recommendation re-runs. The sizes below are editable.</p>';
+    banner += '<div class="ss-big">PV ' + fmtN(rb ? rb.kwp : recommended.pvBest.kwp) + ' kWp' + (rb ? ' + DC-coupled hybrid: ' + fmtN(rb.kwh) + ' kWh battery, ' + fmtN(rb.pkw) + ' kW inverter' : ' (no battery justified)') + '</div>';
+    banner += '<p>PV-only is priced at the applied R/Wp rates and stops paying where each extra 50 kWp passes ' + num('i_hurdlepv') + ' years. The hybrid (DC-coupled, one inverter for PV and battery) is priced with the Sigenergy / Solis costing; extra PV, battery and inverter are added while each step pays back inside ' + num('i_hurdlebat') + ' years. Change the hurdles or any price and the recommendation re-runs. The sizes below are editable.</p>';
     $('ss-reco').innerHTML = banner;
 
     // ---- chips for current configuration
@@ -198,8 +199,8 @@
     const br = recommended.batRows;
     let bh = '<div class="ss-two"><div>' + chartLine([{ pts: br.map((r) => [r.kwh, r.dNpvVsPv / 1e6]), color: '#12908e' }], { fmtY: (v) => v.toFixed(1) + 'm', fmtX: (v) => fmtN(v), xticks: [100, 600, 1100, 1600, 2000], mark: rb ? [rb.kwh, rb.dNpvVsPv / 1e6, fmtN(rb.kwh) + ' kWh'] : null, xlab: 'NPV added by the battery (R million) vs kWh' }) + '</div>';
     bh += '<div>' + chartLine([{ pts: br.filter((r) => r.margPay !== undefined && isFinite(r.margPay)).map((r) => [r.kwh, Math.min(r.margPay, 15)]), color: '#f2a33a' }], { fmtY: (v) => v.toFixed(0) + ' yr', fmtX: (v) => fmtN(v), xticks: [100, 600, 1100, 1600, 2000], hline: [num('i_hurdlebat'), 'hurdle ' + num('i_hurdlebat') + ' yr'], xlab: 'marginal payback of each extra 100 kWh' }) + '</div></div>';
-    bh += '<div class="ss-scroll"><table class="ss-t ss-sm"><thead><tr><th>kWh / kW</th><th class="n">Battery CAPEX</th><th class="n">Discharged MWh</th><th class="n">Arbitrage yr 1</th><th class="n">NPV vs PV only</th><th class="n">Marginal payback</th></tr></thead><tbody>';
-    br.forEach((r) => { bh += '<tr' + (rb && r.kwh === rb.kwh ? ' class="ss-sel"' : '') + '><td>' + fmtN(r.kwh) + ' / ' + fmtN(r.pkw) + '</td><td class="n">' + fmtM(r.capBat) + '</td><td class="n">' + fmtN(r.dis / 1000) + '</td><td class="n">' + fmtM(r.arb) + '</td><td class="n">' + fmtM1(r.dNpvVsPv) + '</td><td class="n">' + (r.margPay === undefined ? '-' : fmtY(r.margPay)) + '</td></tr>'; });
+    bh += '<div class="ss-scroll"><table class="ss-t ss-sm"><thead><tr><th>PV + battery / inverter</th><th class="n">Hybrid extra CAPEX</th><th class="n">Discharged MWh</th><th class="n">Arbitrage yr 1</th><th class="n">NPV vs PV only</th><th class="n">Marginal payback</th></tr></thead><tbody>';
+    br.forEach((r) => { bh += '<tr' + (rb && r.kwh === rb.kwh ? ' class="ss-sel"' : '') + '><td>' + fmtN(r.kwp) + ' kWp + ' + fmtN(r.kwh) + ' kWh / ' + fmtN(r.pkw) + ' kW</td><td class="n">' + fmtM(r.capBat) + '</td><td class="n">' + fmtN(r.dis / 1000) + '</td><td class="n">' + fmtM(r.arb) + '</td><td class="n">' + fmtM1(r.dNpvVsPv) + '</td><td class="n">' + (r.margPay === undefined ? '-' : fmtY(r.margPay)) + '</td></tr>'; });
     bh += '</tbody></table></div>';
     bh += '<p class="ss-cap">Peak energy is about ' + fmtN(peakDay.lo) + ' kWh per low-season weekday and ' + fmtN(peakDay.hi) + ' kWh per high-season weekday. The battery cycles up to twice a day (overnight off-peak charge, then a midday recharge between the two peak windows). Value per kWh of battery falls as it grows because the low-season peak/off-peak spread is small and solar already covers part of the morning peak.</p>';
     $('ss-bat').innerHTML = bh;
@@ -219,11 +220,13 @@
     $('ss-base').innerHTML = bs;
 
     // ---- inverter / electrical
-    const dcac = num('i_dcac') || 1.2; const acKva = kwp / dcac; const n110 = Math.ceil(acKva / 110 - 1e-9); const n50 = 0;
+    const dcacAct = pkw > 0 ? kwp / pkw : 0; const hyb = (hasBat && S.hybrid) ? S.hybrid : null;
     let ie = '<div class="ss-three"><div><h4>Sizing from the numbers</h4><ul>' +
       '<li>PV array: ' + fmtN(kwp) + ' kWp (' + fmtN(Math.ceil(kwp * 1000 / 620 - 1e-9)) + ' x 620 W panels)</li>' +
-      '<li>PV inverter AC: about ' + fmtN(acKva) + ' kVA at DC/AC ' + dcac.toFixed(2) + ' (for example ' + n110 + ' x 110 kW)</li>' +
-      (hasBat ? '<li>Battery: ' + fmtN(kwh) + ' kWh, power ' + fmtN(pkw) + ' kW (' + (kwh / Math.max(1, pkw)).toFixed(1) + ' h rating)</li>' : '<li>No battery in the selected case</li>') +
+      (hasBat ? '<li>DC-coupled hybrid inverter: ' + fmtN(pkw) + ' kW AC for PV and battery together. DC/AC ' + dcacAct.toFixed(2) + (dcacAct > num('i_dcac') + 0.001 ? ' (above the ' + num('i_dcac').toFixed(2) + ' limit, PV will clip)' : '') + '</li>' +
+      '<li>Battery: ' + fmtN(kwh) + ' kWh, charge/discharge limited to ' + fmtN(Math.min(pkw, kwh * (1 / Math.max(0.5, num('i_hours') || 2)))) + ' kW</li>' +
+      (hyb ? '<li>Costed as ' + hyb.brand + ': ' + hyb.desc + ' (' + fmtM(hyb.sell) + ' client price ex VAT at ' + num('i_gp') + '% GP, installer cost ' + fmtM(hyb.cost) + ')</li>' : '')
+      : '<li>PV only: grid-tied string inverters, about ' + fmtN(kwp / 1.2) + ' kVA at DC/AC 1.2 (priced inside the R/Wp rate)</li><li>No battery in the selected case</li>') +
       '<li>Billed maximum demand ' + fmtN(maxKva) + ' kVA is one 30-minute value, not instantaneous load</li>' +
       '<li>Zero-export controller assumed, since no export value is modelled</li></ul></div>';
     ie += '<div><h4>Measurements needed to confirm</h4><ul><li>12 months of 30-minute kW and kVA from the Vivarox check meter</li><li>Power factor at the monthly peak</li><li>Incomer and transformer rating, spare capacity, protection and short-circuit level</li><li>Roof area, orientation, shading, structure</li><li>Municipal embedded-generation approval and any export rule</li></ul></div>';
@@ -232,7 +235,7 @@
   }
 
   function wire() {
-    const sizeIds = ['i_kwp', 'i_kwh', 'i_pkw', 'i_scen', 'i_dcac'];
+    const sizeIds = ['i_kwp', 'i_kwh', 'i_pkw', 'i_scen'];
     // everything re-computes; assumption changes also re-run the optimiser
     document.querySelectorAll('#ss-root input, #ss-root select').forEach((el) => {
       el.addEventListener('input', () => {

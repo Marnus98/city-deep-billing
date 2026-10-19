@@ -91,7 +91,7 @@ function render({ layout, esc, user, propertyName, data }) {
     ${field('i_kwp', 'Size', 750, 'kWp')}
     <div><label for="i_mount">Mounting</label><select id="i_mount"><option value="roof">Roof</option><option value="ground">Ground</option></select></div>
     ${field('i_yield', 'Specific yield', 1550, 'kWh/kWp')}
-    ${field('i_dcac', 'DC/AC ratio', 1.2, '')}
+    ${field('i_dcac', 'Max DC/AC (hybrid)', 1.5, '')}
     ${field('i_rroof', 'Roof sell price', 9, 'R/Wp')}
     ${field('i_rground', 'Ground sell price', 12, 'R/Wp')}
     ${field('i_degpv', 'PV degradation', 0.5, '%/yr')}
@@ -99,13 +99,14 @@ function render({ layout, esc, user, propertyName, data }) {
   </div></div>
   <div class="ss-card"><h2>Battery</h2><div class="ss-f">
     ${field('i_kwh', 'Energy', 700, 'kWh')}
-    ${field('i_pkw', 'Power', 350, 'kW')}
-    ${field('i_rbat', 'Battery sell price', 5, 'R/Wh')}
+    ${field('i_pkw', 'Hybrid inverter (AC)', 500, 'kW')}
+    ${field('i_gp', 'Hybrid GP (client price)', 25, '%')}
+    <div><label for="i_brand">Hybrid brand</label><select id="i_brand"><option value="auto">Cheapest of Sigenergy / Solis</option><option value="sigen">Sigenergy</option><option value="solis">Solis</option></select></div>
     ${field('i_dod', 'Usable (DoD)', 90, '%')}
     ${field('i_eff', 'Round-trip efficiency', 90, '%')}
     ${field('i_degbat', 'Degradation', 2, '%/yr')}
     ${field('i_batlife', 'Battery life', 15, 'yr')}
-    ${field('i_hours', 'Optimiser rating', 2, 'h')}
+    ${field('i_hours', 'Battery C-rate limit (hours)', 2, 'h')}
   </div></div>
   <div class="ss-card"><h2>Economics &amp; finance</h2><div class="ss-f">
     ${field('i_esc', 'Tariff escalation', 8.8, '%/yr')}
