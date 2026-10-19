@@ -170,6 +170,15 @@ const MONTHS = [
     readings: { network_demand: { reading: 633.120, comment: 'Demand=633.120' }, network_access: { reading: 633.120, comment: 'Demand=633.120' },
       standard_low: 50782.029, offpeak_low: 37233.840, peak_low: 21419.574,
       water: 120, sewer: 120 } },
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', waterStartDate: '2026-08-08', waterEndDate: '2026-09-02',
+    // Meter P/S/O labels print scrambled; classified by implied rate (peak ~R11.85, standard ~R3.46, offpeak ~R2.14). Same _low key convention as July.
+    rates: { property_rates: 20806.70, fixed_charge: 3345.78,
+      standard_low: 192863.80 / 55681.44, offpeak_low: 80875.97 / 37783.68, peak_low: 273867.04 / 23116.8,
+      network_demand: 73062.04 / 488.640, network_access: 56389.06 / 488.640,
+      refuse_business: 604.33, refuse_litter: 1199.21, water: 5451.00 / 100, sewer: 2207.00 / 100 },
+    readings: { network_demand: { reading: 488.640, comment: 'Demand=488.640 (printed NETWORK ACCESS CHARGE line, 73,062.04)' }, network_access: { reading: 488.640, comment: 'Demand=488.640 (56,389.06 line)' },
+      standard_low: 55681.44, offpeak_low: 37783.68, peak_low: 23116.8,
+      water: 100, sewer: 100 } },
 ];
 
 function main(dbFile = 'bob-martin.db') {

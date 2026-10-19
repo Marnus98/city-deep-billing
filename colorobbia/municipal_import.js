@@ -39,6 +39,19 @@ const MONTHS = [
       sewer: 551.75 / 25,
     },
     readings: { energy_charge: 2660.585, water: 25, sewer: 25 } },
+  // Aug 2026: new account 1712639743.
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', waterStartDate: '2026-08-06', waterEndDate: '2026-09-01',
+    rates: {
+      property_rates: 13923.00,
+      capacity_charge: 12586.50,
+      fixed_charge: 36.95,
+      energy_charge: 7255.60 / 2165.850,
+      refuse_business: 604.33,
+      refuse_litter: 432.37,
+      water: 817.65 / 15,
+      sewer: 331.05 / 15,
+    },
+    readings: { energy_charge: 2165.850, water: 15, sewer: 15 } },
 ];
 
 function main(dbFile = 'colorobbia.db') {

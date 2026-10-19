@@ -137,6 +137,13 @@ const MONTHS = [
       demand_charge: { reading: 29.520, comment: 'Demand=29.520' }, network_access: { reading: 29.520, comment: 'Demand=29.520' },
       water: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' },
       sewer: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' } } },
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01',
+    rates: { fixed_charge: 4338.39, energy_charge: 23486.67 / 4669.319, demand_charge: 8003.15 / 29.877,
+      network_access: 3507.92 / 29.877, refuse_litter: 0.17, refuse_levy: 0, water: 2016.87 / 37, sewer: 816.59 / 37 },
+    readings: { energy_charge: 4669.319,
+      demand_charge: { reading: 29.877, comment: 'Demand=29.877' }, network_access: { reading: 29.877, comment: 'Demand=29.877' },
+      water: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' },
+      sewer: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' } } },
 ];
 
 function main(dbFile = 'loper-road.db') {

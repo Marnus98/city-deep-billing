@@ -891,5 +891,65 @@
    "note": "New 'R' meter (M-NO:R015523700) appearing for the first time this cycle, tariff code otherwise identical to the standard TOU meters ('TAR:ELE->230/400V <=11KV', not a reactive-energy meter) - billed as reading x a 1000 multiply-factor at a flat R0.3510/kWh (11,617 notional kWh -> R4,077.57 excl VAT). The exact same R0.3510/kWh rate appears on 8 Field Street's and Cranbrook Flavours' own new 'R' meters this same billing cycle (see their own municipal_import.js files) - a genuine new Ekurhuleni tariff item rolled out this period across multiple accounts, not a one-off. Recorded here as sundry since it isn't Peak/Standard/Off-Peak and its official name/purpose hasn't been confirmed with Ekurhuleni yet."
   },
   "grand_total_incl_vat": 1054121.66
+ },
+ {
+  "file": "221075502 - wingfield ekr Aug 2026.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-09-29",
+  "statement_for": "2026-08",
+  "due_date": "2026-10-27",
+  "invoice_number": "2210755502-2026-09-29",
+  "property_rates": {
+   "excl_vat": 374692.5,
+   "vat": 0.0,
+   "incl_vat": 374692.5
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-08-01",
+    "2026-09-01"
+   ],
+   "consumption_kwh": 119828.0,
+   "consumption_kvarh": 0,
+   "tariff_type": "TOU",
+   "lines": {
+    "off_peak_qty": 42550.0,
+    "off_peak": 88546.55,
+    "standard_qty": 59200.0,
+    "standard": 209627.2,
+    "peak_qty": 18078.0,
+    "peak": 223514.57,
+    "demand_qty": 401.138,
+    "demand": 64478.92,
+    "service": 6195.35,
+    "network_surcharge": 39602.0
+   },
+   "excl_vat": 631964.59,
+   "vat": 94794.69,
+   "incl_vat": 726759.28,
+   "note": "Peak is net of two ELEC ADJUSTMENT lines (+260,631.00 and -260,631.01) that cancel July's peak re-bill (net -0.01)."
+  },
+  "water": {
+   "reading_period": null,
+   "consumption_kl": 1227.0,
+   "water_excl_vat": 66346.32,
+   "sanitation_excl_vat": 26765.38,
+   "vat": 13966.75,
+   "note": "Net of an INTERIM REVERSAL (96 kL, water -4,904.64, sanitation -1,926.59): 409 kL + 914 kL billed, 96 kL reversed. Mixed meter windows so reading_period left null."
+  },
+  "refuse": {
+   "excl_vat": 8356.57,
+   "vat": 1253.49,
+   "incl_vat": 9610.06
+  },
+  "sundry": {
+   "excl_vat": 5742.39,
+   "vat": 861.36,
+   "incl_vat": 6603.75,
+   "note": "'R' meter, 16,360.08 notional kWh at R0.3510/kWh (see July entry)."
+  },
+  "grand_total_incl_vat": 1224744.05
  }
 ]

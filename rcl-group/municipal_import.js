@@ -32,6 +32,19 @@ const MONTHS = [
       sewer: 353.12 / 16,
     },
     readings: { energy_charge: 5165.520, water: 16, sewer: 16 } },
+  // Aug 2026: statement now under new account 1712639777 (was 1702329900). TRANSFER BETWEEN ACCOUNTS lines are prior-month charges and excluded.
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01',
+    rates: {
+      property_rates: 9531.60,
+      capacity_charge: 12586.50,
+      fixed_charge: 36.95,
+      energy_charge: 17540.87 / 5236.080,
+      refuse_business: 604.33,
+      refuse_litter: 291.87,
+      water: 763.14 / 14,
+      sewer: 308.98 / 14,
+    },
+    readings: { energy_charge: 5236.080, water: { reading: 14, comment: 'INTERIM estimate, no reading dates' }, sewer: { reading: 14, comment: 'INTERIM estimate, no reading dates' } } },
 ];
 
 function main(dbFile = 'rcl-group.db') {

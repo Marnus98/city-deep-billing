@@ -60,6 +60,32 @@ const MONTHS = [
       sewer: 13,
       sewer_interim: { reading: 16, comment: 'INTERIM estimate (mirrors the water_interim meter), not an actual meter read this cycle' },
     } },
+  // Aug 2026: shared account now 1712639793; 50/50 split of the Rand amounts, full readings kept.
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01',
+    rates: {
+      property_rates: 18232.50 / 2,
+      fixed_charge: 3345.78 / 2,
+      peak: (3920.21 / 2) / 330.900,
+      standard: (3018.41 / 2) / 871.440,
+      offpeak: (960.14 / 2) / 448.560,
+      reactive: (0.39 / 2) / 1.199,
+      demand: (1259.24 / 2) / 10.912,
+      network_access: 2885.00 / 2,
+      refuse_business: 604.33 / 2,
+      refuse_litter: 507.02 / 2,
+      water: (1090.20 / 2) / 20,
+      water_interim: 0,
+      sewer: (441.40 / 2) / 20,
+      sewer_interim: 0,
+    },
+    readings: {
+      peak: 330.900, standard: 871.440, offpeak: 448.560, reactive: 1.199,
+      demand: { reading: 10.912, comment: 'Demand=10.912 (full building reading - see file header note on the 50/50 split)' },
+      water: { reading: 20, comment: '17 kL + 3 kL, blended' },
+      water_interim: 0,
+      sewer: { reading: 20, comment: '17 kL + 3 kL, blended' },
+      sewer_interim: 0,
+    } },
 ];
 
 function main(dbFile = 'zelvio-global.db') {

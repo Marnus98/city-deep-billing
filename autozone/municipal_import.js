@@ -234,6 +234,15 @@ const MONTHS = [
       demand_charge: { reading: 218.600, comment: 'Demand=218.600' },
       water: 2564, sewer: 2564,
     } },
+  // September 2026 consumption - from the COJ statement dated 2026/10/02 (reading period 2026/09/02 to 2026/10/01). Filename was '08) Autozone - 2026-08.pdf' but it is the Oct statement.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-08-26', waterEndDate: '2026-09-28',
+    rates: { property_rates: 117733.76, peak_high: 0, peak_low: 40462.52/12566, standard_high: 0, standard_low: 76178.06/31424,
+      offpeak_high: 0, offpeak_low: 27501.53/14758, surcharge_tou: 0, reactive_energy: 0, network_surcharge: 3524.88/58748,
+      demand_charge: 81000.77/175.600, service_charge: 4629.64, water: 261352.67/3371, demand_management_levy: 413.84,
+      sewer: 197742.86/3371, refuse: 1112.00, sundry_surcharge: 9181.91 + 4595.45 },
+    readings: { peak_low: 12566, standard_low: 31424, offpeak_low: 14758, reactive_energy: 13441,
+      network_surcharge: { reading: 58748, comment: 'Total metered kWh' },
+      demand_charge: { reading: 175.600, comment: 'Demand=175.600' }, water: 3371, sewer: 3371 } },
 ];
 
 function main(dbFile = 'autozone.db') {

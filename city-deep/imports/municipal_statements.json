@@ -3010,5 +3010,255 @@
    "incl_vat": 10225.42,
    "note": "2x 'Surcharge on business services, excluding property rates' lines."
   }
+ },
+ {
+  "file": "COJ_2026-10-05_559304053.pdf",
+  "account": "559304053",
+  "statement_date": "2026/10/05",
+  "statement_for": "September 2026",
+  "invoice_number": "600002805748",
+  "due_date": "2026/10/20",
+  "address": "41 FORTUNE STREET",
+  "market_value": 85037000.0,
+  "grand_total_incl_vat": 1410908.05,
+  "property_rates": {
+   "excl_vat": 175183.31,
+   "vat": 0.0,
+   "incl_vat": 175183.31
+  },
+  "electricity": {
+   "consumption_kwh": 87367.0,
+   "consumption_kvarh": 130992.2,
+   "tariff_type": "TOU",
+   "lines": {
+    "off_peak": 66705.85,
+    "off_peak_qty": 35796.0,
+    "peak": 56321.02,
+    "peak_qty": 17491.0,
+    "standard": 82616.74,
+    "standard_qty": 34080.0,
+    "surcharge_tou": 0.0,
+    "reactive": 48461.72,
+    "reactive_qty": 104782.1,
+    "network_surcharge": 5242.02,
+    "demand": 271081.97,
+    "demand_qty": 628.8,
+    "service": 12708.47
+   },
+   "excl_vat": 543137.79,
+   "vat": 81470.67,
+   "incl_vat": 624608.46,
+   "reading_period": [
+    "2026/09/02",
+    "2026/10/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 2823.081,
+   "reading_period": [
+    "2026/07/25",
+    "2026/09/22"
+   ],
+   "water_excl_vat": 218015.04,
+   "sanitation_excl_vat": 42826.61,
+   "vat": 39126.25,
+   "note": "4 water registers, one estimated (232.081 kL billed at the 2026/09 step)."
+  },
+  "refuse": {
+   "excl_vat": 1112.0,
+   "vat": 166.8,
+   "incl_vat": 1278.8
+  },
+  "sundry": {
+   "excl_vat": 15941.64,
+   "vat": 2391.26,
+   "incl_vat": 18332.9
+  }
+ },
+ {
+  "file": "COJ_2026-10-15_559304060.pdf",
+  "account": "559304060",
+  "statement_date": "2026/10/15",
+  "statement_for": "September 2026",
+  "invoice_number": "600002813447",
+  "due_date": "2026/10/30",
+  "address": "40 FORTUNE STREET",
+  "market_value": 84000000.0,
+  "grand_total_incl_vat": 830184.38,
+  "property_rates": {
+   "excl_vat": 173047.0,
+   "vat": 0.0,
+   "incl_vat": 173047.0
+  },
+  "electricity": {
+   "consumption_kwh": 13927.102,
+   "consumption_kvarh": 7640.601,
+   "tariff_type": "TOU",
+   "lines": {
+    "off_peak": 14815.31,
+    "off_peak_qty": 8028.375,
+    "peak": -18415.8,
+    "peak_qty": -2440.274,
+    "standard": 20215.4,
+    "standard_qty": 8339.001,
+    "surcharge_tou": 0.0,
+    "reactive": 0.0,
+    "reactive_qty": 14478.908,
+    "network_surcharge": 835.63,
+    "demand": 228056.83,
+    "demand_qty": 494.4,
+    "service": 4629.64
+   },
+   "excl_vat": 250137.01,
+   "vat": 37520.55,
+   "incl_vat": 287657.56,
+   "reading_period": [
+    "2026/09/02",
+    "2026/10/01"
+   ],
+   "note": "183-day catch-up statement (2026/04/02 to 2026/10/01) that reverses earlier INTERIM-estimated TOU charges and rebills actuals. reading_period is stored as the current cycle so it attaches to September. consumption_kwh is the NET signed kWh (8,028.375 off-peak - 2,440.274 peak + 8,339.001 standard); kvarh is gross. Line qty/cost values are NET of reversals and reconcile to the statement total; network_surcharge is net of a -3,772.73 'Reversal of interim charges'."
+  },
+  "water": {
+   "consumption_kl": 1446.0,
+   "reading_period": [
+    "2026/08/27",
+    "2026/09/22"
+   ],
+   "water_excl_vat": 111663.1,
+   "sanitation_excl_vat": 84822.36,
+   "vat": 29472.82
+  },
+  "refuse": {
+   "excl_vat": 13753.5,
+   "vat": 166.8,
+   "incl_vat": 13920.3
+  },
+  "sundry": {
+   "excl_vat": 8899.19,
+   "vat": 1334.88,
+   "incl_vat": 10234.07
+  }
+ },
+ {
+  "file": "COJ_2026-10-05_559304078.pdf",
+  "account": "559304078",
+  "statement_date": "2026/10/05",
+  "statement_for": "September 2026",
+  "invoice_number": "600002805749",
+  "due_date": "2026/10/20",
+  "address": "160/RE CITY DEEP EXT.7 TS",
+  "market_value": 57630000.0,
+  "grand_total_incl_vat": 1367832.53,
+  "property_rates": {
+   "excl_vat": 118722.6,
+   "vat": 0.0,
+   "incl_vat": 118722.6
+  },
+  "electricity": {
+   "consumption_kwh": 87907.0,
+   "consumption_kvarh": 44189.6,
+   "tariff_type": "TOU",
+   "lines": {
+    "off_peak": 81878.46,
+    "off_peak_qty": 43938.0,
+    "peak": 49523.6,
+    "peak_qty": 15380.0,
+    "standard": 69305.45,
+    "standard_qty": 28589.0,
+    "surcharge_tou": 0.0,
+    "reactive": 8240.59,
+    "reactive_qty": 17817.5,
+    "network_surcharge": 5274.42,
+    "demand": 113381.93,
+    "demand_qty": 263.0,
+    "service": 12708.47
+   },
+   "excl_vat": 340312.92,
+   "vat": 51046.94,
+   "incl_vat": 391359.86,
+   "reading_period": [
+    "2026/09/02",
+    "2026/10/01"
+   ]
+  },
+  "water": {
+   "consumption_kl": 845.0,
+   "reading_period": [
+    "2026/08/27",
+    "2026/09/22"
+   ],
+   "water_excl_vat": 65319.49,
+   "sanitation_excl_vat": 49567.7,
+   "vat": 17233.08
+  },
+  "refuse": {
+   "excl_vat": 1112.0,
+   "vat": 166.8,
+   "incl_vat": 1278.8
+  },
+  "sundry": {
+   "excl_vat": 8990.23,
+   "vat": 1348.53,
+   "incl_vat": 10338.76
+  }
+ },
+ {
+  "file": "COJ_2026-10-05_559304085.pdf",
+  "account": "559304085",
+  "statement_date": "2026/10/05",
+  "statement_for": "September 2026",
+  "invoice_number": "600002805720",
+  "due_date": "2026/10/20",
+  "address": "34A FORTUNE STREET",
+  "market_value": 13970000.0,
+  "grand_total_incl_vat": 331774.15,
+  "property_rates": {
+   "excl_vat": 28779.36,
+   "vat": 0.0,
+   "incl_vat": 28779.36
+  },
+  "electricity": {
+   "consumption_kwh": 16379.694,
+   "consumption_kvarh": 6774.287,
+   "tariff_type": "flat",
+   "lines": {
+    "energy": 47475.4,
+    "energy_qty": 16379.694,
+    "reactive": 860.43,
+    "reactive_qty": 1860.379,
+    "demand": 32285.4,
+    "demand_qty": 70.0,
+    "service": 3860.67,
+    "network_surcharge": 982.78
+   },
+   "excl_vat": 85464.68,
+   "vat": 12819.7,
+   "incl_vat": 98284.38,
+   "reading_period": [
+    "2026/08/29",
+    "2026/09/27"
+   ],
+   "note": "Reads ESTIMATED. Two energy rate tiers (1,637.969 kWh @ 3.3379; 14,741.725 kWh @ 2.8496) blended into one energy line."
+  },
+  "water": {
+   "consumption_kl": 88.0,
+   "reading_period": [
+    "2026/08/27",
+    "2026/09/22"
+   ],
+   "water_excl_vat": 6901.2,
+   "sanitation_excl_vat": 5162.08,
+   "vat": 1809.49
+  },
+  "refuse": {
+   "excl_vat": 876.0,
+   "vat": 131.4,
+   "incl_vat": 1007.4
+  },
+  "sundry": {
+   "excl_vat": 1922.63,
+   "vat": 288.4,
+   "incl_vat": 2211.03
+  }
  }
 ]

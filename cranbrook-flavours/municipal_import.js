@@ -177,6 +177,16 @@ const MONTHS = [
       water: 55, sewer: 55,
       sundry: { reading: 1, comment: 'RF ASS RATES ADJUSTMENT (4,111.09, correction to a prior rates bill) + new "R" meter M-NO:R021410763 (2,351.220 kWh @ R0.3510/kWh = 825.28, see file header note) - both VAT-taxable' },
       deposit: { reading: 1, comment: 'VA TRANSFER BETWEEN ACCOUNTS (399,669.57) - reads as an inter-account ledger transfer, not a utility charge; utility-vs-ledger status still unverified (see file header note), but it prints with no VAT on the statement, unlike the sundry items above, so it\'s recorded on this shape\'s other vat_exempt line instead of blended in with them' } } },
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', waterStartDate: '2026-07-16', waterEndDate: '2026-09-09',
+    rates: { property_rates: 57824.54, fixed_charge: 6195.35,
+      peak_low: 8121.23 / 656.850, standard_low: 10573.44 / 2986.005, offpeak_low: 4613.05 / 2216.745,
+      network_demand: 8773.83 / 54.584, network_access: 9609.28 / 54.584,
+      refuse: 604.33, water: 24093.42 / 442, sewer: 9754.94 / 442,
+      sundry: 724.81 + 7150.59 },
+    readings: { network_demand: { reading: 54.584, comment: 'Demand=54.584' }, network_access: { reading: 54.584, comment: 'Demand=54.584' },
+      peak_low: 656.850, standard_low: 2986.005, offpeak_low: 2216.745,
+      water: 442, sewer: 442,
+      sundry: { reading: 1, comment: 'R meter 2,064.972 kWh @ R0.3510 = 724.81, plus net ELEC ADJUSTMENT +7,150.59 (+10,274.40 / -3,123.81) re-billing July peak at the new high-season rate' } } },
 ];
 
 function main(dbFile = 'cranbrook-flavours.db') {

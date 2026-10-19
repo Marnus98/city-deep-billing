@@ -32,6 +32,19 @@ const MONTHS = [
       sewer: 308.98 / 14,
     },
     readings: { energy_charge: 2366.850, water: 14, sewer: 14 } },
+  // Aug 2026: new account 1712639751. Water/sewer (11 kL) INFERRED from the statement total - PDF page 2 was missing; verify against the original.
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01',
+    rates: {
+      property_rates: 11889.15,
+      capacity_charge: 8391.00,
+      fixed_charge: 36.95,
+      energy_charge: 6910.85 / 2062.940,
+      refuse_business: 604.33,
+      refuse_litter: 426.86,
+      water: 599.61 / 11,
+      sewer: 242.77 / 11,
+    },
+    readings: { energy_charge: 2062.940, water: { reading: 11, comment: 'Inferred from statement total (page 2 of PDF missing)' }, sewer: { reading: 11, comment: 'Inferred from statement total (page 2 of PDF missing)' } } },
 ];
 
 function main(dbFile = 'interoll.db') {

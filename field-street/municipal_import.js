@@ -169,6 +169,15 @@ const MONTHS = [
       water: { reading: -28, comment: 'NET of a true 165kL reading (meter read window 2026-06-15 to 2026-07-16) less a 193kL INTERIM REVERSAL credit correcting a prior over-estimate - a genuine net-negative (credit) month, not an error - see file header note' },
       sewer: { reading: -28, comment: 'NET of the same -28kL position as water above (165kL true less 193kL reversal) - see file header note' },
       sundry: { reading: 1, comment: 'New "R" meter M-NO:R017048114, 15.696 kWh @ R0.3510/kWh - see file header note' } } },
+  { label: '2026-08', startDate: '2026-08-01', endDate: '2026-09-01', waterStartDate: '2026-07-16', waterEndDate: '2026-09-10',
+    rates: { property_rates: 21686.33, fixed_charge: 6195.35,
+      offpeak_low: 320785.32 / 154149.6, standard_low: 375952.23 / 106171.203, peak_low: 599416.71 / 48481.2,
+      network_demand: 101629.15 / 632.258, network_access: 62836.80 / 632.258,
+      refuse: 604.33, water: 20332.23 / 373, sewer: 8232.11 / 373, sundry: 472761.17 },
+    readings: { network_demand: { reading: 632.258, comment: 'Demand=632.258' }, network_access: { reading: 632.258, comment: 'Demand=632.258' },
+      offpeak_low: 154149.6, standard_low: 106171.203, peak_low: 48481.2,
+      water: 373, sewer: 373,
+      sundry: { reading: 1, comment: 'R meter 18.768 kWh @ R0.3510 = 6.59, plus net ELEC ADJUSTMENT +472,754.58 (679,282.54 less 206,527.96) re-billing July peak at the new high-season rate' } } },
 ];
 
 function main(dbFile = 'field-street.db') {
