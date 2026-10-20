@@ -115,11 +115,16 @@
     if (!recommended) { recommended = runOptimiser(a, c); if (resetSizes !== false) setSizesFromRecommendation(); }
     const kwp = num('i_kwp'), kwh = num('i_kwh'), pkw = num('i_pkw');
     const base = M.baseline(c);
-    const A = M.evaluate(c, a, 'A', kwp, 0, 0);
-    const B = M.evaluate(c, a, 'B', kwp, kwh, pkw);
-    const C = M.evaluate(c, a, 'C', kwp, kwh, pkw);
+    // PV-only column: the typed size when 'PV only' is selected, otherwise the PV-only optimum (not the larger hybrid array)
+    const kwpA = $('i_scen').value === 'A' ? kwp : recommended.pvBest.kwp;
+    const A = M.evaluate(c, a, 'A', kwpA, 0, 0);
+    // when 'PV only' is selected the hybrid columns still show the recommended hybrid system
+    const rbH = recommended.batBest, useRec = $('i_scen').value === 'A' && rbH;
+    const hk = useRec ? rbH.kwp : kwp, he = useRec ? rbH.kwh : kwh, hp = useRec ? Math.round(rbH.pkw) : pkw;
+    const B = M.evaluate(c, a, 'B', hk, he, hp);
+    const C = M.evaluate(c, a, 'C', hk, he, hp);
     const scen = $('i_scen').value; const S = scen === 'B' ? B : scen === 'C' ? C : A;
-    const hasBat = kwh > 0 && pkw > 0;
+    const hasBat = $('i_scen').value !== 'A' && kwh > 0 && pkw > 0;
 
     const per = base.per; const cost = base.costPer;
     const peakDay = (function () { let hi = 0, lo = 0, dh = 0, dl = 0; const cal = M.CAL; const ld = c.load; const seen = {}; for (let i = 0; i < cal.n; i++) { if (cal.per[i] === 'p') { const hiS = !!M.HIGH[cal.month[i]]; const k = cal.month[i] + '-' + Math.floor(i / 24); if (hiS) { hi += ld[i]; } else { lo += ld[i]; } seen[k] = hiS; } } Object.keys(seen).forEach((k) => { if (seen[k]) dh++; else dl++; }); return { hi: dh ? hi / dh : 0, lo: dl ? lo / dl : 0 }; })();
@@ -239,7 +244,8 @@
     // everything re-computes; assumption changes also re-run the optimiser
     document.querySelectorAll('#ss-root input, #ss-root select').forEach((el) => {
       el.addEventListener('input', () => {
-        if (sizeIds.indexOf(el.id) >= 0) { recalc(false); } else { recommended = null; recalc(true); }
+        if (el.id === 'i_scen' && recommended) { const sc = $('i_scen').value; if (sc === 'A') { $('i_kwp').value = recommended.pvBest.kwp; } else if (recommended.batBest) { $('i_kwp').value = recommended.batBest.kwp; $('i_kwh').value = recommended.batBest.kwh; $('i_pkw').value = Math.round(recommended.batBest.pkw); } recalc(false); }
+        else if (sizeIds.indexOf(el.id) >= 0) { recalc(false); } else { recommended = null; recalc(true); }
       });
     });
     $('ss-reset').addEventListener('click', () => { recommended = null; recalc(true); });
