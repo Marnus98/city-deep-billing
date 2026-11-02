@@ -623,7 +623,7 @@ function seedMonth(monthData) {
   console.log(`Seeded ${count} tenants for period ${monthData.label} (${billingPeriod.start_date} - ${billingPeriod.end_date})`);
 }
 
-// All 14 imported months, July 2025 - August 2026. Order here doesn't matter for correctness -
+// All 16 imported months, July 2025 - October 2026. Order here doesn't matter for correctness -
 // seedMonth() is re-sorted by each workbook's own period.start date below - because the file
 // named "July 2025" turns out to carry an internal period of 30 May - 25 June 2025 (about a month
 // behind its filename), which leaves a real, unexplained gap between it and the August 2025
@@ -633,7 +633,7 @@ const MONTH_FILES = [
   'july2025.json', 'august2025.json', 'september2025.json', 'october2025.json',
   'november2025.json', 'december2025.json', 'january2026.json', 'february2026.json',
   'march.json', 'april.json', 'may2026.json', 'june2026.json', 'july2026.json',
-  'august2026.json', 'september2026.json',
+  'august2026.json', 'september2026.json', 'october2026.json',
 ];
 
 // `dbFile` picks which property database this seeds (see properties.js) - defaults to City

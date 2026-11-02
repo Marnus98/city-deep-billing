@@ -53,14 +53,19 @@ function calcElectricityMeterLine({
     networkSurcharge = t.surchargePct * Q * L;
   } else {
     const t = tariff2;
-    serviceCharge = t.serviceCharge * K * L;
+    // Tariff code 3 (first seen Oct 2026, Unit 4 Twinpouch's 2nd meter 240957643E): the client's
+    // workbook prices it on the same step-energy tariff as code 2 but with the Service and Capacity
+    // cells left blank and no Network Levy - the 2% surcharges still apply to the energy. Without
+    // this the app added R1,744.17 of fixed charges the client's own Electrical Billing sheet omits.
+    const noFixed = tariffCode === 3;
+    serviceCharge = noFixed ? 0 : t.serviceCharge * K * L;
     // A handful of tenants carry a fixed capacity charge that doesn't match the standard tariff
     // rate in *any* month, even as the standard rate itself changes - e.g. Unit 4 ATC SA Wireless
     // Infrastructure is charged a flat R661.90/month every single month from July 2025 through
     // June 2026, confirmed against 12 consecutive workbooks. That's a genuine per-tenant
     // negotiated/grandfathered rate baked into the source data, not noise - captured at import
     // time (see seed.js) and applied here instead of the standard rate when present.
-    capacityCharge = (capacityChargeOverride != null ? capacityChargeOverride : t.capacityCharge) * K * L;
+    capacityCharge = noFixed ? 0 : (capacityChargeOverride != null ? capacityChargeOverride : t.capacityCharge) * K * L;
     energyCharge = stepEnergyCharge(Q, t.blocks) * L;
     networkSurcharge = t.surchargePct * Q * L;
   }
