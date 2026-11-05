@@ -75,6 +75,24 @@ function seedTariffsAndPeriod(monthData) {
   const tariff = calc.buildWingfieldTariffParams(tariff_raw);
 
   let bp = get('SELECT * FROM billing_periods WHERE label = ?', [label]);
+  // 'adopt_manual_period' (set in the JSON): the client has already created this month's billing
+  // period by hand on the platform (Billing Periods > New) under whatever label they typed. Rather
+  // than leaving that empty/partial period behind next to a second, seeded one, take it over: the
+  // file's label and dates win. Only periods whose label isn't one of the file labels, and whose
+  // start date sits within 20 days of this file's start, are eligible.
+  if (monthData.adopt_manual_period) {
+    const fileLabels = MONTH_FILES.map((f) => f.replace(/^wingfield_|\.json$/g, ''));
+    const lo = new Date(Date.parse(period.start) - 20 * 86400000).toISOString().slice(0, 10);
+    const hi = new Date(Date.parse(period.start) + 20 * 86400000).toISOString().slice(0, 10);
+    const manual = all('SELECT * FROM billing_periods WHERE start_date BETWEEN ? AND ?', [lo, hi])
+      .filter((p) => !fileLabels.includes(p.label) || p.label === label);
+    if (manual.length) {
+      const keep = (bp && manual.find((p) => p.id === bp.id)) || manual[0];
+      run('UPDATE billing_periods SET label=?, start_date=?, end_date=?, invoice_date=?, due_date=? WHERE id=?',
+        [label, period.start, period.end, period.end, period.end, keep.id]);
+      bp = get('SELECT * FROM billing_periods WHERE id = ?', [keep.id]);
+    }
+  }
   if (!bp) {
     run('INSERT INTO billing_periods (label, start_date, end_date, invoice_date, due_date) VALUES (?,?,?,?,?)',
       [label, period.start, period.end, period.end, period.end]);
@@ -291,6 +309,18 @@ function seedMonth(monthData) {
     count++;
   }
   seedBulkMeters(monthData, billingPeriod);
+  // One-off tidy-up for an adopted manual period (see seedTariffsAndPeriod): the client had started
+  // capturing other tenants' readings on the platform before their data was ready. Those partial
+  // bills/manual readings are cleared ONCE (marker in billing_periods.notes) so only the tenants in
+  // this file remain; after that, anything entered on the platform is left alone.
+  if (monthData.adopt_manual_period && billingPeriod.notes !== 'adopted-manual-period-cleaned') {
+    const keepIds = [...allNames].filter((n) => !EXCLUDED_TENANT_NAMES.has(n)).map((n) => getOrCreateTenant(n).id);
+    const ph = keepIds.map(() => '?').join(',') || 'NULL';
+    run(`DELETE FROM bill_line_items WHERE bill_id IN (SELECT id FROM bills WHERE billing_period_id=? AND tenant_id NOT IN (${ph}))`, [billingPeriod.id, ...keepIds]);
+    run(`DELETE FROM bills WHERE billing_period_id=? AND tenant_id NOT IN (${ph})`, [billingPeriod.id, ...keepIds]);
+    run("DELETE FROM meter_readings WHERE billing_period_id=? AND source='manual'", [billingPeriod.id]);
+    run('UPDATE billing_periods SET notes=? WHERE id=?', ['adopted-manual-period-cleaned', billingPeriod.id]);
+  }
   console.log(`Seeded ${count} tenants for period ${monthData.label} (${billingPeriod.start_date} - ${billingPeriod.end_date})`);
 }
 
@@ -310,6 +340,7 @@ const MONTH_FILES = [
   'wingfield_2025-10.json', 'wingfield_2025-11.json', 'wingfield_2025-12.json', 'wingfield_2026-01.json',
   'wingfield_2026-02.json', 'wingfield_2026-03.json', 'wingfield_2026-04.json', 'wingfield_2026-05.json',
   'wingfield_2026-06.json', 'wingfield_2026-07.json', 'wingfield_2026-08.json', 'wingfield_2026-09.json',
+  'wingfield_2026-10.json',
 ];
 
 // ---------- Ptyprops 348 / Komatsu Offices cross-mirroring ----------
