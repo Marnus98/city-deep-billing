@@ -82,6 +82,14 @@ const INVOICES = [
       north: { amount: 175215.99, productionKwh: 78521.64, exportKwh: 8211.00 },
       mini: { amount: 84741.35, productionKwh: 38544.96, exportKwh: 4407.18 },
     } },
+  // INV2863 (Oct 2026, dated 2026-11-06) - Total Excl R559,993.29 = 206,219.97 + 248,442.96 + 105,330.36;
+  // each sub-site's Report Data workbook "Total Due" matches its invoice line to the cent.
+  { invoiceNumber: 'INV2863', invoiceDate: '2026-11-06', periodLabel: '2026-10', startDate: '2026-10-01', endDate: '2026-10-31',
+    lines: {
+      south: { amount: 206219.97, productionKwh: 97389.75, exportKwh: 16382.325 },
+      north: { amount: 248442.96, productionKwh: 107608.67, exportKwh: 8263.33 },
+      mini: { amount: 105330.36, productionKwh: 45417.47, exportKwh: 3925.63 },
+    } },
 ];
 
 // sub_site is one of 'south'/'north'/'mini' (short internal key, not the full "City Deep South"
