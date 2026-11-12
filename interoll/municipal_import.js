@@ -45,6 +45,23 @@ const MONTHS = [
       sewer: 242.77 / 11,
     },
     readings: { energy_charge: 2062.940, water: { reading: 11, comment: 'Inferred from statement total (page 2 of PDF missing)' }, sewer: { reading: 11, comment: 'Inferred from statement total (page 2 of PDF missing)' } } },
+  // Sep 2026 (statement 2026/10/29, reading dates 26/09/01-26/10/01). Reconciles to the cent against
+  // TOTAL CURRENT LEVY 42846.67 incl VAT (= 40121.59 excl). Water/sewer: 23 kL billed less INTERIM
+  // REVERSAL 11 kL (the Aug interim estimate) -> net 12 kL, net R654.12 / R264.84 stored.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-08-06', waterEndDate: '2026-10-02',
+    rates: {
+      property_rates: 21954.37,
+      capacity_charge: 8391.00,
+      fixed_charge: 36.95,
+      energy_charge: 7789.12 / 1841.400,
+      refuse_business: 604.33,
+      refuse_litter: 426.86,
+      water: (1253.73 - 599.61) / 12,
+      sewer: (507.61 - 242.77) / 12,
+    },
+    readings: { energy_charge: 1841.400,
+      water: { reading: 12, comment: '23 kL billed less 11 kL interim reversal (net)' },
+      sewer: { reading: 12, comment: '23 kL billed less interim reversal (net 12 kL)' } } },
 ];
 
 function main(dbFile = 'interoll.db') {

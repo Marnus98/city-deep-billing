@@ -187,6 +187,17 @@ const MONTHS = [
       peak_low: 656.850, standard_low: 2986.005, offpeak_low: 2216.745,
       water: 442, sewer: 442,
       sundry: { reading: 1, comment: 'R meter 2,064.972 kWh @ R0.3510 = 724.81, plus net ELEC ADJUSTMENT +7,150.59 (+10,274.40 / -3,123.81) re-billing July peak at the new high-season rate' } } },
+  // September 2026 consumption - statement dated 2026-10-31 (electricity reading dates 2026-09-01 to 2026-10-01, water 2026-09-09 to 2026-10-07).
+  // Meter lines classified by implied rate (peak 3.7591 / standard 2.4678 / offpeak 1.8519, low season). The "R" register printed 0.000 kWh this cycle so no sundry line.
+  // Reconciles to the cent: R123,580.25 excl VAT / R133,443.61 incl VAT.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-09-09', waterEndDate: '2026-10-07',
+    rates: { property_rates: 57824.54, fixed_charge: 6195.35,
+      peak_low: 3322.29 / 883.800, standard_low: 8633.85 / 3498.600, offpeak_low: 3894.55 / 2103.000,
+      network_demand: 11594.18 / 72.130, network_access: 9609.28 / 72.130,
+      refuse: 604.33, water: 15589.86 / 286, sewer: 6312.02 / 286 },
+    readings: { network_demand: { reading: 72.130, comment: 'Demand=72.130' }, network_access: { reading: 72.130, comment: 'Demand=72.130' },
+      peak_low: 883.800, standard_low: 3498.600, offpeak_low: 2103.000,
+      water: 286, sewer: 286 } },
 ];
 
 function main(dbFile = 'cranbrook-flavours.db') {

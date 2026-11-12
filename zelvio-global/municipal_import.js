@@ -86,6 +86,33 @@ const MONTHS = [
       sewer: { reading: 20, comment: '17 kL + 3 kL, blended' },
       sewer_interim: 0,
     } },
+  // Sep 2026 (statement 2026/10/29, reading dates 26/09/01-26/10/01): current levy excl VAT 39499.62
+  // (statement total 143161.41 also carries R103,661.78 arrears). 50/50 split, full readings kept.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01',
+    rates: {
+      property_rates: 26072.33 / 2,
+      fixed_charge: 3345.78 / 2,
+      peak: (1223.93 / 2) / 315.300,
+      standard: (1866.08 / 2) / 730.740,
+      offpeak: (610.08 / 2) / 313.020,
+      reactive: 0,
+      demand: (1006.63 / 2) / 8.723,
+      network_access: 2885.00 / 2,
+      refuse_business: 604.33 / 2,
+      refuse_litter: 507.02 / 2,
+      water: (981.18 / 2) / 18,
+      water_interim: 0,
+      sewer: (397.26 / 2) / 18,
+      sewer_interim: 0,
+    },
+    readings: {
+      peak: 315.300, standard: 730.740, offpeak: 313.020, reactive: 0,
+      demand: { reading: 8.723, comment: 'Demand=8.723 (full building reading - see file header note on the 50/50 split)' },
+      water: { reading: 18, comment: '12 kL + 6 kL (two meters), blended' },
+      water_interim: 0,
+      sewer: { reading: 18, comment: '12 kL + 6 kL, blended' },
+      sewer_interim: 0,
+    } },
 ];
 
 function main(dbFile = 'zelvio-global.db') {

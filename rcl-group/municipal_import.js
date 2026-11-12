@@ -45,6 +45,24 @@ const MONTHS = [
       sewer: 308.98 / 14,
     },
     readings: { energy_charge: 5236.080, water: { reading: 14, comment: 'INTERIM estimate, no reading dates' }, sewer: { reading: 14, comment: 'INTERIM estimate, no reading dates' } } },
+  // Sep 2026 (account 1712639777, statement 2026/10/29, reading dates 26/09/01-26/10/01). The R33,275.55
+  // "SUPP 2 FILE 6" journal (14 Oct, supplementary property-rates) is excluded like other carry-forward
+  // items. Water/sewer: 29 kL billed less 14 kL interim reversal -> net 15 kL (R817.65 / R331.05).
+  // Remaining lines reconcile to the cent: TOTAL CURRENT LEVY 92680.08 incl VAT less the supp journal.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-08-06', waterEndDate: '2026-10-05',
+    rates: {
+      property_rates: 16886.10,
+      capacity_charge: 12586.50,
+      fixed_charge: 36.95,
+      energy_charge: 22304.20 / 5272.800,
+      refuse_business: 604.33,
+      refuse_litter: 291.87,
+      water: (1580.79 - 763.14) / 15,
+      sewer: (640.03 - 308.98) / 15,
+    },
+    readings: { energy_charge: 5272.800,
+      water: { reading: 15, comment: '29 kL billed less 14 kL interim reversal (net)' },
+      sewer: { reading: 15, comment: '29 kL billed less interim reversal (net 15 kL)' } } },
 ];
 
 function main(dbFile = 'rcl-group.db') {

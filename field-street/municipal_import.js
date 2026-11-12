@@ -178,6 +178,16 @@ const MONTHS = [
       offpeak_low: 154149.6, standard_low: 106171.203, peak_low: 48481.2,
       water: 373, sewer: 373,
       sundry: { reading: 1, comment: 'R meter 18.768 kWh @ R0.3510 = 6.59, plus net ELEC ADJUSTMENT +472,754.58 (679,282.54 less 206,527.96) re-billing July peak at the new high-season rate' } } },
+  // September 2026 consumption - statement dated 2026-10-31 (electricity reading dates 2026-09-01 to 2026-10-01, water 2026-09-10 to 2026-10-09).
+  // Reconciles to the cent: Total charge excl VAT R953,233.35 / incl VAT R1,092,965.40. The R sundry meter read 0.000 kWh this cycle so no sundry line.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-09-10', waterEndDate: '2026-10-09',
+    rates: { property_rates: 21686.33, fixed_charge: 6195.35,
+      offpeak_low: 283961.43 / 153335.184, standard_low: 277098.84 / 112285.776, peak_low: 178777.68 / 47558.64,
+      network_demand: 100400.45 / 624.614, network_access: 62836.80 / 624.614,
+      refuse: 604.33, water: 15426.33 / 283, sewer: 6245.81 / 283 },
+    readings: { network_demand: { reading: 624.614, comment: 'Demand=624.614' }, network_access: { reading: 624.614, comment: 'Demand=624.614' },
+      offpeak_low: 153335.184, standard_low: 112285.776, peak_low: 47558.64,
+      water: 283, sewer: 283 } },
 ];
 
 function main(dbFile = 'field-street.db') {

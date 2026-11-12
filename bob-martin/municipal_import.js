@@ -179,6 +179,17 @@ const MONTHS = [
     readings: { network_demand: { reading: 488.640, comment: 'Demand=488.640 (printed NETWORK ACCESS CHARGE line, 73,062.04)' }, network_access: { reading: 488.640, comment: 'Demand=488.640 (56,389.06 line)' },
       standard_low: 55681.44, offpeak_low: 37783.68, peak_low: 23116.8,
       water: 100, sewer: 100 } },
+  // September 2026 consumption - statement dated 2026-10-29 (electricity reading dates 2026-09-01 to 2026-10-01, water 2026-09-02 to 2026-10-05).
+  // Meter lines classified by meter number (P/S/O) and cross-checked by implied rate. Network lines follow the Aug 2026 convention
+  // (the R73,062.04 line -> network_demand, the 459.840 kVA R53,065.54 line -> network_access). Reconciles to the cent: R436,202.06 excl VAT / R498,511.37 incl VAT.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-09-02', waterEndDate: '2026-10-05',
+    rates: { property_rates: 20806.70, fixed_charge: 3345.78,
+      standard_low: 128534.26 / 50332.56, offpeak_low: 64693.08 / 33192.96, peak_low: 82007.84 / 21126.24,
+      network_demand: 73062.04 / 459.840, network_access: 53065.54 / 459.840,
+      refuse_business: 604.33, refuse_litter: 1199.21, water: 6323.16 / 116, sewer: 2560.12 / 116 },
+    readings: { network_demand: { reading: 459.840, comment: 'Demand=459.840 (printed NETWORK ACCESS CHARGE line, 73,062.04)' }, network_access: { reading: 459.840, comment: 'Demand=459.840 (53,065.54 line)' },
+      standard_low: 50332.56, offpeak_low: 33192.96, peak_low: 21126.24,
+      water: 116, sewer: 116 } },
 ];
 
 function main(dbFile = 'bob-martin.db') {

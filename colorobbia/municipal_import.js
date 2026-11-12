@@ -52,6 +52,20 @@ const MONTHS = [
       sewer: 331.05 / 15,
     },
     readings: { energy_charge: 2165.850, water: 15, sewer: 15 } },
+  // Sep 2026 (statement 2026/10/29, reading dates 26/09/01-26/10/01). The R34,795.60 "SUPP 2 FILE 6"
+  // journal (14 Oct, supplementary property-rates) is excluded; the remaining lines reconcile to the cent.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-09-01', waterEndDate: '2026-10-05',
+    rates: {
+      property_rates: 17397.80,
+      capacity_charge: 12586.50,
+      fixed_charge: 36.95,
+      energy_charge: 9223.09 / 2180.400,
+      refuse_business: 604.33,
+      refuse_litter: 432.37,
+      water: 1144.71 / 21,
+      sewer: 463.47 / 21,
+    },
+    readings: { energy_charge: 2180.400, water: 21, sewer: 21 } },
 ];
 
 function main(dbFile = 'colorobbia.db') {

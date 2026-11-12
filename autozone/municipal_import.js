@@ -243,6 +243,16 @@ const MONTHS = [
     readings: { peak_low: 12566, standard_low: 31424, offpeak_low: 14758, reactive_energy: 13441,
       network_surcharge: { reading: 58748, comment: 'Total metered kWh' },
       demand_charge: { reading: 175.600, comment: 'Demand=175.600' }, water: 3371, sewer: 3371 } },
+  // October 2026 consumption - COJ statement dated 2026/11/03 (electricity reading period 2026/10/02 to 2026/11/01, water 2026/09/29 to 2026/10/22).
+  // Reconciles to the cent: Current Charges excl VAT R633,699.35 / incl VAT R711,094.19. Reactive (kVArh) register was an ESTIMATED reading this cycle.
+  { label: '2026-10', startDate: '2026-10-01', endDate: '2026-11-01', waterStartDate: '2026-09-29', waterEndDate: '2026-10-22',
+    rates: { property_rates: 117733.76, peak_high: 0, peak_low: 38875.06/12073, standard_high: 0, standard_low: 73065.39/30140,
+      offpeak_high: 0, offpeak_low: 25461.00/13663, surcharge_tou: 0, reactive_energy: 0, network_surcharge: 3352.56/55876,
+      demand_charge: 75797.53/164.320, service_charge: 4629.64, water: 161107.14/2082, demand_management_levy: 413.84,
+      sewer: 122130.12/2082, refuse: 1112.00, sundry_surcharge: 5664.74 + 4356.57 },
+    readings: { peak_low: 12073, standard_low: 30140, offpeak_low: 13663, reactive_energy: 14150.945,
+      network_surcharge: { reading: 55876, comment: 'Total metered kWh' },
+      demand_charge: { reading: 164.320, comment: 'Demand=164.320' }, water: 2082, sewer: 2082 } },
 ];
 
 function main(dbFile = 'autozone.db') {

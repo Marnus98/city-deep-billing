@@ -144,6 +144,19 @@ const MONTHS = [
       demand_charge: { reading: 29.877, comment: 'Demand=29.877' }, network_access: { reading: 29.877, comment: 'Demand=29.877' },
       water: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' },
       sewer: { reading: 37, comment: 'INTERIM estimate, not an actual meter read this cycle - no water reading dates printed' } } },
+  // September 2026 consumption - statement dated 2026-10-29 (electricity reading dates 2026-09-01 to 2026-10-01).
+  // WATER/SEWER ARE NET FIGURES: the meter was read for the first time since 2026-05-04 (152 kl, 2026-05-04 to 2026-10-02) and the statement
+  // reverses the earlier INTERIM estimates (148 kl: water -R7,687.86, sewer -R3,032.52), leaving a true net 4 kl (water R282.33 / sewer R137.60).
+  // The statement's "SUPP 2 FILE 6" R445,500.00 line (net of the cancelled/re-raised SUPP 2 FILE 3 pair) is a supplementary PROPERTY RATES journal -
+  // not utility charges - and is left out, as property rates are for every Loper Road month. Current charges excl VAT R503,530.20 reconcile to the cent
+  // once that R445,500.00 and the R30,458.33 property rates are added back.
+  { label: '2026-09', startDate: '2026-09-01', endDate: '2026-10-01', waterStartDate: '2026-05-04', waterEndDate: '2026-10-02',
+    rates: { fixed_charge: 4338.39, energy_charge: 11325.35 / 4585.16, demand_charge: 7871.91 / 24.488,
+      network_access: 2999.28 / 24.488, refuse_litter: 617.01, refuse_levy: 0, water: 282.33 / 4, sewer: 137.60 / 4 },
+    readings: { energy_charge: 4585.16,
+      demand_charge: { reading: 24.488, comment: 'Demand=24.488' }, network_access: { reading: 24.488, comment: 'Demand=24.488' },
+      water: { reading: 4, comment: 'NET of a true 152 kl read (2026-05-04 to 2026-10-02) less a 148 kl INTERIM REVERSAL of earlier estimates (4 x 37 kl) - see entry note' },
+      sewer: { reading: 4, comment: 'NET of a true 152 kl read less a 148 kl INTERIM REVERSAL - see entry note' } } },
 ];
 
 function main(dbFile = 'loper-road.db') {
