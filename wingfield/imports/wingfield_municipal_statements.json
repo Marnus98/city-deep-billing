@@ -951,5 +951,67 @@
    "note": "'R' meter, 16,360.08 notional kWh at R0.3510/kWh (see July entry)."
   },
   "grand_total_incl_vat": 1224744.05
+ },
+ {
+  "file": "WINGFIELD MUNICIPAL ACCOUNT.pdf",
+  "account": "2210755502",
+  "address": "0 Jones St, Witkoppie 64-IR",
+  "market_value": 192150000.0,
+  "statement_date": "2026-10-28",
+  "statement_for": "2026-09",
+  "due_date": "2026-11-25",
+  "invoice_number": "2210755502-2026-10-28",
+  "property_rates": {
+   "excl_vat": 374692.5,
+   "vat": 0.0,
+   "incl_vat": 374692.5
+  },
+  "electricity": {
+   "reading_period": [
+    "2026-09-01",
+    "2026-10-01"
+   ],
+   "consumption_kwh": 114484.0,
+   "consumption_kvarh": 0,
+   "tariff_type": "TOU",
+   "lines": {
+    "off_peak_qty": 38844.0,
+    "off_peak": 71935.2,
+    "standard_qty": 55468.0,
+    "standard": 136883.93,
+    "peak_qty": 20172.0,
+    "peak": 75828.57,
+    "demand_qty": 360.311,
+    "demand": 57916.39,
+    "service": 6195.35,
+    "network_surcharge": 39631.64
+   },
+   "excl_vat": 388391.08,
+   "vat": 58258.67,
+   "incl_vat": 446649.75,
+   "note": "Scanned statement (4 of 5 pages supplied - page 5 missing). Meter M-NO letters read off the scan: R = off-peak (38,844 kWh), O = peak (20,172 kWh), P = standard (55,468 kWh), classified by implied rate (R1.852 / R3.759 / R2.468). The 'S' meter row at the foot of page 2 has no figures on the pages supplied; the statement total reconciles to the cent with S = R0.00, so it is treated as nil. No 'R' meter notional sundry line this cycle."
+  },
+  "water": {
+   "reading_period": [
+    "2026-09-15",
+    "2026-10-13"
+   ],
+   "consumption_kl": 714.0,
+   "water_excl_vat": 38920.14,
+   "sanitation_excl_vat": 15757.98,
+   "vat": 8201.72,
+   "note": "Meters 60351776 (94 kL) + 100087357 (620 kL), actual reads 26/09/15 - 26/10/13."
+  },
+  "refuse": {
+   "excl_vat": 8356.57,
+   "vat": 1253.49,
+   "incl_vat": 9610.06
+  },
+  "sundry": {
+   "excl_vat": 0.0,
+   "vat": 0.0,
+   "incl_vat": 0.0
+  },
+  "grand_total_incl_vat": 2118576.0
  }
 ]
